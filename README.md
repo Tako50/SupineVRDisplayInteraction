@@ -52,6 +52,7 @@ Useful development controls:
 - `Tab`: switch between `RaycastBaseline` and `ExplicitDisplayFocus`
 - `G`: grip fallback for focus confirmation
 - `Left Shift`: trigger fallback for ExplicitDisplayFocus scrolling
+- `R`: clear the focused display
 - right stick vertical, or `W` / `S`: scroll the currently ray-hit display in `RaycastBaseline`
 
 ## Phase 2 RaycastBaseline
@@ -80,6 +81,26 @@ Useful development controls:
 - moving gaze to another display after focus is locked does not redirect click or scroll input
 
 The debug overlay shows the current condition, focus state, focused display, and gaze candidate ids. Candidate and focus visuals are intentionally simple: candidate displays are highlighted, overlapping gaze candidates make the nearest display semi-transparent, and the focused display is highlighted.
+
+## Phase 3.5 Editor Validation
+
+`Dev_Prototype` includes editor-only validation helpers for testing `ExplicitDisplayFocus` without Quest hardware:
+
+- `EditorDebugInputProvider` keeps keyboard input separate from the real XR input path.
+- `GazeProvider` has `DebugCameraForward` for driving the same gaze candidate path from the Main Camera in Play Mode.
+- The debug overlay shows condition, gaze source, focus state, focused display, gaze candidates, cursor position, layout, debug input state, last click result, and last scroll amount.
+- `FocusManager` exposes safe debug utilities: `ClearFocus`, `ForceRefocusFromCurrentGazeCandidate`, `GetFocusedDisplayId`, `GetCurrentCandidateIds`, and `GetFocusState`.
+
+For editor validation:
+
+1. Open `Assets/Scenes/Dev_Prototype.unity`.
+2. Press Play.
+3. Use `Tab` to switch to `ExplicitDisplayFocus`.
+4. Aim the Game view / Main Camera at a display.
+5. Press `G` to confirm focus and warp the cursor.
+6. Use `WASD` or arrow keys to move the focused cursor.
+7. Press `Space` to click.
+8. Hold `Left Shift` and press `W` / `S` to scroll the focused display.
 
 `GazeProvider` supports `HmdForward` for development only and an `EyeTracking` placeholder source for a later Meta Quest Pro eye-tracking adapter. HMD forward should not be used for experiments.
 

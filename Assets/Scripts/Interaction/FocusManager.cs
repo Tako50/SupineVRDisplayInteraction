@@ -50,10 +50,16 @@ public class FocusManager : MonoBehaviour
             return;
         }
 
+        if (inputManager.ResetFocusPressed)
+        {
+            ClearFocus();
+        }
+
         UpdateCandidates();
 
         if (inputManager.GripPressed)
         {
+            Debug.Log($"[FocusManager] grip received candidates={CurrentCandidateIds}");
             ConfirmFocusFromCurrentCandidate();
         }
     }
@@ -169,6 +175,46 @@ public class FocusManager : MonoBehaviour
         {
             Debug.Log($"[FocusManager] condition={inputManager.CurrentCondition}, focusedDisplay={selected.DisplayId}, normalized={Format(selected.Normalized)}, candidates={CurrentCandidateIds}");
         }
+    }
+
+    public void ClearFocus()
+    {
+        if (displayManager == null)
+        {
+            return;
+        }
+
+        displayManager.SetFocusedDisplay(null);
+        displayManager.HideAllCursors();
+        displayManager.ApplyFocusVisuals(currentCandidates);
+        CurrentState = currentCandidates.Length == 0
+            ? FocusState.NoCandidate
+            : currentCandidates.Length == 1
+                ? FocusState.GazeOnSingleDisplay
+                : FocusState.GazeOnMultipleDisplays;
+
+        Debug.Log("[FocusManager] focus cleared");
+    }
+
+    public void ForceRefocusFromCurrentGazeCandidate()
+    {
+        ConfirmFocusFromCurrentCandidate();
+    }
+
+    public string GetFocusedDisplayId()
+    {
+        DisplaySurface focused = displayManager != null ? displayManager.FocusedDisplay : null;
+        return focused != null ? focused.name : "None";
+    }
+
+    public string GetCurrentCandidateIds()
+    {
+        return CurrentCandidateIds;
+    }
+
+    public FocusState GetFocusState()
+    {
+        return CurrentState;
     }
 
     private static DisplayHit SelectCandidateForFocus(DisplayHit[] candidates)

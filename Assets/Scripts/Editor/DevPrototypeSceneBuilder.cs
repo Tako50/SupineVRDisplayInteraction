@@ -35,6 +35,7 @@ public static class DevPrototypeSceneBuilder
 
         GameObject managers = GameObject.Find("Prototype_Managers") ?? new GameObject("Prototype_Managers");
         ExperimentManager experimentManager = GetOrAdd<ExperimentManager>(managers);
+        EditorDebugInputProvider debugInputProvider = GetOrAdd<EditorDebugInputProvider>(managers);
         PrototypeInputManager inputManager = GetOrAdd<PrototypeInputManager>(managers);
         GazeProvider gazeProvider = GetOrAdd<GazeProvider>(managers);
         EyeTrackingRayAdapter eyeTrackingRayAdapter = GetOrAdd<EyeTrackingRayAdapter>(managers);
@@ -60,6 +61,8 @@ public static class DevPrototypeSceneBuilder
         SetObject(eyeTrackingRayAdapter, "raySource", eyeTrackingRaySource);
         SetObject(gazeProvider, "eyeTrackingAdapter", eyeTrackingRayAdapter);
         SetObject(gazeProvider, "eyeTrackingRaySource", eyeTrackingRaySource);
+        SetEnum(gazeProvider, "gazeSource", GazeSource.DebugCameraForward);
+        SetObject(inputManager, "debugInputProvider", debugInputProvider);
         SetBool(inputManager, "allowConditionToggle", true);
 
         SetObject(experimentManager, "inputManager", inputManager);
@@ -68,7 +71,9 @@ public static class DevPrototypeSceneBuilder
         SetObject(experimentManager, "layoutManager", layoutManager);
         SetObject(experimentManager, "raycastPointer", raycastPointer);
         SetObject(experimentManager, "focusManager", focusManager);
+        SetObject(experimentManager, "debugInputProvider", debugInputProvider);
         SetObject(experimentManager, "logger", logger);
+        SetEnum(experimentManager, "startingCondition", InteractionCondition.RaycastBaseline);
 
         SetObject(focusManager, "inputManager", inputManager);
         SetObject(focusManager, "gazeProvider", gazeProvider);
@@ -103,6 +108,11 @@ public static class DevPrototypeSceneBuilder
         SetObject(debugVisualizer, "gazeProvider", gazeProvider);
         SetObject(debugVisualizer, "displayManager", displayManager);
         SetObject(debugVisualizer, "focusManager", focusManager);
+        SetObject(debugVisualizer, "virtualCursorController", cursorController);
+        SetObject(debugVisualizer, "clickDispatcher", clickDispatcher);
+        SetObject(debugVisualizer, "scrollController", scrollController);
+        SetObject(debugVisualizer, "experimentManager", experimentManager);
+        SetObject(debugVisualizer, "debugInputProvider", debugInputProvider);
         SetObject(debugVisualizer, "controllerRaySource", controllerRaySource);
 
         layoutManager.ApplyLayout(DisplayLayoutPreset.StrongOcclusion);

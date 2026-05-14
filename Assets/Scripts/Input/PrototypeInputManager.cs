@@ -3,10 +3,6 @@ using UnityEngine;
 using UnityEngine.XR;
 using XRInputDevice = UnityEngine.XR.InputDevice;
 using XRCommonUsages = UnityEngine.XR.CommonUsages;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.Controls;
-#endif
 
 [DisallowMultipleComponent]
 public class PrototypeInputManager : MonoBehaviour
@@ -16,6 +12,7 @@ public class PrototypeInputManager : MonoBehaviour
     [SerializeField] private InteractionCondition currentCondition = InteractionCondition.RaycastBaseline;
     [SerializeField] private bool allowConditionToggle = true;
     [SerializeField] private float stickDeadzone = 0.08f;
+    [SerializeField] private EditorDebugInputProvider debugInputProvider;
 
     private readonly List<XRInputDevice> rightHandDevices = new List<XRInputDevice>();
     private bool previousPrimaryButton;
@@ -28,17 +25,24 @@ public class PrototypeInputManager : MonoBehaviour
     public bool GripPressed { get; private set; }
     public bool TriggerPressed { get; private set; }
     public bool TriggerHeld { get; private set; }
+    public bool ResetFocusPressed => debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.ResetFocusPressed;
+    public bool DebugInputEnabled => debugInputProvider != null && debugInputProvider.IsEnabled;
 
     private void Awake()
     {
         Instance = this;
+        ResolveReferences();
     }
 
     private void Update()
     {
+        ResolveReferences();
         ReadInputs();
 
-        if (allowConditionToggle && GetKeyDown(KeyCode.Tab))
+        if (allowConditionToggle
+            && debugInputProvider != null
+            && debugInputProvider.IsEnabled
+            && debugInputProvider.ToggleConditionPressed)
         {
             ToggleCondition();
         }
@@ -64,13 +68,6 @@ public class PrototypeInputManager : MonoBehaviour
 
     private void ReadInputs()
     {
-        Vector2 editorStick = Vector2.zero;
-        editorStick.x += GetKey(KeyCode.D) || GetKey(KeyCode.RightArrow) ? 1f : 0f;
-        editorStick.x -= GetKey(KeyCode.A) || GetKey(KeyCode.LeftArrow) ? 1f : 0f;
-        editorStick.y += GetKey(KeyCode.W) || GetKey(KeyCode.UpArrow) ? 1f : 0f;
-        editorStick.y -= GetKey(KeyCode.S) || GetKey(KeyCode.DownArrow) ? 1f : 0f;
-        editorStick = Vector2.ClampMagnitude(editorStick, 1f);
-
         Vector2 xrStick = Vector2.zero;
         bool xrPrimary = false;
         bool xrGrip = false;
@@ -87,25 +84,37 @@ public class PrototypeInputManager : MonoBehaviour
             rightHand.TryGetFeatureValue(XRCommonUsages.trigger, out xrTriggerValue);
         }
 
-        Stick = editorStick.sqrMagnitude > xrStick.sqrMagnitude ? editorStick : xrStick;
+        Vector2 debugStick = debugInputProvider != null && debugInputProvider.IsEnabled
+            ? debugInputProvider.Stick
+            : Vector2.zero;
+
+        Stick = debugStick.sqrMagnitude > xrStick.sqrMagnitude ? debugStick : xrStick;
         if (Stick.magnitude < stickDeadzone)
         {
             Stick = Vector2.zero;
         }
 
-        bool editorSubmit = GetKeyDown(KeyCode.Space);
-        bool editorGrip = GetKeyDown(KeyCode.G);
-        bool editorTriggerHeld = GetKey(KeyCode.LeftShift);
-        bool editorTriggerPressed = GetKeyDown(KeyCode.LeftShift);
+        bool debugSubmit = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.SubmitPressed;
+        bool debugGrip = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.GripPressed;
+        bool debugTriggerHeld = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.TriggerHeld;
+        bool debugTriggerPressed = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.TriggerPressed;
 
-        SubmitPressed = editorSubmit || (xrPrimary && !previousPrimaryButton);
-        GripPressed = editorGrip || (xrGrip && !previousGripButton);
-        TriggerHeld = editorTriggerHeld || xrTriggerButton || xrTriggerValue > 0.5f;
-        TriggerPressed = editorTriggerPressed || ((xrTriggerButton || xrTriggerValue > 0.5f) && !previousTriggerButton);
+        SubmitPressed = debugSubmit || (xrPrimary && !previousPrimaryButton);
+        GripPressed = debugGrip || (xrGrip && !previousGripButton);
+        TriggerHeld = debugTriggerHeld || xrTriggerButton || xrTriggerValue > 0.5f;
+        TriggerPressed = debugTriggerPressed || ((xrTriggerButton || xrTriggerValue > 0.5f) && !previousTriggerButton);
 
         previousPrimaryButton = xrPrimary;
         previousGripButton = xrGrip;
         previousTriggerButton = xrTriggerButton || xrTriggerValue > 0.5f;
+    }
+
+    private void ResolveReferences()
+    {
+        if (debugInputProvider == null)
+        {
+            debugInputProvider = FindObjectOfType<EditorDebugInputProvider>();
+        }
     }
 
     private XRInputDevice GetRightHandDevice()
@@ -118,64 +127,4 @@ public class PrototypeInputManager : MonoBehaviour
         return rightHandDevices.Count > 0 ? rightHandDevices[0] : default;
     }
 
-    private static bool GetKey(KeyCode keyCode)
-    {
-#if ENABLE_INPUT_SYSTEM
-        KeyControl key = GetInputSystemKey(keyCode);
-        return key != null && key.isPressed;
-#else
-        return UnityEngine.Input.GetKey(keyCode);
-#endif
-    }
-
-    private static bool GetKeyDown(KeyCode keyCode)
-    {
-#if ENABLE_INPUT_SYSTEM
-        KeyControl key = GetInputSystemKey(keyCode);
-        return key != null && key.wasPressedThisFrame;
-#else
-        return UnityEngine.Input.GetKeyDown(keyCode);
-#endif
-    }
-
-#if ENABLE_INPUT_SYSTEM
-    private static KeyControl GetInputSystemKey(KeyCode keyCode)
-    {
-        Keyboard keyboard = Keyboard.current;
-        if (keyboard == null)
-        {
-            return null;
-        }
-
-        switch (keyCode)
-        {
-            case KeyCode.A:
-                return keyboard.aKey;
-            case KeyCode.D:
-                return keyboard.dKey;
-            case KeyCode.G:
-                return keyboard.gKey;
-            case KeyCode.S:
-                return keyboard.sKey;
-            case KeyCode.W:
-                return keyboard.wKey;
-            case KeyCode.Space:
-                return keyboard.spaceKey;
-            case KeyCode.Tab:
-                return keyboard.tabKey;
-            case KeyCode.LeftArrow:
-                return keyboard.leftArrowKey;
-            case KeyCode.RightArrow:
-                return keyboard.rightArrowKey;
-            case KeyCode.UpArrow:
-                return keyboard.upArrowKey;
-            case KeyCode.DownArrow:
-                return keyboard.downArrowKey;
-            case KeyCode.LeftShift:
-                return keyboard.leftShiftKey;
-            default:
-                return null;
-        }
-    }
-#endif
 }

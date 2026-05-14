@@ -1061,6 +1061,7 @@ GameObject:
   - component: {fileID: 1045802441}
   - component: {fileID: 1045802440}
   - component: {fileID: 1045802453}
+  - component: {fileID: 1045802454}
   m_Layer: 0
   m_Name: Prototype_Managers
   m_TagString: Untagged
@@ -1084,6 +1085,11 @@ MonoBehaviour:
   gazeProvider: {fileID: 1045802449}
   displayManager: {fileID: 1045802448}
   focusManager: {fileID: 1045802446}
+  virtualCursorController: {fileID: 1045802444}
+  clickDispatcher: {fileID: 1045802442}
+  scrollController: {fileID: 1045802443}
+  experimentManager: {fileID: 1045802451}
+  debugInputProvider: {fileID: 1045802454}
   controllerRaySource: {fileID: 2098682404}
   rayLength: 4
   hitPointRadius: 0.025
@@ -1160,6 +1166,8 @@ MonoBehaviour:
   cursorSpeed: 0.55
   deadzone: 0.08
   acceleration: 0
+  logCursorMovement: 0
+  cursorMoveLogInterval: 0.25
 --- !u!114 &1045802445
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1298,7 +1306,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a57199c0593c4ff398e1a593da04291, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  gazeSource: 1
+  gazeSource: 2
   hmdCamera: {fileID: 2098682403}
   eyeTrackingAdapter: {fileID: 1045802453}
   eyeTrackingRaySource: {fileID: 1790858881}
@@ -1318,6 +1326,7 @@ MonoBehaviour:
   currentCondition: 0
   allowConditionToggle: 1
   stickDeadzone: 0.08
+  debugInputProvider: {fileID: 1045802454}
 --- !u!114 &1045802451
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1336,8 +1345,9 @@ MonoBehaviour:
   layoutManager: {fileID: 1045802447}
   raycastPointer: {fileID: 1045802445}
   focusManager: {fileID: 1045802446}
+  debugInputProvider: {fileID: 1045802454}
   logger: {fileID: 1045802441}
-  startingCondition: 1
+  startingCondition: 0
   startingLayout: 2
   lockDisplaysAfterStart: 1
   debugLogIntervalSeconds: 0.5
@@ -1373,6 +1383,35 @@ MonoBehaviour:
   hmdCamera: {fileID: 2098682403}
   useHmdPositionWithEyeRotation: 0
   logAvailabilityChanges: 1
+--- !u!114 &1045802454
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1045802439}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b46af9b74c8f49578b2278c6fc417c8, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  enableInEditor: 1
+  enableInPlayer: 0
+  forceEnabled: 0
+  toggleConditionKey: 9
+  gripKey: 103
+  submitKey: 32
+  triggerKey: 304
+  resetFocusKey: 114
+  noOcclusionKey: 49
+  partialOcclusionKey: 50
+  strongOcclusionKey: 51
+  stickLeftKey: 97
+  stickRightKey: 100
+  stickUpKey: 119
+  stickDownKey: 115
+  useArrowKeys: 1
+  logDebugInputEvents: 1
 --- !u!1 &1054095178
 GameObject:
   m_ObjectHideFlags: 0

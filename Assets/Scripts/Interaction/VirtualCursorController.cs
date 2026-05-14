@@ -8,7 +8,10 @@ public class VirtualCursorController : MonoBehaviour
     [SerializeField] private float cursorSpeed = 0.55f;
     [SerializeField] private float deadzone = 0.08f;
     [SerializeField] private float acceleration = 0f;
+    [SerializeField] private bool logCursorMovement = false;
+    [SerializeField] private float cursorMoveLogInterval = 0.25f;
 
+    private float lastCursorMoveLogTime;
     public Vector2 NormalizedPosition { get; private set; } = new Vector2(0.5f, 0.5f);
 
     private void Awake()
@@ -54,6 +57,12 @@ public class VirtualCursorController : MonoBehaviour
             NormalizedPosition = new Vector2(
                 Mathf.Clamp01(NormalizedPosition.x + delta.x),
                 Mathf.Clamp01(NormalizedPosition.y + delta.y));
+
+            if (logCursorMovement && Time.time - lastCursorMoveLogTime >= cursorMoveLogInterval)
+            {
+                lastCursorMoveLogTime = Time.time;
+                Debug.Log($"[VirtualCursor] moved displayId={focusedDisplay.name}, normalized={Format(NormalizedPosition)}");
+            }
         }
 
         displayManager.SetCursorNormalized(focusedDisplay, NormalizedPosition, true);

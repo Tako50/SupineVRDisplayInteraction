@@ -3,7 +3,8 @@ using UnityEngine;
 public enum GazeSource
 {
     HmdForward,
-    EyeTracking
+    EyeTracking,
+    DebugCameraForward
 }
 
 [DisallowMultipleComponent]
@@ -30,6 +31,14 @@ public class GazeProvider : MonoBehaviour
 
     public Ray GetGazeRay()
     {
+        if (gazeSource == GazeSource.DebugCameraForward)
+        {
+            Camera debugCamera = Camera.main != null ? Camera.main : hmdCamera;
+            Transform debugSource = debugCamera != null ? debugCamera.transform : transform;
+            activeGazeSource = GazeSource.DebugCameraForward;
+            return new Ray(debugSource.position, debugSource.forward);
+        }
+
         if (gazeSource == GazeSource.EyeTracking && TryGetEyeTrackingRay(out Ray eyeRay))
         {
             activeGazeSource = GazeSource.EyeTracking;

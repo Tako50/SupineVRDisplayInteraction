@@ -15,6 +15,9 @@ public class ScrollController : MonoBehaviour
 
     private float lastScrollLogTime;
 
+    public float LastScrollAmount { get; private set; }
+    public string LastScrollDisplayId { get; private set; } = "None";
+
     private void Awake()
     {
         ResolveReferences();
@@ -66,6 +69,9 @@ public class ScrollController : MonoBehaviour
             return;
         }
 
+        LastScrollAmount = appliedScroll;
+        LastScrollDisplayId = hit.DisplayId;
+
         if (Time.time - lastScrollLogTime >= scrollLogInterval)
         {
             lastScrollLogTime = Time.time;
@@ -105,6 +111,9 @@ public class ScrollController : MonoBehaviour
         {
             return;
         }
+
+        LastScrollAmount = appliedScroll;
+        LastScrollDisplayId = focusedDisplay.name;
 
         if (Time.time - lastScrollLogTime >= scrollLogInterval)
         {

@@ -1,7 +1,4 @@
 using UnityEngine;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-#endif
 
 [DisallowMultipleComponent]
 public class ExperimentManager : MonoBehaviour
@@ -13,6 +10,7 @@ public class ExperimentManager : MonoBehaviour
     [SerializeField] private DisplayLayoutManager layoutManager;
     [SerializeField] private RaycastPointer raycastPointer;
     [SerializeField] private FocusManager focusManager;
+    [SerializeField] private EditorDebugInputProvider debugInputProvider;
     [SerializeField] private Logger logger;
 
     [Header("Experiment State")]
@@ -64,15 +62,20 @@ public class ExperimentManager : MonoBehaviour
 
     private void HandleKeyboardShortcuts()
     {
-        if (GetKeyDown(KeyCode.Alpha1))
+        if (debugInputProvider == null || !debugInputProvider.IsEnabled)
+        {
+            return;
+        }
+
+        if (debugInputProvider.NoOcclusionPressed)
         {
             ApplyLayout(DisplayLayoutPreset.NoOcclusion);
         }
-        else if (GetKeyDown(KeyCode.Alpha2))
+        else if (debugInputProvider.PartialOcclusionPressed)
         {
             ApplyLayout(DisplayLayoutPreset.PartialOcclusion);
         }
-        else if (GetKeyDown(KeyCode.Alpha3))
+        else if (debugInputProvider.StrongOcclusionPressed)
         {
             ApplyLayout(DisplayLayoutPreset.StrongOcclusion);
         }
@@ -140,6 +143,11 @@ public class ExperimentManager : MonoBehaviour
             focusManager = FindObjectOfType<FocusManager>();
         }
 
+        if (debugInputProvider == null)
+        {
+            debugInputProvider = FindObjectOfType<EditorDebugInputProvider>();
+        }
+
         if (logger == null)
         {
             logger = FindObjectOfType<Logger>();
@@ -151,28 +159,4 @@ public class ExperimentManager : MonoBehaviour
         return $"({value.x:0.000}, {value.y:0.000})";
     }
 
-    private static bool GetKeyDown(KeyCode keyCode)
-    {
-#if ENABLE_INPUT_SYSTEM
-        Keyboard keyboard = Keyboard.current;
-        if (keyboard == null)
-        {
-            return false;
-        }
-
-        switch (keyCode)
-        {
-            case KeyCode.Alpha1:
-                return keyboard.digit1Key.wasPressedThisFrame;
-            case KeyCode.Alpha2:
-                return keyboard.digit2Key.wasPressedThisFrame;
-            case KeyCode.Alpha3:
-                return keyboard.digit3Key.wasPressedThisFrame;
-            default:
-                return false;
-        }
-#else
-        return Input.GetKeyDown(keyCode);
-#endif
-    }
 }

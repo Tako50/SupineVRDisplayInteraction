@@ -11,6 +11,8 @@ public class ClickDispatcher : MonoBehaviour
     [SerializeField] private GazeProvider gazeProvider;
     [SerializeField] private Logger logger;
 
+    public string LastClickResult { get; private set; } = "None";
+
     private void Awake()
     {
         ResolveReferences();
@@ -47,6 +49,7 @@ public class ClickDispatcher : MonoBehaviour
         DisplayHit hit = displayManager.CurrentRaycastHit;
         string targetId = string.Empty;
         bool validTarget = hit.Display != null && hit.Display.TryClickDebugTarget(hit.Normalized, out targetId);
+        LastClickResult = $"{hit.DisplayId} valid={validTarget} target={targetId}";
         Ray ray = raycastPointer != null ? raycastPointer.CurrentRay : default;
         LogClick(hit.DisplayId, hit.Normalized, validTarget, targetId, ray);
     }
@@ -62,6 +65,7 @@ public class ClickDispatcher : MonoBehaviour
         Vector2 normalized = virtualCursorController.NormalizedPosition;
         string targetId = string.Empty;
         bool validTarget = focusedDisplay.TryClickDebugTarget(normalized, out targetId);
+        LastClickResult = $"{focusedDisplay.name} valid={validTarget} target={targetId}";
         Ray gazeRay = gazeProvider != null ? gazeProvider.GetGazeRay() : default;
         bool gazeOnDifferentDisplay = focusManager != null && focusManager.IsGazeOnDifferentDisplay(focusedDisplay);
 
