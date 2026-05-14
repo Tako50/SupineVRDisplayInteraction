@@ -11,6 +11,9 @@ public enum DisplayLayoutPreset
 [DisallowMultipleComponent]
 public class DisplayLayoutManager : MonoBehaviour
 {
+    private static readonly Vector2 BasePhysicalSizeMeters = new Vector2(0.80f, 0.45f);
+    private static readonly Vector2 BasePixelSize = new Vector2(800f, 450f);
+
     [Header("References")]
     [SerializeField] private Camera hmdCamera;
     [SerializeField] private Transform displaysRoot;
@@ -20,6 +23,9 @@ public class DisplayLayoutManager : MonoBehaviour
     [Header("Layout")]
     [SerializeField] private DisplayLayoutPreset initialPreset = DisplayLayoutPreset.StrongOcclusion;
     [SerializeField] private bool applyOnStart = true;
+    [SerializeField] private DisplayLayoutConfig noOcclusion = DisplayLayoutConfig.NoOcclusionDefaults();
+    [SerializeField] private DisplayLayoutConfig partialOcclusion = DisplayLayoutConfig.PartialOcclusionDefaults();
+    [SerializeField] private DisplayLayoutConfig strongOcclusion = DisplayLayoutConfig.StrongOcclusionDefaults();
 
     public DisplayLayoutPreset InitialPreset
     {
@@ -35,6 +41,7 @@ public class DisplayLayoutManager : MonoBehaviour
     {
         AutoAssignReferences();
         initialPreset = DisplayLayoutPreset.StrongOcclusion;
+        ResetPresetDefaults();
     }
 
     private void Start()
@@ -47,6 +54,7 @@ public class DisplayLayoutManager : MonoBehaviour
 
     private void OnValidate()
     {
+        EnsurePresetDefaults();
         AutoAssignReferences();
 
         if (!Application.isPlaying)
@@ -89,6 +97,7 @@ public class DisplayLayoutManager : MonoBehaviour
 
     public void ApplyLayout(DisplayLayoutPreset preset)
     {
+        EnsurePresetDefaults();
         AutoAssignReferences();
 
         Transform hmd = hmdCamera != null ? hmdCamera.transform : null;
@@ -97,93 +106,187 @@ public class DisplayLayoutManager : MonoBehaviour
             return;
         }
 
-        LayoutPose frontPose;
-        LayoutPose backPose;
-        GetPresetPoses(preset, out frontPose, out backPose);
+        DisplayLayoutConfig layout = GetLayout(preset);
 
-        ApplyDisplayPose(displayAFront.transform, hmd, frontPose);
-        ApplyDisplayPose(displayBBack.transform, hmd, backPose);
+        ApplyDisplayPose(displayAFront.transform, hmd, layout.DisplayAFront);
+        ApplyDisplayPose(displayBBack.transform, hmd, layout.DisplayBBack);
 
-        displayAFront.SetSize(frontPose.sizeMeters, frontPose.pixelSize);
-        displayBBack.SetSize(backPose.sizeMeters, backPose.pixelSize);
+        ApplyDisplayScale(displayAFront, layout.DisplayAFront);
+        ApplyDisplayScale(displayBBack, layout.DisplayBBack);
     }
 
-    private static void ApplyDisplayPose(Transform display, Transform hmd, LayoutPose pose)
+    private void EnsurePresetDefaults()
     {
-        Vector3 targetPosition = hmd.position
-            + hmd.forward * pose.distanceMeters
-            + hmd.right * pose.horizontalOffsetMeters
-            + hmd.up * pose.verticalOffsetMeters;
-
-        Quaternion baseRotation = Quaternion.LookRotation(hmd.forward, hmd.up);
-        Quaternion rotationOffset = Quaternion.Euler(pose.rotationOffsetEuler);
-        display.SetPositionAndRotation(targetPosition, baseRotation * rotationOffset);
+        noOcclusion ??= DisplayLayoutConfig.NoOcclusionDefaults();
+        partialOcclusion ??= DisplayLayoutConfig.PartialOcclusionDefaults();
+        strongOcclusion ??= DisplayLayoutConfig.StrongOcclusionDefaults();
     }
 
-    private static void GetPresetPoses(DisplayLayoutPreset preset, out LayoutPose front, out LayoutPose back)
+    private void ResetPresetDefaults()
     {
-        front = new LayoutPose(
-            horizontalOffsetMeters: -0.18f,
-            verticalOffsetMeters: -0.18f,
-            distanceMeters: 1.10f,
-            rotationOffsetEuler: Vector3.zero,
-            sizeMeters: new Vector2(0.70f, 0.40f),
-            pixelSize: new Vector2(700f, 400f));
+        noOcclusion = DisplayLayoutConfig.NoOcclusionDefaults();
+        partialOcclusion = DisplayLayoutConfig.PartialOcclusionDefaults();
+        strongOcclusion = DisplayLayoutConfig.StrongOcclusionDefaults();
+    }
 
-        back = new LayoutPose(
-            horizontalOffsetMeters: 0.18f,
-            verticalOffsetMeters: 0.10f,
-            distanceMeters: 1.55f,
-            rotationOffsetEuler: Vector3.zero,
-            sizeMeters: new Vector2(1.10f, 0.62f),
-            pixelSize: new Vector2(1100f, 620f));
-
+    private DisplayLayoutConfig GetLayout(DisplayLayoutPreset preset)
+    {
         switch (preset)
         {
             case DisplayLayoutPreset.NoOcclusion:
-                front.horizontalOffsetMeters = -0.55f;
-                front.verticalOffsetMeters = -0.22f;
-                front.rotationOffsetEuler = Vector3.zero;
-                back.horizontalOffsetMeters = 0.55f;
-                back.verticalOffsetMeters = 0.18f;
-                back.rotationOffsetEuler = Vector3.zero;
-                break;
+                return noOcclusion;
             case DisplayLayoutPreset.PartialOcclusion:
-                front.horizontalOffsetMeters = -0.18f;
-                front.verticalOffsetMeters = -0.18f;
-                front.rotationOffsetEuler = Vector3.zero;
-                back.horizontalOffsetMeters = 0.18f;
-                back.verticalOffsetMeters = 0.10f;
-                back.rotationOffsetEuler = Vector3.zero;
-                break;
+                return partialOcclusion;
             case DisplayLayoutPreset.StrongOcclusion:
-                front.horizontalOffsetMeters = -0.04f;
-                front.verticalOffsetMeters = -0.16f;
-                front.rotationOffsetEuler = Vector3.zero;
-                back.horizontalOffsetMeters = 0.04f;
-                back.verticalOffsetMeters = 0.02f;
-                back.rotationOffsetEuler = Vector3.zero;
-                break;
+            default:
+                return strongOcclusion;
         }
     }
 
-    private struct LayoutPose
+    private static void ApplyDisplayPose(Transform display, Transform hmd, DisplayPlacementConfig config)
     {
-        public float horizontalOffsetMeters;
-        public float verticalOffsetMeters;
-        public float distanceMeters;
-        public Vector3 rotationOffsetEuler;
-        public Vector2 sizeMeters;
-        public Vector2 pixelSize;
+        Vector3 targetPosition = hmd.position
+            + hmd.forward * config.DistanceFromHmd
+            + hmd.right * config.HorizontalOffset
+            + hmd.up * config.VerticalOffset;
 
-        public LayoutPose(float horizontalOffsetMeters, float verticalOffsetMeters, float distanceMeters, Vector3 rotationOffsetEuler, Vector2 sizeMeters, Vector2 pixelSize)
+        Vector3 directionFromHmd = targetPosition - hmd.position;
+        Quaternion hmdFacingRotation = directionFromHmd.sqrMagnitude > 0.0001f
+            ? Quaternion.LookRotation(directionFromHmd.normalized, hmd.up)
+            : Quaternion.LookRotation(hmd.forward, hmd.up);
+
+        Quaternion rotationOffset = Quaternion.Euler(
+            config.PitchDegrees,
+            config.YawDegrees,
+            config.RollDegrees);
+
+        display.SetPositionAndRotation(targetPosition, hmdFacingRotation * rotationOffset);
+    }
+
+    private static void ApplyDisplayScale(DisplaySurface display, DisplayPlacementConfig config)
+    {
+        float clampedScale = Mathf.Max(0.01f, config.Scale);
+        display.transform.localScale = Vector3.one;
+        display.SetSize(BasePhysicalSizeMeters * clampedScale, BasePixelSize * clampedScale);
+    }
+}
+
+[System.Serializable]
+public class DisplayLayoutConfig
+{
+    [SerializeField] private DisplayPlacementConfig displayAFront = DisplayPlacementConfig.FrontDefaults();
+    [SerializeField] private DisplayPlacementConfig displayBBack = DisplayPlacementConfig.BackDefaults();
+
+    public DisplayPlacementConfig DisplayAFront => displayAFront;
+    public DisplayPlacementConfig DisplayBBack => displayBBack;
+
+    public static DisplayLayoutConfig NoOcclusionDefaults()
+    {
+        DisplayLayoutConfig config = new DisplayLayoutConfig();
+        config.displayAFront = DisplayPlacementConfig.FrontDefaults();
+        config.displayAFront.HorizontalOffset = -0.55f;
+        config.displayBBack = DisplayPlacementConfig.BackDefaults();
+        config.displayBBack.HorizontalOffset = 0.55f;
+        return config;
+    }
+
+    public static DisplayLayoutConfig PartialOcclusionDefaults()
+    {
+        DisplayLayoutConfig config = new DisplayLayoutConfig();
+        config.displayAFront = DisplayPlacementConfig.FrontDefaults();
+        config.displayAFront.HorizontalOffset = -0.18f;
+        config.displayBBack = DisplayPlacementConfig.BackDefaults();
+        config.displayBBack.HorizontalOffset = 0.18f;
+        return config;
+    }
+
+    public static DisplayLayoutConfig StrongOcclusionDefaults()
+    {
+        DisplayLayoutConfig config = new DisplayLayoutConfig();
+        config.displayAFront = DisplayPlacementConfig.FrontDefaults();
+        config.displayBBack = DisplayPlacementConfig.BackDefaults();
+        return config;
+    }
+}
+
+[System.Serializable]
+public class DisplayPlacementConfig
+{
+    [SerializeField] private float distanceFromHmd = 1.15f;
+    [SerializeField] private float verticalOffset = -0.35f;
+    [SerializeField] private float horizontalOffset;
+    [SerializeField] private float scale = 0.75f;
+    [SerializeField] private float pitchDegrees = 10f;
+    [SerializeField] private float yawDegrees;
+    [SerializeField] private float rollDegrees;
+
+    public float DistanceFromHmd
+    {
+        get => distanceFromHmd;
+        set => distanceFromHmd = value;
+    }
+
+    public float VerticalOffset
+    {
+        get => verticalOffset;
+        set => verticalOffset = value;
+    }
+
+    public float HorizontalOffset
+    {
+        get => horizontalOffset;
+        set => horizontalOffset = value;
+    }
+
+    public float Scale
+    {
+        get => scale;
+        set => scale = value;
+    }
+
+    public float PitchDegrees
+    {
+        get => pitchDegrees;
+        set => pitchDegrees = value;
+    }
+
+    public float YawDegrees
+    {
+        get => yawDegrees;
+        set => yawDegrees = value;
+    }
+
+    public float RollDegrees
+    {
+        get => rollDegrees;
+        set => rollDegrees = value;
+    }
+
+    public static DisplayPlacementConfig FrontDefaults()
+    {
+        return new DisplayPlacementConfig
         {
-            this.horizontalOffsetMeters = horizontalOffsetMeters;
-            this.verticalOffsetMeters = verticalOffsetMeters;
-            this.distanceMeters = distanceMeters;
-            this.rotationOffsetEuler = rotationOffsetEuler;
-            this.sizeMeters = sizeMeters;
-            this.pixelSize = pixelSize;
-        }
+            distanceFromHmd = 1.15f,
+            verticalOffset = -0.35f,
+            horizontalOffset = 0f,
+            scale = 0.75f,
+            pitchDegrees = 10f,
+            yawDegrees = 0f,
+            rollDegrees = 0f
+        };
+    }
+
+    public static DisplayPlacementConfig BackDefaults()
+    {
+        return new DisplayPlacementConfig
+        {
+            distanceFromHmd = 1.90f,
+            verticalOffset = 0.15f,
+            horizontalOffset = 0f,
+            scale = 1.25f,
+            pitchDegrees = -5f,
+            yawDegrees = 0f,
+            rollDegrees = 0f
+        };
     }
 }
