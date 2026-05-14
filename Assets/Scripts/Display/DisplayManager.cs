@@ -116,6 +116,7 @@ public class DisplayManager : MonoBehaviour
     public void SetFocusedDisplay(DisplaySurface display)
     {
         focusedDisplay = display;
+        ApplyFocusVisuals(null);
     }
 
     public Vector2 GetNormalizedFromWorldPoint(DisplaySurface display, Vector3 worldPoint)
@@ -169,6 +170,94 @@ public class DisplayManager : MonoBehaviour
             }
         }
     }
+
+    public void HideAllCursors()
+    {
+        SetOnlyCursorsVisible(null, null);
+    }
+
+    public void ApplyFocusVisuals(DisplayHit[] gazeCandidates, bool showOverlapPreview = true)
+    {
+        if (displays == null)
+        {
+            return;
+        }
+
+        bool hasMultipleCandidates = showOverlapPreview && gazeCandidates != null && gazeCandidates.Length > 1;
+        for (int i = 0; i < displays.Length; i++)
+        {
+            DisplaySurface display = displays[i];
+            if (display == null)
+            {
+                continue;
+            }
+
+            if (display == focusedDisplay)
+            {
+                display.SetFocusVisual(true);
+                continue;
+            }
+
+            bool isCandidate = ContainsDisplay(gazeCandidates, display);
+            bool overlapPreview = hasMultipleCandidates && gazeCandidates[0].Display == display;
+            display.SetCandidateVisual(isCandidate, overlapPreview);
+        }
+    }
+
+    public void ResetDisplayVisuals()
+    {
+        if (displays == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < displays.Length; i++)
+        {
+            if (displays[i] != null)
+            {
+                displays[i].SetCandidateVisual(false, false);
+            }
+        }
+    }
+
+    public static string FormatDisplayIds(DisplayHit[] hits)
+    {
+        if (hits == null || hits.Length == 0)
+        {
+            return "None";
+        }
+
+        System.Text.StringBuilder builder = new System.Text.StringBuilder();
+        for (int i = 0; i < hits.Length; i++)
+        {
+            if (i > 0)
+            {
+                builder.Append('|');
+            }
+
+            builder.Append(hits[i].DisplayId);
+        }
+
+        return builder.ToString();
+    }
+
+    private static bool ContainsDisplay(DisplayHit[] hits, DisplaySurface display)
+    {
+        if (hits == null || display == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            if (hits[i].Display == display)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
 
 public struct DisplayHit
@@ -178,6 +267,7 @@ public struct DisplayHit
     public readonly Vector2 Normalized;
 
     public float Distance => Hit.distance;
+    public Vector3 WorldPosition => Hit.point;
     public string DisplayId => Display != null ? Display.name : "None";
 
     public DisplayHit(DisplaySurface display, RaycastHit hit, Vector2 normalized)

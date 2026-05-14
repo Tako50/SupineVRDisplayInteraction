@@ -11,12 +11,14 @@ public class GazeProvider : MonoBehaviour
 {
     [SerializeField] private GazeSource gazeSource = GazeSource.HmdForward;
     [SerializeField] private Camera hmdCamera;
+    [SerializeField] private EyeTrackingRayAdapter eyeTrackingAdapter;
     [SerializeField] private Transform eyeTrackingRaySource;
     [SerializeField] private bool warnWhenEyeTrackingFallsBack = true;
 
     private bool warnedAboutFallback;
+    private GazeSource activeGazeSource = GazeSource.HmdForward;
 
-    public GazeSource CurrentGazeSource => gazeSource;
+    public GazeSource CurrentGazeSource => activeGazeSource;
 
     private void Awake()
     {
@@ -26,10 +28,11 @@ public class GazeProvider : MonoBehaviour
         }
     }
 
-    public Ray GetRay()
+    public Ray GetGazeRay()
     {
         if (gazeSource == GazeSource.EyeTracking && TryGetEyeTrackingRay(out Ray eyeRay))
         {
+            activeGazeSource = GazeSource.EyeTracking;
             return eyeRay;
         }
 
@@ -41,16 +44,32 @@ public class GazeProvider : MonoBehaviour
 
         Camera cameraForRay = hmdCamera != null ? hmdCamera : Camera.main;
         Transform source = cameraForRay != null ? cameraForRay.transform : transform;
+        activeGazeSource = GazeSource.HmdForward;
         return new Ray(source.position, source.forward);
+    }
+
+    public Ray GetRay()
+    {
+        return GetGazeRay();
     }
 
     public bool IsEyeTrackingAvailable()
     {
+        if (eyeTrackingAdapter != null)
+        {
+            return eyeTrackingAdapter.IsEyeTrackingAvailable;
+        }
+
         return eyeTrackingRaySource != null;
     }
 
     private bool TryGetEyeTrackingRay(out Ray ray)
     {
+        if (eyeTrackingAdapter != null && eyeTrackingAdapter.TryGetRay(out ray))
+        {
+            return true;
+        }
+
         if (eyeTrackingRaySource != null)
         {
             ray = new Ray(eyeTrackingRaySource.position, eyeTrackingRaySource.forward);

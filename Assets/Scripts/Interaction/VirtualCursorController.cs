@@ -5,7 +5,9 @@ public class VirtualCursorController : MonoBehaviour
 {
     [SerializeField] private PrototypeInputManager inputManager;
     [SerializeField] private DisplayManager displayManager;
-    [SerializeField] private float cursorSpeedNormalizedPerSecond = 0.55f;
+    [SerializeField] private float cursorSpeed = 0.55f;
+    [SerializeField] private float deadzone = 0.08f;
+    [SerializeField] private float acceleration = 0f;
 
     public Vector2 NormalizedPosition { get; private set; } = new Vector2(0.5f, 0.5f);
 
@@ -34,7 +36,19 @@ public class VirtualCursorController : MonoBehaviour
             return;
         }
 
-        Vector2 delta = inputManager.Stick * cursorSpeedNormalizedPerSecond * Time.deltaTime;
+        Vector2 stick = inputManager.Stick;
+        if (stick.magnitude < deadzone || inputManager.TriggerHeld)
+        {
+            stick = Vector2.zero;
+        }
+
+        float speed = cursorSpeed;
+        if (acceleration > 0f)
+        {
+            speed += acceleration * stick.magnitude;
+        }
+
+        Vector2 delta = stick * speed * Time.deltaTime;
         if (delta.sqrMagnitude > 0f)
         {
             NormalizedPosition = new Vector2(
@@ -72,6 +86,7 @@ public class VirtualCursorController : MonoBehaviour
         NormalizedPosition = new Vector2(Mathf.Clamp01(normalized.x), Mathf.Clamp01(normalized.y));
         if (displayManager != null)
         {
+            displayManager.SetOnlyCursorsVisible(display, null);
             displayManager.SetCursorNormalized(display, NormalizedPosition, true);
         }
     }

@@ -12,7 +12,7 @@ The first working prototype is implemented in `Assets/Scenes/Dev_Prototype.unity
 It is being built in phases from `Docs/prototype_spec.md`:
 
 - `RaycastBaseline`: standard controller raycasting. The foremost display hit by the controller ray is the active operation target.
-- `ExplicitDisplayFocus`: planned for a later phase. It remains disabled during Phase 2.
+- `ExplicitDisplayFocus`: gaze candidate selection, grip-confirmed display focus, cursor warp, stick cursor movement, and trigger+stick scrolling.
 
 The scene contains:
 
@@ -24,6 +24,10 @@ The scene contains:
 - `DisplayLayoutManager`
 - `Logger`
 - supporting scripts for raycast pointing, baseline click/scroll logging, and debug visualization
+- `FocusManager`
+- `VirtualCursorController`
+- `ClickDispatcher`
+- `ScrollController`
 - two World Space Canvas displays:
   - `Display_A_Front`: near, lower, smaller
   - `Display_B_Back`: far, upper, larger
@@ -45,9 +49,12 @@ Useful development controls:
 - `3`: apply `StrongOcclusion`
 - `WASD` or arrow keys: stick fallback for cursor movement
 - `Space`: submit/click fallback
+- `Tab`: switch between `RaycastBaseline` and `ExplicitDisplayFocus`
+- `G`: grip fallback for focus confirmation
+- `Left Shift`: trigger fallback for ExplicitDisplayFocus scrolling
 - right stick vertical, or `W` / `S`: scroll the currently ray-hit display in `RaycastBaseline`
 
-Phase 2 implements `RaycastBaseline` only:
+## Phase 2 RaycastBaseline
 
 - the right controller ray uses a single `Physics.Raycast`
 - only the first `DisplaySurface` hit receives input
@@ -56,8 +63,40 @@ Phase 2 implements `RaycastBaseline` only:
 - right stick vertical / `W` / `S` scrolls only the currently hit display
 - `StrongOcclusion` preserves input-ray occlusion, so the front display blocks the back display when it is hit first
 
+## Phase 3 ExplicitDisplayFocus MVP
+
+`ExplicitDisplayFocus` is implemented as the first proposed-method MVP:
+
+- gaze uses `RaycastAll`-style candidate detection through `DisplayManager.GetDisplayHitsAll`
+- gaze candidates are sorted by hit distance
+- grip / `G` confirms the current candidate as the focused display
+- when multiple candidates are under gaze, the nearest candidate is selected for this MVP
+- focus does not change from gaze movement alone
+- focus remains locked until grip is pressed again on another candidate
+- cursor warps to the gaze hit position when focus is confirmed
+- right stick / `WASD` moves the virtual cursor inside the focused display
+- A button / `Space` clicks at the virtual cursor on the focused display
+- right trigger + right stick vertical, or `Left Shift` + `W` / `S`, scrolls the focused display
+- moving gaze to another display after focus is locked does not redirect click or scroll input
+
+The debug overlay shows the current condition, focus state, focused display, and gaze candidate ids. Candidate and focus visuals are intentionally simple: candidate displays are highlighted, overlapping gaze candidates make the nearest display semi-transparent, and the focused display is highlighted.
+
 `GazeProvider` supports `HmdForward` for development only and an `EyeTracking` placeholder source for a later Meta Quest Pro eye-tracking adapter. HMD forward should not be used for experiments.
 
-CSV logs are written under `Application.persistentDataPath/Logs` with a `prototype_phase1_*.csv` filename.
+## Quest Pro Eye Tracking
+
+The first OpenXR eye-gaze adapter is included as `EyeTrackingRayAdapter`.
+
+To use real Quest Pro gaze:
+
+1. In Unity, confirm `Project Settings > XR Plug-in Management > OpenXR` has `Eye Gaze Interaction Profile` enabled for Android.
+2. Build and run on Meta Quest Pro.
+3. In `Dev_Prototype`, set `Prototype_Managers > GazeProvider > Gaze Source` to `EyeTracking`.
+4. Keep `Eye Tracking Adapter` assigned to the `EyeTrackingRayAdapter` on `Prototype_Managers`.
+5. Check the debug overlay or logs. `CurrentGazeSource` should report `EyeTracking` only when an `EyeGazeDevice` is tracked.
+
+If the OpenXR eye-gaze device is not available or not tracked, `GazeProvider` logs a warning and falls back to `HmdForward` for development only.
+
+CSV logs are written under `Application.persistentDataPath/Logs` with a `prototype_*.csv` filename.
 
 To rebuild the development scene wiring, run Unity menu item `Prototype > Build Dev Prototype Scene`.

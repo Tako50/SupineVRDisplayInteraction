@@ -32,6 +32,7 @@ public class RaycastPointer : MonoBehaviour
 
         if (inputManager.CurrentCondition != InteractionCondition.RaycastBaseline)
         {
+            displayManager.ClearCurrentRaycastHit();
             SetRayVisible(false);
             return;
         }

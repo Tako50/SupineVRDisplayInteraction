@@ -14,7 +14,7 @@ public class PrototypeInputManager : MonoBehaviour
     public static PrototypeInputManager Instance { get; private set; }
 
     [SerializeField] private InteractionCondition currentCondition = InteractionCondition.RaycastBaseline;
-    [SerializeField] private bool allowConditionToggle = false;
+    [SerializeField] private bool allowConditionToggle = true;
     [SerializeField] private float stickDeadzone = 0.08f;
 
     private readonly List<XRInputDevice> rightHandDevices = new List<XRInputDevice>();

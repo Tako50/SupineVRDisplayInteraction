@@ -24,7 +24,16 @@ public class DisplaySurface : MonoBehaviour
     [SerializeField] private float scrollPixelsPerUnit = 160f;
     [SerializeField] private float maxScrollPixels = 420f;
 
+    [Header("Explicit Focus Visuals")]
+    [SerializeField] private Color focusHighlightColor = new Color(0.20f, 1f, 0.45f, 1f);
+    [SerializeField] private Color candidateHighlightColor = new Color(1f, 0.92f, 0.20f, 1f);
+    [SerializeField] private float normalAlpha = 0.86f;
+    [SerializeField] private float overlapPreviewAlpha = 0.36f;
+
     private float scrollOffsetPixels;
+    private Image visiblePanelImage;
+    private Color basePanelColor = Color.white;
+    private bool hasCachedBasePanelColor;
 
     public Canvas WorldSpaceCanvas => worldSpaceCanvas;
     public RectTransform VisiblePanel => visiblePanel;
@@ -34,6 +43,11 @@ public class DisplaySurface : MonoBehaviour
     public RectTransform DebugClickTarget => debugClickTarget;
     public Vector2 PhysicalSizeMeters => physicalSizeMeters;
     public Vector2 CanvasPixelSize => canvasPixelSize;
+
+    private void Awake()
+    {
+        CachePanelImage();
+    }
 
     public void AssignParts(Canvas canvas, RectTransform panel, BoxCollider hitPlane, RectTransform cursorRect)
     {
@@ -49,6 +63,38 @@ public class DisplaySurface : MonoBehaviour
         scrollContent = contentRoot;
         debugClickTarget = clickTarget;
         ApplyScrollOffset();
+    }
+
+    public void SetFocusVisual(bool focused)
+    {
+        CachePanelImage();
+        if (visiblePanelImage == null)
+        {
+            return;
+        }
+
+        visiblePanelImage.color = focused
+            ? WithAlpha(focusHighlightColor, Mathf.Max(basePanelColor.a, normalAlpha))
+            : WithAlpha(basePanelColor, basePanelColor.a);
+    }
+
+    public void SetCandidateVisual(bool candidate, bool overlapPreview)
+    {
+        CachePanelImage();
+        if (visiblePanelImage == null)
+        {
+            return;
+        }
+
+        if (!candidate)
+        {
+            visiblePanelImage.color = WithAlpha(basePanelColor, basePanelColor.a);
+            return;
+        }
+
+        Color color = candidateHighlightColor;
+        color.a = overlapPreview ? overlapPreviewAlpha : Mathf.Max(basePanelColor.a, normalAlpha);
+        visiblePanelImage.color = color;
     }
 
     public void SetSize(Vector2 sizeMeters, Vector2 pixelSize)
@@ -186,6 +232,26 @@ public class DisplaySurface : MonoBehaviour
         {
             scrollContent.anchoredPosition = new Vector2(scrollContent.anchoredPosition.x, scrollOffsetPixels);
         }
+    }
+
+    private void CachePanelImage()
+    {
+        if (visiblePanelImage == null && visiblePanel != null)
+        {
+            visiblePanelImage = visiblePanel.GetComponent<Image>();
+        }
+
+        if (!hasCachedBasePanelColor && visiblePanelImage != null)
+        {
+            basePanelColor = visiblePanelImage.color;
+            hasCachedBasePanelColor = true;
+        }
+    }
+
+    private static Color WithAlpha(Color color, float alpha)
+    {
+        color.a = alpha;
+        return color;
     }
 
     private void OnValidate()

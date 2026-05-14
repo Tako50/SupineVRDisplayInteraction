@@ -1,5 +1,14 @@
 using UnityEngine;
 
+public enum FocusState
+{
+    NoCandidate,
+    GazeOnSingleDisplay,
+    GazeOnMultipleDisplays,
+    FocusPreview,
+    FocusedLocked
+}
+
 [DisallowMultipleComponent]
 public class FocusManager : MonoBehaviour
 {
@@ -7,11 +16,17 @@ public class FocusManager : MonoBehaviour
     [SerializeField] private GazeProvider gazeProvider;
     [SerializeField] private DisplayManager displayManager;
     [SerializeField] private VirtualCursorController virtualCursorController;
+    [SerializeField] private Logger logger;
 
-    private DisplayHit currentCandidate;
-    private bool hasCandidate;
+    private DisplayHit[] currentCandidates = new DisplayHit[0];
+    private string lastCandidateIds = "None";
 
-    public DisplaySurface CandidateDisplay => hasCandidate ? currentCandidate.Display : null;
+    public FocusState CurrentState { get; private set; } = FocusState.NoCandidate;
+    public DisplaySurface CandidateDisplay => currentCandidates.Length > 0 ? currentCandidates[0].Display : null;
+    public DisplayHit PrimaryCandidate => currentCandidates.Length > 0 ? currentCandidates[0] : default;
+    public DisplayHit[] CurrentCandidates => currentCandidates;
+    public string CurrentCandidateIds => DisplayManager.FormatDisplayIds(currentCandidates);
+    public bool HasCandidate => currentCandidates.Length > 0;
 
     private void Awake()
     {
@@ -29,22 +44,17 @@ public class FocusManager : MonoBehaviour
 
         if (inputManager.CurrentCondition != InteractionCondition.ExplicitDisplayFocus)
         {
-            hasCandidate = false;
+            currentCandidates = new DisplayHit[0];
+            CurrentState = FocusState.NoCandidate;
+            displayManager.ResetDisplayVisuals();
             return;
         }
 
-        UpdateCandidate();
+        UpdateCandidates();
 
-        if (hasCandidate && inputManager.GripPressed)
+        if (inputManager.GripPressed)
         {
-            displayManager.SetFocusedDisplay(currentCandidate.Display);
-
-            if (virtualCursorController != null)
-            {
-                virtualCursorController.WarpTo(currentCandidate.Display, currentCandidate.Normalized);
-            }
-
-            Debug.Log($"[FocusManager] condition={inputManager.CurrentCondition}, focusedDisplay={currentCandidate.DisplayId}, normalized={Format(currentCandidate.Normalized)}");
+            ConfirmFocusFromCurrentCandidate();
         }
     }
 
@@ -73,26 +83,134 @@ public class FocusManager : MonoBehaviour
         {
             virtualCursorController = FindObjectOfType<VirtualCursorController>();
         }
+
+        if (logger == null)
+        {
+            logger = FindObjectOfType<Logger>();
+        }
     }
 
-    private void UpdateCandidate()
+    private void UpdateCandidates()
     {
-        DisplayHit[] candidates = displayManager.GetDisplayHitsAll(gazeProvider.GetRay());
-        hasCandidate = candidates.Length > 0;
-        if (!hasCandidate)
+        Ray gazeRay = gazeProvider.GetGazeRay();
+        currentCandidates = displayManager.GetDisplayHitsAll(gazeRay);
+
+        if (currentCandidates.Length == 0)
+        {
+            CurrentState = displayManager.FocusedDisplay != null ? FocusState.FocusedLocked : FocusState.NoCandidate;
+        }
+        else if (displayManager.FocusedDisplay != null)
+        {
+            CurrentState = FocusState.FocusedLocked;
+        }
+        else
+        {
+            CurrentState = currentCandidates.Length == 1
+                ? FocusState.GazeOnSingleDisplay
+                : FocusState.GazeOnMultipleDisplays;
+        }
+
+        displayManager.ApplyFocusVisuals(currentCandidates, displayManager.FocusedDisplay == null);
+
+        if (displayManager.FocusedDisplay != null)
         {
             displayManager.SetOnlyCursorsVisible(displayManager.FocusedDisplay, null);
+        }
+        else
+        {
+            displayManager.HideAllCursors();
+        }
+
+        LogCandidateChange(gazeRay);
+    }
+
+    private void ConfirmFocusFromCurrentCandidate()
+    {
+        if (currentCandidates.Length == 0)
+        {
             return;
         }
 
-        currentCandidate = candidates[0];
+        DisplayHit selected = SelectCandidateForFocus(currentCandidates);
+        displayManager.SetFocusedDisplay(selected.Display);
+        displayManager.SetOnlyCursorsVisible(selected.Display, null);
+        displayManager.ApplyFocusVisuals(null);
+        CurrentState = FocusState.FocusedLocked;
 
-        if (displayManager.FocusedDisplay != currentCandidate.Display)
+        if (virtualCursorController != null)
         {
-            displayManager.SetCursorNormalized(currentCandidate.Display, currentCandidate.Normalized, true);
+            virtualCursorController.WarpTo(selected.Display, selected.Normalized);
         }
 
-        displayManager.SetOnlyCursorsVisible(displayManager.FocusedDisplay, currentCandidate.Display);
+        Ray gazeRay = gazeProvider.GetGazeRay();
+        bool gazeOnDifferentDisplay = IsGazeOnDifferentDisplay(selected.Display);
+        if (logger != null)
+        {
+            logger.LogExplicitFocus(
+                inputManager.CurrentCondition,
+                gazeProvider.CurrentGazeSource,
+                CurrentCandidateIds,
+                selected.DisplayId,
+                selected.Normalized,
+                gazeOnDifferentDisplay,
+                gazeRay.origin,
+                gazeRay.direction);
+            logger.LogExplicitCursorWarp(
+                inputManager.CurrentCondition,
+                gazeProvider.CurrentGazeSource,
+                CurrentCandidateIds,
+                selected.DisplayId,
+                selected.Normalized,
+                gazeOnDifferentDisplay,
+                gazeRay.origin,
+                gazeRay.direction);
+        }
+        else
+        {
+            Debug.Log($"[FocusManager] condition={inputManager.CurrentCondition}, focusedDisplay={selected.DisplayId}, normalized={Format(selected.Normalized)}, candidates={CurrentCandidateIds}");
+        }
+    }
+
+    private static DisplayHit SelectCandidateForFocus(DisplayHit[] candidates)
+    {
+        return candidates[0];
+    }
+
+    public bool IsGazeOnDifferentDisplay(DisplaySurface focusedDisplay)
+    {
+        if (focusedDisplay == null || currentCandidates.Length == 0)
+        {
+            return false;
+        }
+
+        return currentCandidates[0].Display != null && currentCandidates[0].Display != focusedDisplay;
+    }
+
+    private void LogCandidateChange(Ray gazeRay)
+    {
+        string candidateIds = CurrentCandidateIds;
+        if (candidateIds == lastCandidateIds)
+        {
+            return;
+        }
+
+        lastCandidateIds = candidateIds;
+        if (logger != null)
+        {
+            logger.LogExplicitCandidateUpdate(
+                inputManager.CurrentCondition,
+                gazeProvider.CurrentGazeSource,
+                CurrentState,
+                candidateIds,
+                displayManager.FocusedDisplay != null ? displayManager.FocusedDisplay.name : "None",
+                displayManager.FocusedDisplay != null && IsGazeOnDifferentDisplay(displayManager.FocusedDisplay),
+                gazeRay.origin,
+                gazeRay.direction);
+        }
+        else
+        {
+            Debug.Log($"[FocusManager] state={CurrentState}, candidates={candidateIds}");
+        }
     }
 
     private static string Format(Vector2 value)

@@ -277,8 +277,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Material: {fileID: 0}
   m_Color: {r: 0.9, g: 0.38, b: 0.16, a: 0.82}
   m_RaycastTarget: 1
@@ -315,8 +315,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3312d7739989d2b4e91e6319e9a96d76, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Padding: {x: 0, y: 0, z: 0, w: 0}
   m_Softness: {x: 0, y: 0}
 --- !u!1 &359398848
@@ -451,8 +451,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a64fc2b719b334d2db3e3f7593f21b1c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   worldSpaceCanvas: {fileID: 1222415400}
   visiblePanel: {fileID: 856379150}
   transparentHitPlane: {fileID: 1034436738}
@@ -467,6 +467,10 @@ MonoBehaviour:
   debugTargetId: DebugTarget
   scrollPixelsPerUnit: 160
   maxScrollPixels: 420
+  focusHighlightColor: {r: 0.2, g: 1, b: 0.45, a: 1}
+  candidateHighlightColor: {r: 1, g: 0.92, b: 0.2, a: 1}
+  normalAlpha: 0.86
+  overlapPreviewAlpha: 0.36
 --- !u!4 &528464814
 Transform:
   m_ObjectHideFlags: 0
@@ -531,8 +535,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
@@ -749,8 +753,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Material: {fileID: 0}
   m_Color: {r: 0.12, g: 0.4, b: 0.9, a: 0.86}
   m_RaycastTarget: 1
@@ -787,8 +791,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3312d7739989d2b4e91e6319e9a96d76, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Padding: {x: 0, y: 0, z: 0, w: 0}
   m_Softness: {x: 0, y: 0}
 --- !u!1 &888164665
@@ -998,8 +1002,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a64fc2b719b334d2db3e3f7593f21b1c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   worldSpaceCanvas: {fileID: 1846588276}
   visiblePanel: {fileID: 11759483}
   transparentHitPlane: {fileID: 1302094133}
@@ -1014,6 +1018,10 @@ MonoBehaviour:
   debugTargetId: DebugTarget
   scrollPixelsPerUnit: 160
   maxScrollPixels: 420
+  focusHighlightColor: {r: 0.2, g: 1, b: 0.45, a: 1}
+  candidateHighlightColor: {r: 1, g: 0.92, b: 0.2, a: 1}
+  normalAlpha: 0.86
+  overlapPreviewAlpha: 0.36
 --- !u!4 &1035063438
 Transform:
   m_ObjectHideFlags: 0
@@ -1052,6 +1060,7 @@ GameObject:
   - component: {fileID: 1045802442}
   - component: {fileID: 1045802441}
   - component: {fileID: 1045802440}
+  - component: {fileID: 1045802453}
   m_Layer: 0
   m_Name: Prototype_Managers
   m_TagString: Untagged
@@ -1069,11 +1078,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d83fc6048a9b445cabadfa0283d047a8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   inputManager: {fileID: 1045802450}
   gazeProvider: {fileID: 1045802449}
   displayManager: {fileID: 1045802448}
+  focusManager: {fileID: 1045802446}
   controllerRaySource: {fileID: 2098682404}
   rayLength: 4
   hitPointRadius: 0.025
@@ -1088,10 +1098,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e1fef714380b8494aa7e95bb98a6cd86, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   writeCsv: 1
-  filePrefix: prototype_phase1
+  filePrefix: prototype
   sampleIntervalSeconds: 0.25
 --- !u!114 &1045802442
 MonoBehaviour:
@@ -1103,11 +1113,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a26fa9e3baea345608bd352f8f482241, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   inputManager: {fileID: 1045802450}
   displayManager: {fileID: 1045802448}
   raycastPointer: {fileID: 1045802445}
+  focusManager: {fileID: 1045802446}
+  virtualCursorController: {fileID: 1045802444}
+  gazeProvider: {fileID: 1045802449}
   logger: {fileID: 1045802441}
 --- !u!114 &1045802443
 MonoBehaviour:
@@ -1119,11 +1132,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: db0275176f4e546b6a9503a30c7ce1b6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   inputManager: {fileID: 1045802450}
   displayManager: {fileID: 1045802448}
   raycastPointer: {fileID: 1045802445}
+  focusManager: {fileID: 1045802446}
+  virtualCursorController: {fileID: 1045802444}
+  gazeProvider: {fileID: 1045802449}
   logger: {fileID: 1045802441}
   scrollLogInterval: 0.12
   stickScrollDeadzone: 0.05
@@ -1137,11 +1153,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 46f8d96bb3d544064b7963e7509406e1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   inputManager: {fileID: 1045802450}
   displayManager: {fileID: 1045802448}
-  cursorSpeedNormalizedPerSecond: 0.55
+  cursorSpeed: 0.55
+  deadzone: 0.08
+  acceleration: 0
 --- !u!114 &1045802445
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1152,8 +1170,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2b3db965018cf421abafc7b2372d1783, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   inputManager: {fileID: 1045802450}
   displayManager: {fileID: 1045802448}
   rightControllerTransform: {fileID: 2098682404}
@@ -1172,12 +1190,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b36c5b5f2c1004346ab8ca978c1fce85, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   inputManager: {fileID: 1045802450}
   gazeProvider: {fileID: 1045802449}
   displayManager: {fileID: 1045802448}
   virtualCursorController: {fileID: 1045802444}
+  logger: {fileID: 1045802441}
 --- !u!114 &1045802447
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1188,8 +1207,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 70e1254b5ecad431d98ac8b9f492fdc0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   hmdCamera: {fileID: 2098682403}
   displaysRoot: {fileID: 888164666}
   displayAFront: {fileID: 528464813}
@@ -1257,8 +1276,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 50f96c144ae574ae9837a2a59ad8b757, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   displays:
   - {fileID: 528464813}
   - {fileID: 1035063437}
@@ -1277,11 +1296,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7a57199c0593c4ff398e1a593da04291, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  gazeSource: 0
+  m_Name:
+  m_EditorClassIdentifier:
+  gazeSource: 1
   hmdCamera: {fileID: 2098682403}
-  eyeTrackingRaySource: {fileID: 0}
+  eyeTrackingAdapter: {fileID: 1045802453}
+  eyeTrackingRaySource: {fileID: 1790858881}
   warnWhenEyeTrackingFallsBack: 1
 --- !u!114 &1045802450
 MonoBehaviour:
@@ -1293,10 +1313,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fae70ad27fba542398250c9d4ce5350a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   currentCondition: 0
-  allowConditionToggle: 0
+  allowConditionToggle: 1
   stickDeadzone: 0.08
 --- !u!114 &1045802451
 MonoBehaviour:
@@ -1308,15 +1328,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 01e2f54794f154a13a5afb1fe71a4378, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   inputManager: {fileID: 1045802450}
   gazeProvider: {fileID: 1045802449}
   displayManager: {fileID: 1045802448}
   layoutManager: {fileID: 1045802447}
   raycastPointer: {fileID: 1045802445}
+  focusManager: {fileID: 1045802446}
   logger: {fileID: 1045802441}
-  startingCondition: 0
+  startingCondition: 1
   startingLayout: 2
   lockDisplaysAfterStart: 1
   debugLogIntervalSeconds: 0.5
@@ -1332,9 +1353,26 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 1790858881}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1045802453
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1045802439}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 810d38ec6c49842719e6695509e92cc0, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  raySource: {fileID: 1790858881}
+  hmdCamera: {fileID: 2098682403}
+  useHmdPositionWithEyeRotation: 0
+  logAvailabilityChanges: 1
 --- !u!1 &1054095178
 GameObject:
   m_ObjectHideFlags: 0
@@ -1383,8 +1421,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Material: {fileID: 0}
   m_Color: {r: 0.05, g: 0.95, b: 0.42, a: 0.95}
   m_RaycastTarget: 1
@@ -1459,8 +1497,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Material: {fileID: 0}
   m_Color: {r: 0.05, g: 0.95, b: 0.42, a: 0.95}
   m_RaycastTarget: 1
@@ -1534,8 +1572,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Material: {fileID: 0}
   m_Color: {r: 0, g: 0, b: 0, a: 1}
   m_RaycastTarget: 1
@@ -1614,8 +1652,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 0.86}
   m_RaycastTarget: 1
@@ -1724,8 +1762,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_IgnoreReversedGraphics: 1
   m_BlockingObjects: 0
   m_BlockingMask:
@@ -1741,8 +1779,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_UiScaleMode: 0
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
@@ -1982,8 +2020,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   m_RaycastTarget: 1
@@ -2094,8 +2132,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 0.86}
   m_RaycastTarget: 1
@@ -2154,6 +2192,37 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1619621303}
   m_CullTransparentMesh: 1
+--- !u!1 &1790858880
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1790858881}
+  m_Layer: 0
+  m_Name: EyeTracking_RaySource
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1790858881
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1790858880}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1045802452}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1800657491
 GameObject:
   m_ObjectHideFlags: 0
@@ -2201,8 +2270,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
@@ -2283,8 +2352,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_IgnoreReversedGraphics: 1
   m_BlockingObjects: 0
   m_BlockingMask:
@@ -2300,8 +2369,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_UiScaleMode: 0
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
@@ -2383,8 +2452,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Material: {fileID: 0}
   m_Color: {r: 0, g: 0, b: 0, a: 1}
   m_RaycastTarget: 1
@@ -2605,8 +2674,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   m_RaycastTarget: 1

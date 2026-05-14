@@ -12,6 +12,7 @@ public class ExperimentManager : MonoBehaviour
     [SerializeField] private DisplayManager displayManager;
     [SerializeField] private DisplayLayoutManager layoutManager;
     [SerializeField] private RaycastPointer raycastPointer;
+    [SerializeField] private FocusManager focusManager;
     [SerializeField] private Logger logger;
 
     [Header("Experiment State")]
@@ -101,7 +102,9 @@ public class ExperimentManager : MonoBehaviour
             nextDebugLogTime = Time.time + debugLogIntervalSeconds;
             string rayDisplay = hasRayHit ? $"{rayHit.DisplayId} {Format(rayHit.Normalized)}" : "None";
             string focusDisplay = displayManager.FocusedDisplay != null ? displayManager.FocusedDisplay.name : "None";
-            Debug.Log($"[ExperimentManager] condition={inputManager.CurrentCondition}, layout={currentLayout}, rayHit={rayDisplay}, focused={focusDisplay}, controllerRayOrigin={controllerRay.origin}, controllerRayDirection={controllerRay.direction}");
+            string focusState = focusManager != null ? focusManager.CurrentState.ToString() : "Unknown";
+            string candidateIds = focusManager != null ? focusManager.CurrentCandidateIds : "None";
+            Debug.Log($"[ExperimentManager] condition={inputManager.CurrentCondition}, layout={currentLayout}, rayHit={rayDisplay}, focused={focusDisplay}, focusState={focusState}, gazeCandidates={candidateIds}, controllerRayOrigin={controllerRay.origin}, controllerRayDirection={controllerRay.direction}");
         }
     }
 
@@ -130,6 +133,11 @@ public class ExperimentManager : MonoBehaviour
         if (raycastPointer == null)
         {
             raycastPointer = FindObjectOfType<RaycastPointer>();
+        }
+
+        if (focusManager == null)
+        {
+            focusManager = FindObjectOfType<FocusManager>();
         }
 
         if (logger == null)

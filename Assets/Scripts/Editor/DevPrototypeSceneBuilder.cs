@@ -37,6 +37,7 @@ public static class DevPrototypeSceneBuilder
         ExperimentManager experimentManager = GetOrAdd<ExperimentManager>(managers);
         PrototypeInputManager inputManager = GetOrAdd<PrototypeInputManager>(managers);
         GazeProvider gazeProvider = GetOrAdd<GazeProvider>(managers);
+        EyeTrackingRayAdapter eyeTrackingRayAdapter = GetOrAdd<EyeTrackingRayAdapter>(managers);
         DisplayManager displayManager = GetOrAdd<DisplayManager>(managers);
         DisplayLayoutManager layoutManager = GetOrAdd<DisplayLayoutManager>(managers);
         FocusManager focusManager = GetOrAdd<FocusManager>(managers);
@@ -54,18 +55,26 @@ public static class DevPrototypeSceneBuilder
         SetEnum(layoutManager, "initialPreset", DisplayLayoutPreset.StrongOcclusion);
 
         SetObject(gazeProvider, "hmdCamera", hmdCamera);
+        Transform eyeTrackingRaySource = EnsureChild(managers.transform, "EyeTracking_RaySource");
+        SetObject(eyeTrackingRayAdapter, "hmdCamera", hmdCamera);
+        SetObject(eyeTrackingRayAdapter, "raySource", eyeTrackingRaySource);
+        SetObject(gazeProvider, "eyeTrackingAdapter", eyeTrackingRayAdapter);
+        SetObject(gazeProvider, "eyeTrackingRaySource", eyeTrackingRaySource);
+        SetBool(inputManager, "allowConditionToggle", true);
 
         SetObject(experimentManager, "inputManager", inputManager);
         SetObject(experimentManager, "gazeProvider", gazeProvider);
         SetObject(experimentManager, "displayManager", displayManager);
         SetObject(experimentManager, "layoutManager", layoutManager);
         SetObject(experimentManager, "raycastPointer", raycastPointer);
+        SetObject(experimentManager, "focusManager", focusManager);
         SetObject(experimentManager, "logger", logger);
 
         SetObject(focusManager, "inputManager", inputManager);
         SetObject(focusManager, "gazeProvider", gazeProvider);
         SetObject(focusManager, "displayManager", displayManager);
         SetObject(focusManager, "virtualCursorController", cursorController);
+        SetObject(focusManager, "logger", logger);
 
         SetObject(raycastPointer, "inputManager", inputManager);
         SetObject(raycastPointer, "displayManager", displayManager);
@@ -77,16 +86,23 @@ public static class DevPrototypeSceneBuilder
         SetObject(scrollController, "inputManager", inputManager);
         SetObject(scrollController, "displayManager", displayManager);
         SetObject(scrollController, "raycastPointer", raycastPointer);
+        SetObject(scrollController, "focusManager", focusManager);
+        SetObject(scrollController, "virtualCursorController", cursorController);
+        SetObject(scrollController, "gazeProvider", gazeProvider);
         SetObject(scrollController, "logger", logger);
 
         SetObject(clickDispatcher, "inputManager", inputManager);
         SetObject(clickDispatcher, "displayManager", displayManager);
         SetObject(clickDispatcher, "raycastPointer", raycastPointer);
+        SetObject(clickDispatcher, "focusManager", focusManager);
+        SetObject(clickDispatcher, "virtualCursorController", cursorController);
+        SetObject(clickDispatcher, "gazeProvider", gazeProvider);
         SetObject(clickDispatcher, "logger", logger);
 
         SetObject(debugVisualizer, "inputManager", inputManager);
         SetObject(debugVisualizer, "gazeProvider", gazeProvider);
         SetObject(debugVisualizer, "displayManager", displayManager);
+        SetObject(debugVisualizer, "focusManager", focusManager);
         SetObject(debugVisualizer, "controllerRaySource", controllerRaySource);
 
         layoutManager.ApplyLayout(DisplayLayoutPreset.StrongOcclusion);
@@ -335,6 +351,17 @@ public static class DevPrototypeSceneBuilder
         if (property != null)
         {
             property.enumValueIndex = System.Convert.ToInt32(value);
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+        }
+    }
+
+    private static void SetBool(Object target, string propertyName, bool value)
+    {
+        SerializedObject serializedObject = new SerializedObject(target);
+        SerializedProperty property = serializedObject.FindProperty(propertyName);
+        if (property != null)
+        {
+            property.boolValue = value;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
         }
     }

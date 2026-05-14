@@ -6,6 +6,9 @@ public class ScrollController : MonoBehaviour
     [SerializeField] private PrototypeInputManager inputManager;
     [SerializeField] private DisplayManager displayManager;
     [SerializeField] private RaycastPointer raycastPointer;
+    [SerializeField] private FocusManager focusManager;
+    [SerializeField] private VirtualCursorController virtualCursorController;
+    [SerializeField] private GazeProvider gazeProvider;
     [SerializeField] private Logger logger;
     [SerializeField] private float scrollLogInterval = 0.12f;
     [SerializeField] private float stickScrollDeadzone = 0.05f;
@@ -26,11 +29,20 @@ public class ScrollController : MonoBehaviour
             return;
         }
 
-        if (inputManager.CurrentCondition != InteractionCondition.RaycastBaseline)
+        if (inputManager.CurrentCondition == InteractionCondition.RaycastBaseline)
         {
+            ScrollRaycastBaseline();
             return;
         }
 
+        if (inputManager.CurrentCondition == InteractionCondition.ExplicitDisplayFocus)
+        {
+            ScrollExplicitFocus();
+        }
+    }
+
+    private void ScrollRaycastBaseline()
+    {
         if (!displayManager.HasCurrentRaycastHit)
         {
             return;
@@ -69,6 +81,59 @@ public class ScrollController : MonoBehaviour
         }
     }
 
+    private void ScrollExplicitFocus()
+    {
+        if (!inputManager.TriggerHeld)
+        {
+            return;
+        }
+
+        float stickVertical = inputManager.Stick.y;
+        if (Mathf.Abs(stickVertical) < stickScrollDeadzone)
+        {
+            return;
+        }
+
+        DisplaySurface focusedDisplay = displayManager.FocusedDisplay;
+        if (focusedDisplay == null)
+        {
+            return;
+        }
+
+        float appliedScroll = focusedDisplay.Scroll(stickVertical, Time.deltaTime);
+        if (Mathf.Approximately(appliedScroll, 0f))
+        {
+            return;
+        }
+
+        if (Time.time - lastScrollLogTime >= scrollLogInterval)
+        {
+            lastScrollLogTime = Time.time;
+            Vector2 normalized = virtualCursorController != null
+                ? virtualCursorController.NormalizedPosition
+                : new Vector2(0.5f, 0.5f);
+            Ray gazeRay = gazeProvider != null ? gazeProvider.GetGazeRay() : default;
+            bool gazeOnDifferentDisplay = focusManager != null && focusManager.IsGazeOnDifferentDisplay(focusedDisplay);
+            if (logger != null)
+            {
+                logger.LogExplicitScroll(
+                    inputManager.CurrentCondition,
+                    gazeProvider != null ? gazeProvider.CurrentGazeSource : GazeSource.HmdForward,
+                    focusManager != null ? focusManager.CurrentCandidateIds : "None",
+                    focusedDisplay.name,
+                    normalized,
+                    appliedScroll,
+                    gazeOnDifferentDisplay,
+                    gazeRay.origin,
+                    gazeRay.direction);
+            }
+            else
+            {
+                Debug.Log($"[ScrollController] condition={inputManager.CurrentCondition}, focusedDisplay={focusedDisplay.name}, normalized={Format(normalized)}, scrollAmount={appliedScroll:0.000}, gazeOnDifferentDisplay={gazeOnDifferentDisplay}");
+            }
+        }
+    }
+
     private void ResolveReferences()
     {
         if (inputManager == null)
@@ -88,6 +153,21 @@ public class ScrollController : MonoBehaviour
         if (raycastPointer == null)
         {
             raycastPointer = FindObjectOfType<RaycastPointer>();
+        }
+
+        if (focusManager == null)
+        {
+            focusManager = FindObjectOfType<FocusManager>();
+        }
+
+        if (virtualCursorController == null)
+        {
+            virtualCursorController = FindObjectOfType<VirtualCursorController>();
+        }
+
+        if (gazeProvider == null)
+        {
+            gazeProvider = FindObjectOfType<GazeProvider>();
         }
 
         if (logger == null)

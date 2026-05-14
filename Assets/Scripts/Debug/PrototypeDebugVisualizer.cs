@@ -6,6 +6,7 @@ public class PrototypeDebugVisualizer : MonoBehaviour
     [SerializeField] private PrototypeInputManager inputManager;
     [SerializeField] private GazeProvider gazeProvider;
     [SerializeField] private DisplayManager displayManager;
+    [SerializeField] private FocusManager focusManager;
     [SerializeField] private Transform controllerRaySource;
     [SerializeField] private float rayLength = 4f;
     [SerializeField] private float hitPointRadius = 0.025f;
@@ -40,12 +41,14 @@ public class PrototypeDebugVisualizer : MonoBehaviour
 
         if (gazeProvider != null)
         {
-            Ray gazeRay = gazeProvider.GetRay();
+            Ray gazeRay = gazeProvider.GetGazeRay();
             Gizmos.color = Color.magenta;
             Gizmos.DrawLine(gazeRay.origin, gazeRay.origin + gazeRay.direction * rayLength);
-            if (displayManager.TryGetForemostHit(gazeRay, out DisplayHit gazeHit))
+            DisplayHit[] gazeHits = displayManager.GetDisplayHitsAll(gazeRay);
+            for (int i = 0; i < gazeHits.Length; i++)
             {
-                Gizmos.DrawWireSphere(gazeHit.Hit.point, hitPointRadius * 1.4f);
+                Gizmos.color = i == 0 ? Color.magenta : Color.yellow;
+                Gizmos.DrawWireSphere(gazeHits[i].Hit.point, hitPointRadius * (1.4f + i * 0.25f));
             }
         }
 
@@ -67,13 +70,17 @@ public class PrototypeDebugVisualizer : MonoBehaviour
         Ray controllerRay = GetControllerRay();
         bool hasRayHit = displayManager.TryGetForemostHit(controllerRay, out DisplayHit rayHit);
         DisplayHit gazeHit = default;
-        bool hasGazeHit = gazeProvider != null && displayManager.TryGetForemostHit(gazeProvider.GetRay(), out gazeHit);
+        bool hasGazeHit = gazeProvider != null && displayManager.TryGetForemostHit(gazeProvider.GetGazeRay(), out gazeHit);
+        string focusState = focusManager != null ? focusManager.CurrentState.ToString() : "Unknown";
+        string candidates = focusManager != null ? focusManager.CurrentCandidateIds : "None";
 
-        GUI.Box(new Rect(12f, 12f, 420f, 118f), "Explicit Display Focus Debug");
+        GUI.Box(new Rect(12f, 12f, 500f, 164f), "Explicit Display Focus Debug");
         GUI.Label(new Rect(24f, 40f, 390f, 20f), $"Condition: {(inputManager != null ? inputManager.CurrentCondition.ToString() : "Unknown")}");
         GUI.Label(new Rect(24f, 62f, 390f, 20f), $"Controller hit: {(hasRayHit ? rayHit.DisplayId + " " + Format(rayHit.Normalized) : "None")}");
         GUI.Label(new Rect(24f, 84f, 390f, 20f), $"Gaze hit: {(hasGazeHit ? gazeHit.DisplayId + " " + Format(gazeHit.Normalized) : "None")}");
         GUI.Label(new Rect(24f, 106f, 390f, 20f), $"Focused display: {(displayManager.FocusedDisplay != null ? displayManager.FocusedDisplay.name : "None")}");
+        GUI.Label(new Rect(24f, 128f, 460f, 20f), $"Focus state: {focusState}");
+        GUI.Label(new Rect(24f, 150f, 460f, 20f), $"Gaze candidates: {candidates}");
     }
 
     private void ResolveReferences()
@@ -91,6 +98,11 @@ public class PrototypeDebugVisualizer : MonoBehaviour
         if (gazeProvider == null)
         {
             gazeProvider = FindObjectOfType<GazeProvider>();
+        }
+
+        if (focusManager == null)
+        {
+            focusManager = FindObjectOfType<FocusManager>();
         }
     }
 

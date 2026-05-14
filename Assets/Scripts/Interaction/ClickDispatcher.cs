@@ -6,6 +6,9 @@ public class ClickDispatcher : MonoBehaviour
     [SerializeField] private PrototypeInputManager inputManager;
     [SerializeField] private DisplayManager displayManager;
     [SerializeField] private RaycastPointer raycastPointer;
+    [SerializeField] private FocusManager focusManager;
+    [SerializeField] private VirtualCursorController virtualCursorController;
+    [SerializeField] private GazeProvider gazeProvider;
     [SerializeField] private Logger logger;
 
     private void Awake()
@@ -22,11 +25,20 @@ public class ClickDispatcher : MonoBehaviour
             return;
         }
 
-        if (inputManager.CurrentCondition != InteractionCondition.RaycastBaseline)
+        if (inputManager.CurrentCondition == InteractionCondition.RaycastBaseline)
         {
+            DispatchRaycastBaselineClick();
             return;
         }
 
+        if (inputManager.CurrentCondition == InteractionCondition.ExplicitDisplayFocus)
+        {
+            DispatchExplicitFocusClick();
+        }
+    }
+
+    private void DispatchRaycastBaselineClick()
+    {
         if (!displayManager.HasCurrentRaycastHit)
         {
             return;
@@ -37,6 +49,40 @@ public class ClickDispatcher : MonoBehaviour
         bool validTarget = hit.Display != null && hit.Display.TryClickDebugTarget(hit.Normalized, out targetId);
         Ray ray = raycastPointer != null ? raycastPointer.CurrentRay : default;
         LogClick(hit.DisplayId, hit.Normalized, validTarget, targetId, ray);
+    }
+
+    private void DispatchExplicitFocusClick()
+    {
+        DisplaySurface focusedDisplay = displayManager.FocusedDisplay;
+        if (focusedDisplay == null || virtualCursorController == null)
+        {
+            return;
+        }
+
+        Vector2 normalized = virtualCursorController.NormalizedPosition;
+        string targetId = string.Empty;
+        bool validTarget = focusedDisplay.TryClickDebugTarget(normalized, out targetId);
+        Ray gazeRay = gazeProvider != null ? gazeProvider.GetGazeRay() : default;
+        bool gazeOnDifferentDisplay = focusManager != null && focusManager.IsGazeOnDifferentDisplay(focusedDisplay);
+
+        if (logger != null)
+        {
+            logger.LogExplicitClick(
+                inputManager.CurrentCondition,
+                gazeProvider != null ? gazeProvider.CurrentGazeSource : GazeSource.HmdForward,
+                focusManager != null ? focusManager.CurrentCandidateIds : "None",
+                focusedDisplay.name,
+                normalized,
+                validTarget,
+                targetId,
+                gazeOnDifferentDisplay,
+                gazeRay.origin,
+                gazeRay.direction);
+        }
+        else
+        {
+            Debug.Log($"[ClickDispatcher] condition={inputManager.CurrentCondition}, focusedDisplay={focusedDisplay.name}, normalized={Format(normalized)}, validTarget={validTarget}, targetId={targetId}, gazeOnDifferentDisplay={gazeOnDifferentDisplay}");
+        }
     }
 
     private void ResolveReferences()
@@ -58,6 +104,21 @@ public class ClickDispatcher : MonoBehaviour
         if (raycastPointer == null)
         {
             raycastPointer = FindObjectOfType<RaycastPointer>();
+        }
+
+        if (focusManager == null)
+        {
+            focusManager = FindObjectOfType<FocusManager>();
+        }
+
+        if (virtualCursorController == null)
+        {
+            virtualCursorController = FindObjectOfType<VirtualCursorController>();
+        }
+
+        if (gazeProvider == null)
+        {
+            gazeProvider = FindObjectOfType<GazeProvider>();
         }
 
         if (logger == null)
