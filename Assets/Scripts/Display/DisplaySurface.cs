@@ -1,6 +1,14 @@
 using UnityEngine;
 using UnityEngine.UI;
 
+public enum DisplayContentMode
+{
+    Debug,
+    ConditionSelection,
+    PointingTask,
+    ScrollTask
+}
+
 [DisallowMultipleComponent]
 public class DisplaySurface : MonoBehaviour
 {
@@ -20,15 +28,10 @@ public class DisplaySurface : MonoBehaviour
     [SerializeField] private Vector2 cursorPixelSize = new Vector2(10f, 10f);
 
     [Header("Debug Content")]
+    [SerializeField] private DisplayContentMode contentMode = DisplayContentMode.Debug;
     [SerializeField] private string debugTargetId = "DebugTarget";
     [SerializeField] private float scrollPixelsPerUnit = 160f;
     [SerializeField] private float maxScrollPixels = 420f;
-
-    [Header("Explicit Focus Visuals")]
-    [SerializeField] private Color focusHighlightColor = new Color(0.20f, 1f, 0.45f, 1f);
-    [SerializeField] private Color candidateHighlightColor = new Color(1f, 0.92f, 0.20f, 1f);
-    [SerializeField] private float normalAlpha = 0.86f;
-    [SerializeField] private float overlapPreviewAlpha = 0.36f;
 
     private float scrollOffsetPixels;
     private Image visiblePanelImage;
@@ -43,6 +46,7 @@ public class DisplaySurface : MonoBehaviour
     public RectTransform DebugClickTarget => debugClickTarget;
     public Vector2 PhysicalSizeMeters => physicalSizeMeters;
     public Vector2 CanvasPixelSize => canvasPixelSize;
+    public DisplayContentMode ContentMode => contentMode;
 
     private void Awake()
     {
@@ -63,6 +67,22 @@ public class DisplaySurface : MonoBehaviour
         scrollContent = contentRoot;
         debugClickTarget = clickTarget;
         ApplyScrollOffset();
+        ApplyContentMode();
+    }
+
+    public void SetContentMode(DisplayContentMode mode)
+    {
+        contentMode = mode;
+        ApplyContentMode();
+        BringCursorToFront();
+    }
+
+    public void BringCursorToFront()
+    {
+        if (cursor != null)
+        {
+            cursor.SetAsLastSibling();
+        }
     }
 
     public void SetFocusVisual(bool focused)
@@ -73,9 +93,7 @@ public class DisplaySurface : MonoBehaviour
             return;
         }
 
-        visiblePanelImage.color = focused
-            ? WithAlpha(focusHighlightColor, Mathf.Max(basePanelColor.a, normalAlpha))
-            : WithAlpha(basePanelColor, basePanelColor.a);
+        visiblePanelImage.color = WithAlpha(basePanelColor, basePanelColor.a);
     }
 
     public void SetCandidateVisual(bool candidate, bool overlapPreview)
@@ -86,15 +104,7 @@ public class DisplaySurface : MonoBehaviour
             return;
         }
 
-        if (!candidate)
-        {
-            visiblePanelImage.color = WithAlpha(basePanelColor, basePanelColor.a);
-            return;
-        }
-
-        Color color = candidateHighlightColor;
-        color.a = overlapPreview ? overlapPreviewAlpha : Mathf.Max(basePanelColor.a, normalAlpha);
-        visiblePanelImage.color = color;
+        visiblePanelImage.color = WithAlpha(basePanelColor, basePanelColor.a);
     }
 
     public void SetSize(Vector2 sizeMeters, Vector2 pixelSize)
@@ -152,6 +162,7 @@ public class DisplaySurface : MonoBehaviour
             cursor.sizeDelta = cursorPixelSize;
             cursor.localScale = Vector3.one;
             cursor.localRotation = Quaternion.identity;
+            cursor.SetAsLastSibling();
         }
 
         ApplyScrollOffset();
@@ -173,7 +184,7 @@ public class DisplaySurface : MonoBehaviour
     public bool TryClickDebugTarget(Vector2 normalized, out string targetId)
     {
         targetId = debugTargetId;
-        if (debugClickTarget == null || worldSpaceCanvas == null)
+        if (debugClickTarget == null || worldSpaceCanvas == null || !debugClickTarget.gameObject.activeInHierarchy)
         {
             return false;
         }
@@ -209,7 +220,7 @@ public class DisplaySurface : MonoBehaviour
 
     public float Scroll(float stickVertical, float deltaTime)
     {
-        if (scrollContent == null)
+        if (scrollContent == null || !scrollContent.gameObject.activeInHierarchy)
         {
             return 0f;
         }
@@ -232,6 +243,17 @@ public class DisplaySurface : MonoBehaviour
         {
             scrollContent.anchoredPosition = new Vector2(scrollContent.anchoredPosition.x, scrollOffsetPixels);
         }
+    }
+
+    private void ApplyContentMode()
+    {
+        if (scrollContent == null)
+        {
+            return;
+        }
+
+        bool showPseudoContent = contentMode == DisplayContentMode.Debug || contentMode == DisplayContentMode.ScrollTask;
+        scrollContent.gameObject.SetActive(showPseudoContent);
     }
 
     private void CachePanelImage()
@@ -257,5 +279,6 @@ public class DisplaySurface : MonoBehaviour
     private void OnValidate()
     {
         ApplyConfiguration();
+        ApplyContentMode();
     }
 }

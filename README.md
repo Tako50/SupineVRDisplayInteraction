@@ -102,6 +102,19 @@ For editor validation:
 7. Press `Space` to click.
 8. Hold `Left Shift` and press `W` / `S` to scroll the focused display.
 
+## Phase 4 FocusPointing Task Skeleton
+
+`Dev_Prototype` now includes the first task layer for T1 display selection + target selection:
+
+- `FocusPointingTaskManager` manages a simple trial list.
+- Each trial defines condition, layout preset, target display, target normalized position, target size, and trial index.
+- A visible `FocusPointingTarget` is generated on the active target display.
+- `ClickDispatcher` reports click attempts to the task layer for both `RaycastBaseline` and `ExplicitDisplayFocus`.
+- `ErrorEvaluator` classifies clicks as `Correct`, `DisplayError`, `TargetError`, or `Miss`.
+- `Logger` writes `TrialResult` rows with participant/session placeholders, target info, click info, result flags, start time, click time, and completion time.
+
+This is a task skeleton only. It does not implement T2 scroll tasks, T3 attention-focus tasks, participant flow, questionnaires, or counterbalancing.
+
 `GazeProvider` supports `HmdForward` for development only and an `EyeTracking` placeholder source for a later Meta Quest Pro eye-tracking adapter. HMD forward should not be used for experiments.
 
 ## Quest Pro Eye Tracking

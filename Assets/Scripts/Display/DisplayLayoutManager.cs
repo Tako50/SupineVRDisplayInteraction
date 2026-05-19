@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.XR;
 
 public enum DisplayLayoutPreset
 {
@@ -23,9 +25,19 @@ public class DisplayLayoutManager : MonoBehaviour
     [Header("Layout")]
     [SerializeField] private DisplayLayoutPreset initialPreset = DisplayLayoutPreset.StrongOcclusion;
     [SerializeField] private bool applyOnStart = true;
+    [SerializeField] private bool resetLayoutOnXrRecenter = true;
+    [SerializeField] private bool logLayoutResetEvents = true;
     [SerializeField] private DisplayLayoutConfig noOcclusion = DisplayLayoutConfig.NoOcclusionDefaults();
     [SerializeField] private DisplayLayoutConfig partialOcclusion = DisplayLayoutConfig.PartialOcclusionDefaults();
     [SerializeField] private DisplayLayoutConfig strongOcclusion = DisplayLayoutConfig.StrongOcclusionDefaults();
+
+    private static readonly List<XRInputSubsystem> InputSubsystems = new List<XRInputSubsystem>();
+
+    private DisplayLayoutPreset currentPreset;
+    private bool hasRuntimeAnchor;
+    private Vector3 anchorPosition;
+    private Vector3 anchorForward = Vector3.forward;
+    private Vector3 anchorUp = Vector3.up;
 
     public DisplayLayoutPreset InitialPreset
     {
@@ -44,10 +56,21 @@ public class DisplayLayoutManager : MonoBehaviour
         ResetPresetDefaults();
     }
 
+    private void OnEnable()
+    {
+        SubscribeToXrRecenterEvents();
+    }
+
+    private void OnDisable()
+    {
+        UnsubscribeFromXrRecenterEvents();
+    }
+
     private void Start()
     {
         if (applyOnStart)
         {
+            CaptureCurrentHmdAsLayoutAnchor();
             ApplyLayout(initialPreset);
         }
     }
@@ -99,6 +122,7 @@ public class DisplayLayoutManager : MonoBehaviour
     {
         EnsurePresetDefaults();
         AutoAssignReferences();
+        currentPreset = preset;
 
         Transform hmd = hmdCamera != null ? hmdCamera.transform : null;
         if (hmd == null || displayAFront == null || displayBBack == null)
@@ -106,13 +130,91 @@ public class DisplayLayoutManager : MonoBehaviour
             return;
         }
 
+        if (Application.isPlaying && !hasRuntimeAnchor)
+        {
+            CaptureCurrentHmdAsLayoutAnchor();
+        }
+
         DisplayLayoutConfig layout = GetLayout(preset);
 
-        ApplyDisplayPose(displayAFront.transform, hmd, layout.DisplayAFront);
-        ApplyDisplayPose(displayBBack.transform, hmd, layout.DisplayBBack);
+        if (Application.isPlaying)
+        {
+            ApplyDisplayPose(displayAFront.transform, anchorPosition, anchorForward, anchorUp, layout.DisplayAFront);
+            ApplyDisplayPose(displayBBack.transform, anchorPosition, anchorForward, anchorUp, layout.DisplayBBack);
+        }
+        else
+        {
+            ApplyDisplayPose(displayAFront.transform, hmd.position, hmd.forward, hmd.up, layout.DisplayAFront);
+            ApplyDisplayPose(displayBBack.transform, hmd.position, hmd.forward, hmd.up, layout.DisplayBBack);
+        }
 
         ApplyDisplayScale(displayAFront, layout.DisplayAFront);
         ApplyDisplayScale(displayBBack, layout.DisplayBBack);
+    }
+
+    public void ResetLayoutFromCurrentHmd()
+    {
+        CaptureCurrentHmdAsLayoutAnchor();
+        ApplyLayout(currentPreset);
+        if (logLayoutResetEvents)
+        {
+            Debug.Log($"[DisplayLayoutManager] reset layout anchor from HMD. preset={currentPreset}, forward={anchorForward}");
+        }
+    }
+
+    public void ResetLayoutFromCurrentHmd(DisplayLayoutPreset preset)
+    {
+        currentPreset = preset;
+        ResetLayoutFromCurrentHmd();
+    }
+
+    private void CaptureCurrentHmdAsLayoutAnchor()
+    {
+        AutoAssignReferences();
+        Transform hmd = hmdCamera != null ? hmdCamera.transform : null;
+        if (hmd == null)
+        {
+            return;
+        }
+
+        anchorPosition = hmd.position;
+        anchorForward = NormalizeOrFallback(hmd.forward, Vector3.forward);
+        anchorUp = NormalizeOrFallback(hmd.up, Vector3.up);
+        hasRuntimeAnchor = true;
+    }
+
+    private void SubscribeToXrRecenterEvents()
+    {
+        if (!Application.isPlaying || !resetLayoutOnXrRecenter)
+        {
+            return;
+        }
+
+        SubsystemManager.GetInstances(InputSubsystems);
+        for (int i = 0; i < InputSubsystems.Count; i++)
+        {
+            InputSubsystems[i].trackingOriginUpdated -= HandleTrackingOriginUpdated;
+            InputSubsystems[i].trackingOriginUpdated += HandleTrackingOriginUpdated;
+        }
+    }
+
+    private void UnsubscribeFromXrRecenterEvents()
+    {
+        SubsystemManager.GetInstances(InputSubsystems);
+        for (int i = 0; i < InputSubsystems.Count; i++)
+        {
+            InputSubsystems[i].trackingOriginUpdated -= HandleTrackingOriginUpdated;
+        }
+    }
+
+    private void HandleTrackingOriginUpdated(XRInputSubsystem subsystem)
+    {
+        if (!resetLayoutOnXrRecenter)
+        {
+            return;
+        }
+
+        ResetLayoutFromCurrentHmd();
     }
 
     private void EnsurePresetDefaults()
@@ -143,17 +245,33 @@ public class DisplayLayoutManager : MonoBehaviour
         }
     }
 
-    private static void ApplyDisplayPose(Transform display, Transform hmd, DisplayPlacementConfig config)
+    private static void ApplyDisplayPose(
+        Transform display,
+        Vector3 origin,
+        Vector3 forward,
+        Vector3 up,
+        DisplayPlacementConfig config)
     {
-        Vector3 targetPosition = hmd.position
-            + hmd.forward * config.DistanceFromHmd
-            + hmd.right * config.HorizontalOffset
-            + hmd.up * config.VerticalOffset;
+        forward = NormalizeOrFallback(forward, Vector3.forward);
+        up = NormalizeOrFallback(up, Vector3.up);
+        Vector3 right = Vector3.Cross(up, forward);
+        if (right.sqrMagnitude < 0.0001f)
+        {
+            right = Vector3.Cross(Vector3.up, forward);
+        }
 
-        Vector3 directionFromHmd = targetPosition - hmd.position;
+        right = NormalizeOrFallback(right, Vector3.right);
+        up = Vector3.Cross(forward, right).normalized;
+
+        Vector3 targetPosition = origin
+            + forward * config.DistanceFromHmd
+            + right * config.HorizontalOffset
+            + up * config.VerticalOffset;
+
+        Vector3 directionFromHmd = targetPosition - origin;
         Quaternion hmdFacingRotation = directionFromHmd.sqrMagnitude > 0.0001f
-            ? Quaternion.LookRotation(directionFromHmd.normalized, hmd.up)
-            : Quaternion.LookRotation(hmd.forward, hmd.up);
+            ? Quaternion.LookRotation(directionFromHmd.normalized, up)
+            : Quaternion.LookRotation(forward, up);
 
         Quaternion rotationOffset = Quaternion.Euler(
             config.PitchDegrees,
@@ -161,6 +279,11 @@ public class DisplayLayoutManager : MonoBehaviour
             config.RollDegrees);
 
         display.SetPositionAndRotation(targetPosition, hmdFacingRotation * rotationOffset);
+    }
+
+    private static Vector3 NormalizeOrFallback(Vector3 value, Vector3 fallback)
+    {
+        return value.sqrMagnitude > 0.0001f ? value.normalized : fallback;
     }
 
     private static void ApplyDisplayScale(DisplaySurface display, DisplayPlacementConfig config)

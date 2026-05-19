@@ -277,10 +277,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.9, g: 0.38, b: 0.16, a: 0.82}
+  m_Color: {r: 0.18, g: 0.32, b: 0.46, a: 0.86}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -315,8 +315,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3312d7739989d2b4e91e6319e9a96d76, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Padding: {x: 0, y: 0, z: 0, w: 0}
   m_Softness: {x: 0, y: 0}
 --- !u!1 &359398848
@@ -451,8 +451,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a64fc2b719b334d2db3e3f7593f21b1c, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   worldSpaceCanvas: {fileID: 1222415400}
   visiblePanel: {fileID: 856379150}
   transparentHitPlane: {fileID: 1034436738}
@@ -464,6 +464,7 @@ MonoBehaviour:
   canvasScale: 0.001
   hitPlaneDepthMeters: 0.02
   cursorPixelSize: {x: 10, y: 10}
+  contentMode: 1
   debugTargetId: DebugTarget
   scrollPixelsPerUnit: 160
   maxScrollPixels: 420
@@ -535,8 +536,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
@@ -753,10 +754,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.12, g: 0.4, b: 0.9, a: 0.86}
+  m_Color: {r: 0.18, g: 0.32, b: 0.46, a: 0.86}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -791,8 +792,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3312d7739989d2b4e91e6319e9a96d76, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Padding: {x: 0, y: 0, z: 0, w: 0}
   m_Softness: {x: 0, y: 0}
 --- !u!1 &888164665
@@ -1002,8 +1003,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a64fc2b719b334d2db3e3f7593f21b1c, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   worldSpaceCanvas: {fileID: 1846588276}
   visiblePanel: {fileID: 11759483}
   transparentHitPlane: {fileID: 1302094133}
@@ -1015,6 +1016,7 @@ MonoBehaviour:
   canvasScale: 0.001
   hitPlaneDepthMeters: 0.02
   cursorPixelSize: {x: 10, y: 10}
+  contentMode: 1
   debugTargetId: DebugTarget
   scrollPixelsPerUnit: 160
   maxScrollPixels: 420
@@ -1062,6 +1064,10 @@ GameObject:
   - component: {fileID: 1045802440}
   - component: {fileID: 1045802453}
   - component: {fileID: 1045802454}
+  - component: {fileID: 1045802456}
+  - component: {fileID: 1045802455}
+  - component: {fileID: 1045802457}
+  - component: {fileID: 1045802458}
   m_Layer: 0
   m_Name: Prototype_Managers
   m_TagString: Untagged
@@ -1079,10 +1085,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d83fc6048a9b445cabadfa0283d047a8, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   inputManager: {fileID: 1045802450}
   gazeProvider: {fileID: 1045802449}
+  eyeTrackingAdapter: {fileID: 1045802453}
   displayManager: {fileID: 1045802448}
   focusManager: {fileID: 1045802446}
   virtualCursorController: {fileID: 1045802444}
@@ -1090,10 +1097,31 @@ MonoBehaviour:
   scrollController: {fileID: 1045802443}
   experimentManager: {fileID: 1045802451}
   debugInputProvider: {fileID: 1045802454}
+  focusPointingTaskManager: {fileID: 1045802456}
+  raycastPointer: {fileID: 1045802445}
   controllerRaySource: {fileID: 2098682404}
   rayLength: 4
-  hitPointRadius: 0.025
+  hitPointRadius: 0.01
+  rayVisualizationMode: 4
+  allowRuntimeRayVisualizationToggle: 0
+  showGazeRayInGame: 1
+  showGazeRayOnlyWhileGripHeld: 1
+  gazeRayStartOffset: 0.35
+  gazeRayStartWidth: 0.0035
+  gazeRayEndWidth: 0.001
+  gazeRayColor: {r: 1, g: 0, b: 1, a: 1}
+  gazeRayLine: {fileID: 0}
+  gazeHitMarker: {fileID: 0}
   showOverlay: 1
+  useUnityUiOverlay: 1
+  overlayText: {fileID: 0}
+  showWorldConditionLabel: 1
+  worldConditionLabelAnchorDisplayId: Display_B_Back
+  worldConditionLabelNormalizedAnchor: {x: 0.5, y: 1.08}
+  worldConditionLabelForwardOffset: -0.01
+  worldConditionLabelSize: {x: 520, y: 72}
+  worldConditionLabelScale: 0.0015
+  worldConditionLabel: {fileID: 0}
 --- !u!114 &1045802441
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1104,8 +1132,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e1fef714380b8494aa7e95bb98a6cd86, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   writeCsv: 1
   filePrefix: prototype
   sampleIntervalSeconds: 0.25
@@ -1119,14 +1147,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a26fa9e3baea345608bd352f8f482241, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   inputManager: {fileID: 1045802450}
   displayManager: {fileID: 1045802448}
   raycastPointer: {fileID: 1045802445}
   focusManager: {fileID: 1045802446}
   virtualCursorController: {fileID: 1045802444}
   gazeProvider: {fileID: 1045802449}
+  focusPointingTaskManager: {fileID: 1045802456}
+  vrTaskMenuManager: {fileID: 1045802458}
   logger: {fileID: 1045802441}
 --- !u!114 &1045802443
 MonoBehaviour:
@@ -1138,8 +1168,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: db0275176f4e546b6a9503a30c7ce1b6, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   inputManager: {fileID: 1045802450}
   displayManager: {fileID: 1045802448}
   raycastPointer: {fileID: 1045802445}
@@ -1159,13 +1189,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 46f8d96bb3d544064b7963e7509406e1, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   inputManager: {fileID: 1045802450}
   displayManager: {fileID: 1045802448}
   cursorSpeed: 0.55
   deadzone: 0.08
   acceleration: 0
+  allowStickCursorMovement: 1
   logCursorMovement: 0
   cursorMoveLogInterval: 0.25
 --- !u!114 &1045802445
@@ -1178,8 +1209,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2b3db965018cf421abafc7b2372d1783, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   inputManager: {fileID: 1045802450}
   displayManager: {fileID: 1045802448}
   rightControllerTransform: {fileID: 2098682404}
@@ -1188,6 +1219,7 @@ MonoBehaviour:
   rayStartWidth: 0.007
   rayEndWidth: 0.002
   rayColor: {r: 0, g: 1, b: 1, a: 1}
+  showRayLine: 1
 --- !u!114 &1045802446
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1198,8 +1230,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b36c5b5f2c1004346ab8ca978c1fce85, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   inputManager: {fileID: 1045802450}
   gazeProvider: {fileID: 1045802449}
   displayManager: {fileID: 1045802448}
@@ -1215,14 +1247,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 70e1254b5ecad431d98ac8b9f492fdc0, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   hmdCamera: {fileID: 2098682403}
   displaysRoot: {fileID: 888164666}
   displayAFront: {fileID: 528464813}
   displayBBack: {fileID: 1035063437}
   initialPreset: 2
   applyOnStart: 1
+  resetLayoutOnXrRecenter: 1
+  logLayoutResetEvents: 1
   noOcclusion:
     displayAFront:
       distanceFromHmd: 1.15
@@ -1284,8 +1318,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 50f96c144ae574ae9837a2a59ad8b757, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   displays:
   - {fileID: 528464813}
   - {fileID: 1035063437}
@@ -1304,13 +1338,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7a57199c0593c4ff398e1a593da04291, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   gazeSource: 2
   hmdCamera: {fileID: 2098682403}
   eyeTrackingAdapter: {fileID: 1045802453}
   eyeTrackingRaySource: {fileID: 1790858881}
   warnWhenEyeTrackingFallsBack: 1
+  allowRawEyeTrackingRaySourceFallback: 0
 --- !u!114 &1045802450
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1321,8 +1356,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fae70ad27fba542398250c9d4ce5350a, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   currentCondition: 0
   allowConditionToggle: 1
   stickDeadzone: 0.08
@@ -1337,8 +1372,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 01e2f54794f154a13a5afb1fe71a4378, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   inputManager: {fileID: 1045802450}
   gazeProvider: {fileID: 1045802449}
   displayManager: {fileID: 1045802448}
@@ -1377,12 +1412,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 810d38ec6c49842719e6695509e92cc0, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   raySource: {fileID: 1790858881}
   hmdCamera: {fileID: 2098682403}
   useHmdPositionWithEyeRotation: 0
   logAvailabilityChanges: 1
+  logPoseChanges: 0
+  poseLogIntervalSeconds: 1
+  requestMetaQuestEyeTrackingPermission: 1
+  metaQuestEyeTrackingPermission: com.oculus.permission.EYE_TRACKING
 --- !u!114 &1045802454
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1393,8 +1432,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6b46af9b74c8f49578b2278c6fc417c8, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   enableInEditor: 1
   enableInPlayer: 0
   forceEnabled: 0
@@ -1406,12 +1445,107 @@ MonoBehaviour:
   noOcclusionKey: 49
   partialOcclusionKey: 50
   strongOcclusionKey: 51
+  toggleRayVisualizationKey: 118
   stickLeftKey: 97
   stickRightKey: 100
   stickUpKey: 119
   stickDownKey: 115
   useArrowKeys: 1
   logDebugInputEvents: 1
+--- !u!114 &1045802455
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1045802439}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf6b065ee7714d7f87e32f33c1e1b2d4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &1045802456
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1045802439}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0d1c935b706447d9f64d1c80ad5c9a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  inputManager: {fileID: 1045802450}
+  experimentManager: {fileID: 1045802451}
+  displayManager: {fileID: 1045802448}
+  errorEvaluator: {fileID: 1045802455}
+  logger: {fileID: 1045802441}
+  participantId: P000
+  sessionId: S000
+  autoStartOnPlay: 0
+  loopTrainingTrials: 1
+  returnToConditionSelectionAfterMainTask: 1
+  selectedCondition: 0
+  selectedLayout: 2
+  targetColor: {r: 0.1, g: 1, b: 0.3, a: 0.95}
+  inactiveTargetColor: {r: 0.1, g: 1, b: 0.3, a: 0.35}
+  targetSizesNormalized:
+  - 0.1
+  - 0.14
+  targetPositionsNormalized:
+  - {x: 0.25, y: 0.35}
+  - {x: 0.72, y: 0.62}
+  trials: []
+--- !u!114 &1045802457
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1045802439}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f8619cb0ed4f48a4bca5ee2fe5f470c1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  condition: 0
+  layout: 2
+  gazeSource: 1
+  rayMode: 4
+  showDebugOverlay: 1
+  showWorldConditionLabel: 1
+  showGazeRayOnlyWhileGripHeld: 1
+  allowStickCursorMovement: 1
+  inputManager: {fileID: 1045802450}
+  experimentManager: {fileID: 1045802451}
+  gazeProvider: {fileID: 1045802449}
+  debugVisualizer: {fileID: 1045802440}
+  virtualCursorController: {fileID: 1045802444}
+  focusPointingTaskManager: {fileID: 1045802456}
+--- !u!114 &1045802458
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1045802439}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8cad4644ae0a248359cdd81a19c5bde6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  inputManager: {fileID: 1045802450}
+  experimentManager: {fileID: 1045802451}
+  displayManager: {fileID: 1045802448}
+  focusPointingTaskManager: {fileID: 1045802456}
+  menuDisplayId: Display_B_Back
+  showMenuInConditionSelection: 1
+  panelColor: {r: 0.04, g: 0.05, b: 0.06, a: 0.82}
+  buttonColor: {r: 0.16, g: 0.18, b: 0.2, a: 0.92}
+  selectedButtonColor: {r: 0.15, g: 0.48, b: 0.85, a: 0.95}
+  startButtonColor: {r: 0.1, g: 0.7, b: 0.32, a: 0.95}
+  textColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &1054095178
 GameObject:
   m_ObjectHideFlags: 0
@@ -1460,8 +1594,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 0.05, g: 0.95, b: 0.42, a: 0.95}
   m_RaycastTarget: 1
@@ -1536,8 +1670,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 0.05, g: 0.95, b: 0.42, a: 0.95}
   m_RaycastTarget: 1
@@ -1611,8 +1745,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 0, g: 0, b: 0, a: 1}
   m_RaycastTarget: 1
@@ -1691,8 +1825,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 0.86}
   m_RaycastTarget: 1
@@ -1714,27 +1848,25 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: 'RaycastBaseline debug page
+  m_Text: 'Scroll task content preview
 
 
-    Use the right controller ray to move
-    the cursor.
+    Use this panel only when validating
+    scroll behavior.
 
-    Press A / Space on the target button.
+    Pointing trials hide this text and show only the target.
 
-    Use right stick vertical
-    / W-S to scroll this content.
-
-
-    Line 01  Baseline scroll content
 
     Line
-    02  Front-most ray hit receives input
+    01  Scrollable reading content
 
-    Line 03  Rear displays do not receive
-    input through the front display
+    Line 02  The active input target receives
+    scroll events
 
-    Line 04  CSV and Debug.Log events are emitted
+    Line 03  In ExplicitDisplayFocus, focus decides the scroll
+    target
+
+    Line 04  In RaycastBaseline, the ray hit decides the scroll target
 
     Line
     05  More content below the visible panel
@@ -1801,8 +1933,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_IgnoreReversedGraphics: 1
   m_BlockingObjects: 0
   m_BlockingMask:
@@ -1818,8 +1950,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_UiScaleMode: 0
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
@@ -2059,8 +2191,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   m_RaycastTarget: 1
@@ -2171,8 +2303,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 0.86}
   m_RaycastTarget: 1
@@ -2194,27 +2326,25 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: 'RaycastBaseline debug page
+  m_Text: 'Scroll task content preview
 
 
-    Use the right controller ray to move
-    the cursor.
+    Use this panel only when validating
+    scroll behavior.
 
-    Press A / Space on the target button.
+    Pointing trials hide this text and show only the target.
 
-    Use right stick vertical
-    / W-S to scroll this content.
-
-
-    Line 01  Baseline scroll content
 
     Line
-    02  Front-most ray hit receives input
+    01  Scrollable reading content
 
-    Line 03  Rear displays do not receive
-    input through the front display
+    Line 02  The active input target receives
+    scroll events
 
-    Line 04  CSV and Debug.Log events are emitted
+    Line 03  In ExplicitDisplayFocus, focus decides the scroll
+    target
+
+    Line 04  In RaycastBaseline, the ray hit decides the scroll target
 
     Line
     05  More content below the visible panel
@@ -2309,8 +2439,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
@@ -2391,8 +2521,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_IgnoreReversedGraphics: 1
   m_BlockingObjects: 0
   m_BlockingMask:
@@ -2408,8 +2538,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_UiScaleMode: 0
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
@@ -2420,7 +2550,7 @@ MonoBehaviour:
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
   m_DynamicPixelsPerUnit: 1
-  m_PresetInfoIsWorld: 0
+  m_PresetInfoIsWorld: 1
 --- !u!223 &1846588276
 Canvas:
   m_ObjectHideFlags: 0
@@ -2491,8 +2621,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 0, g: 0, b: 0, a: 1}
   m_RaycastTarget: 1
@@ -2531,6 +2661,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 3385890772825029785, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 3711799367079663623, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
       propertyPath: m_Enabled
       value: 0
@@ -2583,8 +2717,20 @@ PrefabInstance:
       propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 4710497675663264238, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6443765611106601763, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
       propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6454594071094758631, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6688015753839463788, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
+      propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6694496370488184912, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
@@ -2607,6 +2753,10 @@ PrefabInstance:
       propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6962680226186472951, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7169631891049266947, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
       propertyPath: m_IsActive
       value: 0
@@ -2625,6 +2775,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8340661700907349775, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
       propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8677371567480465662, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
+      propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 9014170784424948809, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
@@ -2713,8 +2867,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   m_RaycastTarget: 1

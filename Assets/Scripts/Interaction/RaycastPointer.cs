@@ -11,6 +11,7 @@ public class RaycastPointer : MonoBehaviour
     [SerializeField] private float rayStartWidth = 0.0035f;
     [SerializeField] private float rayEndWidth = 0.001f;
     [SerializeField] private Color rayColor = Color.cyan;
+    [SerializeField] private bool showRayLine = true;
 
     public Ray CurrentRay { get; private set; }
 
@@ -119,7 +120,13 @@ public class RaycastPointer : MonoBehaviour
         EnsureLineRenderer();
         rayLine.SetPosition(0, start);
         rayLine.SetPosition(1, end);
-        SetRayVisible(true);
+        SetRayVisible(showRayLine);
+    }
+
+    public void SetRayLineVisible(bool visible)
+    {
+        showRayLine = visible;
+        SetRayVisible(visible);
     }
 
     private void SetRayVisible(bool visible)

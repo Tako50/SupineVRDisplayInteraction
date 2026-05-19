@@ -9,6 +9,8 @@ public class ClickDispatcher : MonoBehaviour
     [SerializeField] private FocusManager focusManager;
     [SerializeField] private VirtualCursorController virtualCursorController;
     [SerializeField] private GazeProvider gazeProvider;
+    [SerializeField] private FocusPointingTaskManager focusPointingTaskManager;
+    [SerializeField] private VRTaskMenuManager vrTaskMenuManager;
     [SerializeField] private Logger logger;
 
     public string LastClickResult { get; private set; } = "None";
@@ -43,13 +45,22 @@ public class ClickDispatcher : MonoBehaviour
     {
         if (!displayManager.HasCurrentRaycastHit)
         {
+            LastClickResult = "None valid=False target=None";
+            NotifyTaskLayer("None", Vector2.zero, false);
             return;
         }
 
         DisplayHit hit = displayManager.CurrentRaycastHit;
+        if (vrTaskMenuManager != null && vrTaskMenuManager.TryHandleClick(hit.DisplayId, hit.Normalized))
+        {
+            LastClickResult = $"{hit.DisplayId} menu=True";
+            return;
+        }
+
         string targetId = string.Empty;
         bool validTarget = hit.Display != null && hit.Display.TryClickDebugTarget(hit.Normalized, out targetId);
         LastClickResult = $"{hit.DisplayId} valid={validTarget} target={targetId}";
+        NotifyTaskLayer(hit.DisplayId, hit.Normalized, hit.Display != null);
         Ray ray = raycastPointer != null ? raycastPointer.CurrentRay : default;
         LogClick(hit.DisplayId, hit.Normalized, validTarget, targetId, ray);
     }
@@ -59,13 +70,22 @@ public class ClickDispatcher : MonoBehaviour
         DisplaySurface focusedDisplay = displayManager.FocusedDisplay;
         if (focusedDisplay == null || virtualCursorController == null)
         {
+            LastClickResult = "None valid=False target=None";
+            NotifyTaskLayer("None", Vector2.zero, false);
             return;
         }
 
         Vector2 normalized = virtualCursorController.NormalizedPosition;
+        if (vrTaskMenuManager != null && vrTaskMenuManager.TryHandleClick(focusedDisplay.name, normalized))
+        {
+            LastClickResult = $"{focusedDisplay.name} menu=True";
+            return;
+        }
+
         string targetId = string.Empty;
         bool validTarget = focusedDisplay.TryClickDebugTarget(normalized, out targetId);
         LastClickResult = $"{focusedDisplay.name} valid={validTarget} target={targetId}";
+        NotifyTaskLayer(focusedDisplay.name, normalized, true);
         Ray gazeRay = gazeProvider != null ? gazeProvider.GetGazeRay() : default;
         bool gazeOnDifferentDisplay = focusManager != null && focusManager.IsGazeOnDifferentDisplay(focusedDisplay);
 
@@ -125,10 +145,37 @@ public class ClickDispatcher : MonoBehaviour
             gazeProvider = FindObjectOfType<GazeProvider>();
         }
 
+        if (focusPointingTaskManager == null)
+        {
+            focusPointingTaskManager = FindObjectOfType<FocusPointingTaskManager>();
+        }
+
+        if (vrTaskMenuManager == null)
+        {
+            vrTaskMenuManager = FindObjectOfType<VRTaskMenuManager>();
+        }
+
         if (logger == null)
         {
             logger = FindObjectOfType<Logger>();
         }
+    }
+
+    private void NotifyTaskLayer(string clickedDisplayId, Vector2 normalized, bool hasValidDisplay)
+    {
+        if (focusPointingTaskManager == null || inputManager == null)
+        {
+            return;
+        }
+
+        focusPointingTaskManager.HandleClick(new FocusPointingClickEvent
+        {
+            Condition = inputManager.CurrentCondition,
+            ClickedDisplayId = clickedDisplayId,
+            ClickedNormalizedPosition = normalized,
+            Timestamp = Time.time,
+            HasValidDisplay = hasValidDisplay
+        });
     }
 
     private void LogClick(string displayId, Vector2 normalized, bool validTarget, string targetId, Ray ray)

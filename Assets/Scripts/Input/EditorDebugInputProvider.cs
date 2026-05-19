@@ -1,5 +1,7 @@
 using UnityEngine;
 
+#pragma warning disable 0414
+
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
@@ -23,6 +25,7 @@ public class EditorDebugInputProvider : MonoBehaviour
     [SerializeField] private KeyCode noOcclusionKey = KeyCode.Alpha1;
     [SerializeField] private KeyCode partialOcclusionKey = KeyCode.Alpha2;
     [SerializeField] private KeyCode strongOcclusionKey = KeyCode.Alpha3;
+    [SerializeField] private KeyCode toggleRayVisualizationKey = KeyCode.V;
 
     [Header("Stick Keys")]
     [SerializeField] private KeyCode stickLeftKey = KeyCode.A;
@@ -39,6 +42,7 @@ public class EditorDebugInputProvider : MonoBehaviour
     public Vector2 Stick { get; private set; }
     public bool SubmitPressed { get; private set; }
     public bool GripPressed { get; private set; }
+    public bool GripHeld { get; private set; }
     public bool TriggerPressed { get; private set; }
     public bool TriggerHeld { get; private set; }
     public bool ToggleConditionPressed { get; private set; }
@@ -46,6 +50,7 @@ public class EditorDebugInputProvider : MonoBehaviour
     public bool NoOcclusionPressed { get; private set; }
     public bool PartialOcclusionPressed { get; private set; }
     public bool StrongOcclusionPressed { get; private set; }
+    public bool ToggleRayVisualizationPressed { get; private set; }
 
     private void Update()
     {
@@ -69,6 +74,7 @@ public class EditorDebugInputProvider : MonoBehaviour
         Stick = Vector2.ClampMagnitude(stick, 1f);
         SubmitPressed = GetKeyDown(submitKey);
         GripPressed = GetKeyDown(gripKey);
+        GripHeld = GetKey(gripKey);
         TriggerHeld = GetKey(triggerKey);
         TriggerPressed = GetKeyDown(triggerKey);
         ToggleConditionPressed = GetKeyDown(toggleConditionKey);
@@ -76,6 +82,7 @@ public class EditorDebugInputProvider : MonoBehaviour
         NoOcclusionPressed = GetKeyDown(noOcclusionKey);
         PartialOcclusionPressed = GetKeyDown(partialOcclusionKey);
         StrongOcclusionPressed = GetKeyDown(strongOcclusionKey);
+        ToggleRayVisualizationPressed = GetKeyDown(toggleRayVisualizationKey);
 
         if (logDebugInputEvents)
         {
@@ -88,6 +95,7 @@ public class EditorDebugInputProvider : MonoBehaviour
         Stick = Vector2.zero;
         SubmitPressed = false;
         GripPressed = false;
+        GripHeld = false;
         TriggerHeld = false;
         TriggerPressed = false;
         ToggleConditionPressed = false;
@@ -95,6 +103,7 @@ public class EditorDebugInputProvider : MonoBehaviour
         NoOcclusionPressed = false;
         PartialOcclusionPressed = false;
         StrongOcclusionPressed = false;
+        ToggleRayVisualizationPressed = false;
     }
 
     private bool IsPlatformEnabled()
@@ -136,6 +145,11 @@ public class EditorDebugInputProvider : MonoBehaviour
         if (NoOcclusionPressed || PartialOcclusionPressed || StrongOcclusionPressed)
         {
             Debug.Log("[EditorDebugInput] Layout preset shortcut");
+        }
+
+        if (ToggleRayVisualizationPressed)
+        {
+            Debug.Log("[EditorDebugInput] Toggle ray visualization");
         }
     }
 
@@ -202,9 +216,13 @@ public class EditorDebugInputProvider : MonoBehaviour
                 return keyboard.digit2Key;
             case KeyCode.Alpha3:
                 return keyboard.digit3Key;
+            case KeyCode.V:
+                return keyboard.vKey;
             default:
                 return null;
         }
     }
 #endif
 }
+
+#pragma warning restore 0414

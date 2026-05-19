@@ -15,17 +15,24 @@ public class GazeProvider : MonoBehaviour
     [SerializeField] private EyeTrackingRayAdapter eyeTrackingAdapter;
     [SerializeField] private Transform eyeTrackingRaySource;
     [SerializeField] private bool warnWhenEyeTrackingFallsBack = true;
+    [SerializeField] private bool allowRawEyeTrackingRaySourceFallback = false;
 
     private bool warnedAboutFallback;
     private GazeSource activeGazeSource = GazeSource.HmdForward;
 
     public GazeSource CurrentGazeSource => activeGazeSource;
+    public GazeSource ConfiguredGazeSource => gazeSource;
 
     private void Awake()
     {
         if (hmdCamera == null)
         {
             hmdCamera = Camera.main;
+        }
+
+        if (eyeTrackingAdapter == null)
+        {
+            eyeTrackingAdapter = FindObjectOfType<EyeTrackingRayAdapter>();
         }
     }
 
@@ -45,10 +52,10 @@ public class GazeProvider : MonoBehaviour
             return eyeRay;
         }
 
-        if (gazeSource == GazeSource.EyeTracking && warnWhenEyeTrackingFallsBack && !warnedAboutFallback)
+        if (Application.isPlaying && gazeSource == GazeSource.EyeTracking && warnWhenEyeTrackingFallsBack && !warnedAboutFallback)
         {
             warnedAboutFallback = true;
-            Debug.LogWarning("[GazeProvider] EyeTracking is selected, but no eye-tracking adapter is connected. Falling back to HMD forward for development only.");
+            Debug.LogWarning("[GazeProvider] EyeTracking is selected, but eye tracking is unavailable or untracked. Falling back to HMD forward for development only.");
         }
 
         Camera cameraForRay = hmdCamera != null ? hmdCamera : Camera.main;
@@ -60,6 +67,18 @@ public class GazeProvider : MonoBehaviour
     public Ray GetRay()
     {
         return GetGazeRay();
+    }
+
+    public void SetGazeSource(GazeSource source)
+    {
+        if (gazeSource == source)
+        {
+            return;
+        }
+
+        gazeSource = source;
+        warnedAboutFallback = false;
+        Debug.Log($"[GazeProvider] configuredGazeSource={gazeSource}");
     }
 
     public bool IsEyeTrackingAvailable()
@@ -79,7 +98,7 @@ public class GazeProvider : MonoBehaviour
             return true;
         }
 
-        if (eyeTrackingRaySource != null)
+        if (eyeTrackingAdapter == null && allowRawEyeTrackingRaySourceFallback && eyeTrackingRaySource != null)
         {
             ray = new Ray(eyeTrackingRaySource.position, eyeTrackingRaySource.forward);
             return true;

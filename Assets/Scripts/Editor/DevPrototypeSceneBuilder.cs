@@ -30,10 +30,12 @@ public static class DevPrototypeSceneBuilder
         GameObject prototypeRoot = GameObject.Find("Prototype_Root") ?? new GameObject("Prototype_Root");
         Transform displaysRoot = EnsureChild(prototypeRoot.transform, "Displays");
 
-        DisplaySurface displayA = CreateOrUpdateDisplay(displaysRoot, "Display_A_Front", new Color(0.12f, 0.40f, 0.90f, 0.86f), "A Front");
-        DisplaySurface displayB = CreateOrUpdateDisplay(displaysRoot, "Display_B_Back", new Color(0.90f, 0.38f, 0.16f, 0.82f), "B Back");
+        Color sharedDisplayColor = new Color(0.18f, 0.32f, 0.46f, 0.86f);
+        DisplaySurface displayA = CreateOrUpdateDisplay(displaysRoot, "Display_A_Front", sharedDisplayColor, "A Front");
+        DisplaySurface displayB = CreateOrUpdateDisplay(displaysRoot, "Display_B_Back", sharedDisplayColor, "B Back");
 
         GameObject managers = GameObject.Find("Prototype_Managers") ?? new GameObject("Prototype_Managers");
+        Component controlPanel = GetOrAddByTypeName(managers, "PrototypeControlPanel");
         ExperimentManager experimentManager = GetOrAdd<ExperimentManager>(managers);
         EditorDebugInputProvider debugInputProvider = GetOrAdd<EditorDebugInputProvider>(managers);
         PrototypeInputManager inputManager = GetOrAdd<PrototypeInputManager>(managers);
@@ -46,6 +48,9 @@ public static class DevPrototypeSceneBuilder
         VirtualCursorController cursorController = GetOrAdd<VirtualCursorController>(managers);
         ScrollController scrollController = GetOrAdd<ScrollController>(managers);
         ClickDispatcher clickDispatcher = GetOrAdd<ClickDispatcher>(managers);
+        FocusPointingTaskManager focusPointingTaskManager = GetOrAdd<FocusPointingTaskManager>(managers);
+        ErrorEvaluator errorEvaluator = GetOrAdd<ErrorEvaluator>(managers);
+        VRTaskMenuManager vrTaskMenuManager = GetOrAdd<VRTaskMenuManager>(managers);
         Logger logger = GetOrAdd<Logger>(managers);
         PrototypeDebugVisualizer debugVisualizer = GetOrAdd<PrototypeDebugVisualizer>(managers);
 
@@ -87,6 +92,7 @@ public static class DevPrototypeSceneBuilder
 
         SetObject(cursorController, "inputManager", inputManager);
         SetObject(cursorController, "displayManager", displayManager);
+        SetBool(cursorController, "allowStickCursorMovement", true);
 
         SetObject(scrollController, "inputManager", inputManager);
         SetObject(scrollController, "displayManager", displayManager);
@@ -102,7 +108,20 @@ public static class DevPrototypeSceneBuilder
         SetObject(clickDispatcher, "focusManager", focusManager);
         SetObject(clickDispatcher, "virtualCursorController", cursorController);
         SetObject(clickDispatcher, "gazeProvider", gazeProvider);
+        SetObject(clickDispatcher, "focusPointingTaskManager", focusPointingTaskManager);
+        SetObject(clickDispatcher, "vrTaskMenuManager", vrTaskMenuManager);
         SetObject(clickDispatcher, "logger", logger);
+
+        SetObject(focusPointingTaskManager, "inputManager", inputManager);
+        SetObject(focusPointingTaskManager, "experimentManager", experimentManager);
+        SetObject(focusPointingTaskManager, "displayManager", displayManager);
+        SetObject(focusPointingTaskManager, "errorEvaluator", errorEvaluator);
+        SetObject(focusPointingTaskManager, "logger", logger);
+
+        SetObject(vrTaskMenuManager, "inputManager", inputManager);
+        SetObject(vrTaskMenuManager, "experimentManager", experimentManager);
+        SetObject(vrTaskMenuManager, "displayManager", displayManager);
+        SetObject(vrTaskMenuManager, "focusPointingTaskManager", focusPointingTaskManager);
 
         SetObject(debugVisualizer, "inputManager", inputManager);
         SetObject(debugVisualizer, "gazeProvider", gazeProvider);
@@ -113,7 +132,37 @@ public static class DevPrototypeSceneBuilder
         SetObject(debugVisualizer, "scrollController", scrollController);
         SetObject(debugVisualizer, "experimentManager", experimentManager);
         SetObject(debugVisualizer, "debugInputProvider", debugInputProvider);
+        SetObject(debugVisualizer, "focusPointingTaskManager", focusPointingTaskManager);
+        SetObject(debugVisualizer, "raycastPointer", raycastPointer);
         SetObject(debugVisualizer, "controllerRaySource", controllerRaySource);
+        SetEnum(debugVisualizer, "rayVisualizationMode", RayVisualizationMode.Hidden);
+        SetBool(debugVisualizer, "allowRuntimeRayVisualizationToggle", false);
+        SetFloat(debugVisualizer, "hitPointRadius", 0.01f);
+        SetBool(debugVisualizer, "showWorldConditionLabel", true);
+        SetString(debugVisualizer, "worldConditionLabelAnchorDisplayId", "Display_B_Back");
+        SetBool(debugVisualizer, "showGazeRayOnlyWhileGripHeld", true);
+        SetFloat(debugVisualizer, "gazeRayStartOffset", 0.35f);
+        SetFloat(debugVisualizer, "gazeRayStartWidth", 0.0035f);
+        SetFloat(debugVisualizer, "gazeRayEndWidth", 0.001f);
+
+        SetObject(controlPanel, "inputManager", inputManager);
+        SetObject(controlPanel, "experimentManager", experimentManager);
+        SetObject(controlPanel, "gazeProvider", gazeProvider);
+        SetObject(controlPanel, "debugVisualizer", debugVisualizer);
+        SetObject(controlPanel, "virtualCursorController", cursorController);
+        SetObject(controlPanel, "focusPointingTaskManager", focusPointingTaskManager);
+        SetEnum(controlPanel, "condition", InteractionCondition.RaycastBaseline);
+        SetEnum(controlPanel, "layout", DisplayLayoutPreset.StrongOcclusion);
+        SetEnum(controlPanel, "gazeSource", GazeSource.EyeTracking);
+        SetEnum(controlPanel, "rayMode", RayVisualizationMode.Hidden);
+        SetBool(controlPanel, "showDebugOverlay", true);
+        SetBool(controlPanel, "showWorldConditionLabel", true);
+        SetBool(controlPanel, "showGazeRayOnlyWhileGripHeld", true);
+        SetBool(controlPanel, "allowStickCursorMovement", true);
+
+        SetBool(focusPointingTaskManager, "autoStartOnPlay", false);
+        SetBool(focusPointingTaskManager, "loopTrainingTrials", true);
+        SetBool(focusPointingTaskManager, "returnToConditionSelectionAfterMainTask", true);
 
         layoutManager.ApplyLayout(DisplayLayoutPreset.StrongOcclusion);
         displayManager.RefreshDisplays();
@@ -186,6 +235,8 @@ public static class DevPrototypeSceneBuilder
 
             DisableComponentIfPresent(gameObject, "ActionBasedControllerManager");
             DisableComponentIfPresent(gameObject, "XRInteractorLineVisual");
+            DisableComponentIfPresent(gameObject, "XRPokeInteractor");
+            DisableComponentIfPresent(gameObject, "XRDirectInteractor");
 
             LineRenderer lineRenderer = gameObject.GetComponent<LineRenderer>();
             if (lineRenderer != null && gameObject.transform.root.name == "XR Interaction Setup")
@@ -266,14 +317,13 @@ public static class DevPrototypeSceneBuilder
 
         Text contentText = GetOrAdd<Text>(content.gameObject);
         contentText.text =
-            "RaycastBaseline debug page\n\n" +
-            "Use the right controller ray to move the cursor.\n" +
-            "Press A / Space on the target button.\n" +
-            "Use right stick vertical / W-S to scroll this content.\n\n" +
-            "Line 01  Baseline scroll content\n" +
-            "Line 02  Front-most ray hit receives input\n" +
-            "Line 03  Rear displays do not receive input through the front display\n" +
-            "Line 04  CSV and Debug.Log events are emitted\n" +
+            "Scroll task content preview\n\n" +
+            "Use this panel only when validating scroll behavior.\n" +
+            "Pointing trials hide this text and show only the target.\n\n" +
+            "Line 01  Scrollable reading content\n" +
+            "Line 02  The active input target receives scroll events\n" +
+            "Line 03  In ExplicitDisplayFocus, focus decides the scroll target\n" +
+            "Line 04  In RaycastBaseline, the ray hit decides the scroll target\n" +
             "Line 05  More content below the visible panel\n" +
             "Line 06  More content below the visible panel\n" +
             "Line 07  More content below the visible panel";
@@ -312,6 +362,7 @@ public static class DevPrototypeSceneBuilder
 
         surface.AssignParts(canvas, panel, hitPlane, cursor);
         surface.AssignDebugContent(content, clickTarget);
+        surface.SetContentMode(DisplayContentMode.ConditionSelection);
         cursor.gameObject.SetActive(false);
         return surface;
     }
@@ -343,8 +394,39 @@ public static class DevPrototypeSceneBuilder
         return component != null ? component : gameObject.AddComponent<T>();
     }
 
+    private static Component GetOrAddByTypeName(GameObject gameObject, string typeName)
+    {
+        Component existing = gameObject.GetComponent(typeName);
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        System.Type type = System.Type.GetType(typeName);
+        if (type == null)
+        {
+            foreach (System.Reflection.Assembly assembly in System.AppDomain.CurrentDomain.GetAssemblies())
+            {
+                type = assembly.GetType(typeName);
+                if (type != null)
+                {
+                    break;
+                }
+            }
+        }
+
+        return type != null && typeof(Component).IsAssignableFrom(type)
+            ? gameObject.AddComponent(type)
+            : null;
+    }
+
     private static void SetObject(Object target, string propertyName, Object value)
     {
+        if (target == null)
+        {
+            return;
+        }
+
         SerializedObject serializedObject = new SerializedObject(target);
         SerializedProperty property = serializedObject.FindProperty(propertyName);
         if (property != null)
@@ -356,6 +438,11 @@ public static class DevPrototypeSceneBuilder
 
     private static void SetEnum(Object target, string propertyName, System.Enum value)
     {
+        if (target == null)
+        {
+            return;
+        }
+
         SerializedObject serializedObject = new SerializedObject(target);
         SerializedProperty property = serializedObject.FindProperty(propertyName);
         if (property != null)
@@ -367,11 +454,48 @@ public static class DevPrototypeSceneBuilder
 
     private static void SetBool(Object target, string propertyName, bool value)
     {
+        if (target == null)
+        {
+            return;
+        }
+
         SerializedObject serializedObject = new SerializedObject(target);
         SerializedProperty property = serializedObject.FindProperty(propertyName);
         if (property != null)
         {
             property.boolValue = value;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+        }
+    }
+
+    private static void SetFloat(Object target, string propertyName, float value)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        SerializedObject serializedObject = new SerializedObject(target);
+        SerializedProperty property = serializedObject.FindProperty(propertyName);
+        if (property != null)
+        {
+            property.floatValue = value;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+        }
+    }
+
+    private static void SetString(Object target, string propertyName, string value)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        SerializedObject serializedObject = new SerializedObject(target);
+        SerializedProperty property = serializedObject.FindProperty(propertyName);
+        if (property != null)
+        {
+            property.stringValue = value;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
         }
     }

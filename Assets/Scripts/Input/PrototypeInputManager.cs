@@ -16,6 +16,7 @@ public class PrototypeInputManager : MonoBehaviour
 
     private readonly List<XRInputDevice> rightHandDevices = new List<XRInputDevice>();
     private bool previousPrimaryButton;
+    private bool previousSecondaryButton;
     private bool previousGripButton;
     private bool previousTriggerButton;
 
@@ -23,10 +24,14 @@ public class PrototypeInputManager : MonoBehaviour
     public Vector2 Stick { get; private set; }
     public bool SubmitPressed { get; private set; }
     public bool GripPressed { get; private set; }
+    public bool GripHeld { get; private set; }
     public bool TriggerPressed { get; private set; }
     public bool TriggerHeld { get; private set; }
+    public bool ConditionTogglePressed { get; private set; }
+    public bool RayVisualizationTogglePressed { get; private set; }
     public bool ResetFocusPressed => debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.ResetFocusPressed;
     public bool DebugInputEnabled => debugInputProvider != null && debugInputProvider.IsEnabled;
+    public bool IsConditionLocked { get; private set; }
 
     private void Awake()
     {
@@ -40,9 +45,7 @@ public class PrototypeInputManager : MonoBehaviour
         ReadInputs();
 
         if (allowConditionToggle
-            && debugInputProvider != null
-            && debugInputProvider.IsEnabled
-            && debugInputProvider.ToggleConditionPressed)
+            && ConditionTogglePressed)
         {
             ToggleCondition();
         }
@@ -50,13 +53,42 @@ public class PrototypeInputManager : MonoBehaviour
 
     public void SetCondition(InteractionCondition condition)
     {
+        SetCondition(condition, false);
+    }
+
+    public void SetCondition(InteractionCondition condition, bool force)
+    {
         if (currentCondition == condition)
         {
             return;
         }
 
+        if (IsConditionLocked && !force)
+        {
+            Debug.Log($"[PrototypeInput] condition locked. ignored={condition}, current={currentCondition}");
+            return;
+        }
+
         currentCondition = condition;
         Debug.Log($"[PrototypeInput] condition={currentCondition}");
+    }
+
+    public void LockCondition(InteractionCondition condition)
+    {
+        currentCondition = condition;
+        IsConditionLocked = true;
+        Debug.Log($"[PrototypeInput] condition locked={currentCondition}");
+    }
+
+    public void UnlockCondition()
+    {
+        if (!IsConditionLocked)
+        {
+            return;
+        }
+
+        IsConditionLocked = false;
+        Debug.Log("[PrototypeInput] condition unlocked");
     }
 
     private void ToggleCondition()
@@ -70,6 +102,7 @@ public class PrototypeInputManager : MonoBehaviour
     {
         Vector2 xrStick = Vector2.zero;
         bool xrPrimary = false;
+        bool xrSecondary = false;
         bool xrGrip = false;
         bool xrTriggerButton = false;
         float xrTriggerValue = 0f;
@@ -79,6 +112,7 @@ public class PrototypeInputManager : MonoBehaviour
         {
             rightHand.TryGetFeatureValue(XRCommonUsages.primary2DAxis, out xrStick);
             rightHand.TryGetFeatureValue(XRCommonUsages.primaryButton, out xrPrimary);
+            rightHand.TryGetFeatureValue(XRCommonUsages.secondaryButton, out xrSecondary);
             rightHand.TryGetFeatureValue(XRCommonUsages.gripButton, out xrGrip);
             rightHand.TryGetFeatureValue(XRCommonUsages.triggerButton, out xrTriggerButton);
             rightHand.TryGetFeatureValue(XRCommonUsages.trigger, out xrTriggerValue);
@@ -96,15 +130,21 @@ public class PrototypeInputManager : MonoBehaviour
 
         bool debugSubmit = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.SubmitPressed;
         bool debugGrip = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.GripPressed;
+        bool debugGripHeld = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.GripHeld;
         bool debugTriggerHeld = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.TriggerHeld;
         bool debugTriggerPressed = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.TriggerPressed;
+        bool debugConditionToggle = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.ToggleConditionPressed;
 
         SubmitPressed = debugSubmit || (xrPrimary && !previousPrimaryButton);
         GripPressed = debugGrip || (xrGrip && !previousGripButton);
+        GripHeld = debugGripHeld || xrGrip;
         TriggerHeld = debugTriggerHeld || xrTriggerButton || xrTriggerValue > 0.5f;
         TriggerPressed = debugTriggerPressed || ((xrTriggerButton || xrTriggerValue > 0.5f) && !previousTriggerButton);
+        ConditionTogglePressed = debugConditionToggle || (xrSecondary && !previousSecondaryButton);
+        RayVisualizationTogglePressed = false;
 
         previousPrimaryButton = xrPrimary;
+        previousSecondaryButton = xrSecondary;
         previousGripButton = xrGrip;
         previousTriggerButton = xrTriggerButton || xrTriggerValue > 0.5f;
     }

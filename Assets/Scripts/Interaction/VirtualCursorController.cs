@@ -8,6 +8,7 @@ public class VirtualCursorController : MonoBehaviour
     [SerializeField] private float cursorSpeed = 0.55f;
     [SerializeField] private float deadzone = 0.08f;
     [SerializeField] private float acceleration = 0f;
+    [SerializeField] private bool allowStickCursorMovement = true;
     [SerializeField] private bool logCursorMovement = false;
     [SerializeField] private float cursorMoveLogInterval = 0.25f;
 
@@ -36,6 +37,12 @@ public class VirtualCursorController : MonoBehaviour
         DisplaySurface focusedDisplay = displayManager.FocusedDisplay;
         if (focusedDisplay == null)
         {
+            return;
+        }
+
+        if (inputManager.GripHeld || !allowStickCursorMovement)
+        {
+            displayManager.SetCursorNormalized(focusedDisplay, NormalizedPosition, true);
             return;
         }
 
@@ -98,6 +105,11 @@ public class VirtualCursorController : MonoBehaviour
             displayManager.SetOnlyCursorsVisible(display, null);
             displayManager.SetCursorNormalized(display, NormalizedPosition, true);
         }
+    }
+
+    public void SetStickCursorMovementEnabled(bool enabled)
+    {
+        allowStickCursorMovement = enabled;
     }
 
     private static string Format(Vector2 value)

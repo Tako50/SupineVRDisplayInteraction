@@ -53,8 +53,14 @@ public class ExperimentManager : MonoBehaviour
         currentLayout = preset;
         if (layoutManager != null)
         {
-            layoutManager.ApplyLayout(preset);
-            layoutManager.enabled = !lockDisplaysAfterStart;
+            if (lockDisplaysAfterStart)
+            {
+                layoutManager.ApplyLayout(preset);
+            }
+            else
+            {
+                layoutManager.ResetLayoutFromCurrentHmd(preset);
+            }
         }
 
         Debug.Log($"[ExperimentManager] layout={preset}");

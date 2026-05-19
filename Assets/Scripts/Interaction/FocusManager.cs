@@ -57,10 +57,14 @@ public class FocusManager : MonoBehaviour
 
         UpdateCandidates();
 
-        if (inputManager.GripPressed)
+        if (inputManager.GripHeld)
         {
-            Debug.Log($"[FocusManager] grip received candidates={CurrentCandidateIds}");
-            ConfirmFocusFromCurrentCandidate();
+            if (inputManager.GripPressed)
+            {
+                Debug.Log($"[FocusManager] grip received candidates={CurrentCandidateIds}");
+            }
+
+            UpdateFocusFromCurrentGaze(inputManager.GripPressed);
         }
     }
 
@@ -130,7 +134,7 @@ public class FocusManager : MonoBehaviour
         LogCandidateChange(gazeRay);
     }
 
-    private void ConfirmFocusFromCurrentCandidate()
+    private void UpdateFocusFromCurrentGaze(bool logFocusEvent)
     {
         if (currentCandidates.Length == 0)
         {
@@ -150,6 +154,11 @@ public class FocusManager : MonoBehaviour
 
         Ray gazeRay = gazeProvider.GetGazeRay();
         bool gazeOnDifferentDisplay = IsGazeOnDifferentDisplay(selected.Display);
+        if (!logFocusEvent)
+        {
+            return;
+        }
+
         if (logger != null)
         {
             logger.LogExplicitFocus(
@@ -198,7 +207,7 @@ public class FocusManager : MonoBehaviour
 
     public void ForceRefocusFromCurrentGazeCandidate()
     {
-        ConfirmFocusFromCurrentCandidate();
+        UpdateFocusFromCurrentGaze(true);
     }
 
     public string GetFocusedDisplayId()

@@ -142,6 +142,8 @@ public class DisplayManager : MonoBehaviour
             return;
         }
 
+        display.BringCursorToFront();
+
         RectTransform canvasRect = display.WorldSpaceCanvas != null
             ? display.WorldSpaceCanvas.GetComponent<RectTransform>()
             : null;
@@ -167,6 +169,10 @@ public class DisplayManager : MonoBehaviour
             {
                 bool visible = display == primary || display == secondary;
                 display.Cursor.gameObject.SetActive(visible);
+                if (visible)
+                {
+                    display.BringCursorToFront();
+                }
             }
         }
     }
@@ -216,6 +222,28 @@ public class DisplayManager : MonoBehaviour
             if (displays[i] != null)
             {
                 displays[i].SetCandidateVisual(false, false);
+            }
+        }
+    }
+
+    public void SetAllDisplayContentMode(DisplayContentMode mode)
+    {
+        if (displays == null || displays.Length == 0)
+        {
+            RefreshDisplays();
+        }
+
+        if (displays == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < displays.Length; i++)
+        {
+            if (displays[i] != null)
+            {
+                displays[i].SetContentMode(mode);
+                displays[i].BringCursorToFront();
             }
         }
     }
