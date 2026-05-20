@@ -66,7 +66,7 @@ public static class DevPrototypeSceneBuilder
         SetObject(eyeTrackingRayAdapter, "raySource", eyeTrackingRaySource);
         SetObject(gazeProvider, "eyeTrackingAdapter", eyeTrackingRayAdapter);
         SetObject(gazeProvider, "eyeTrackingRaySource", eyeTrackingRaySource);
-        SetEnum(gazeProvider, "gazeSource", GazeSource.DebugCameraForward);
+        SetEnum(gazeProvider, "gazeSource", GazeSource.EyeTracking);
         SetObject(inputManager, "debugInputProvider", debugInputProvider);
         SetBool(inputManager, "allowConditionToggle", true);
 
@@ -117,6 +117,10 @@ public static class DevPrototypeSceneBuilder
         SetObject(focusPointingTaskManager, "displayManager", displayManager);
         SetObject(focusPointingTaskManager, "errorEvaluator", errorEvaluator);
         SetObject(focusPointingTaskManager, "logger", logger);
+        SetObject(focusPointingTaskManager, "displayA", displayA.transform);
+        SetObject(focusPointingTaskManager, "displayB", displayB.transform);
+        SetBool(focusPointingTaskManager, "autoGenerateTrials", true);
+        SetBool(focusPointingTaskManager, "rebuildTrialsOnStart", true);
 
         SetObject(vrTaskMenuManager, "inputManager", inputManager);
         SetObject(vrTaskMenuManager, "experimentManager", experimentManager);

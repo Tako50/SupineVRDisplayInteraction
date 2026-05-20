@@ -43,7 +43,7 @@ public class PrototypeDebugVisualizer : MonoBehaviour
     [SerializeField] private Text overlayText;
     [SerializeField] private bool showWorldConditionLabel = true;
     [SerializeField] private string worldConditionLabelAnchorDisplayId = "Display_B_Back";
-    [SerializeField] private Vector2 worldConditionLabelNormalizedAnchor = new Vector2(0.5f, 1.08f);
+    [SerializeField] private Vector2 worldConditionLabelNormalizedAnchor = new Vector2(0.5f, 1.30f);
     [SerializeField] private float worldConditionLabelForwardOffset = -0.01f;
     [SerializeField] private Vector2 worldConditionLabelSize = new Vector2(520f, 72f);
     [SerializeField] private float worldConditionLabelScale = 0.0015f;
@@ -534,10 +534,8 @@ public class PrototypeDebugVisualizer : MonoBehaviour
         labelTransform.localScale = Vector3.one * worldConditionLabelScale;
 
         string condition = inputManager != null ? inputManager.CurrentCondition.ToString() : "Unknown";
-        string layout = experimentManager != null ? experimentManager.CurrentLayout.ToString() : "Unknown";
-        string gaze = gazeProvider != null ? gazeProvider.CurrentGazeSource.ToString() : "Unknown";
         string phase = focusPointingTaskManager != null ? focusPointingTaskManager.CurrentPhase.ToString() : "Dev";
-        worldConditionLabel.text = $"{phase} | {condition} | {layout} | {rayVisualizationMode} | {gaze}";
+        worldConditionLabel.text = $"{phase} | {condition}";
     }
 
     private Vector3 GetWorldConditionLabelPosition(out Quaternion rotation)
@@ -611,7 +609,8 @@ public class PrototypeDebugVisualizer : MonoBehaviour
         string focusedDisplay = displayManager.FocusedDisplay != null ? displayManager.FocusedDisplay.name : "None";
         string cursorPosition = virtualCursorController != null ? Format(virtualCursorController.NormalizedPosition) : "(n/a)";
         string layout = experimentManager != null ? experimentManager.CurrentLayout.ToString() : "Unknown";
-        string gazeSource = gazeProvider != null ? gazeProvider.CurrentGazeSource.ToString() : "Unknown";
+        string configuredGazeSource = gazeProvider != null ? gazeProvider.ConfiguredGazeSource.ToString() : "Unknown";
+        string activeGazeSource = gazeProvider != null ? gazeProvider.CurrentGazeSource.ToString() : "Unknown";
         string eyeTracking = eyeTrackingAdapter != null
             ? $"{eyeTrackingAdapter.IsEyeTrackingAvailable} permission={eyeTrackingAdapter.HasEyeTrackingPermission} device={eyeTrackingAdapter.LastDeviceName} tracked={eyeTrackingAdapter.LastIsTrackedValue:0.0} delta={eyeTrackingAdapter.LastForwardDeltaDegrees:0.00}"
             : "No adapter";
@@ -628,7 +627,7 @@ public class PrototypeDebugVisualizer : MonoBehaviour
             "Explicit Display Focus Debug\n" +
             $"Condition: {condition}\n" +
             $"Ray mode: {rayVisualizationMode}\n" +
-            $"Gaze source: {gazeSource}\n" +
+            $"Gaze source: configured={configuredGazeSource}, active={activeGazeSource}\n" +
             $"Eye tracking: {eyeTracking}\n" +
             $"Focus state: {focusState}\n" +
             $"Focused display: {focusedDisplay}\n" +

@@ -27,9 +27,13 @@ public class RaycastPointer : MonoBehaviour
 
         if (inputManager == null || displayManager == null)
         {
+            CurrentRay = GetPointerRay();
             SetRayVisible(false);
             return;
         }
+
+        Ray pointerRay = GetPointerRay();
+        CurrentRay = pointerRay;
 
         if (inputManager.CurrentCondition != InteractionCondition.RaycastBaseline)
         {
@@ -38,8 +42,6 @@ public class RaycastPointer : MonoBehaviour
             return;
         }
 
-        Ray pointerRay = GetPointerRay();
-        CurrentRay = pointerRay;
         Vector3 lineEnd = pointerRay.origin + pointerRay.direction * visibleRayLength;
 
         if (displayManager.TryGetFirstDisplayHit(pointerRay, out DisplayHit hit))

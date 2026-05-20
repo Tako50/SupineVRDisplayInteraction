@@ -106,14 +106,24 @@ For editor validation:
 
 `Dev_Prototype` now includes the first task layer for T1 display selection + target selection:
 
-- `FocusPointingTaskManager` manages a simple trial list.
-- Each trial defines condition, layout preset, target display, target normalized position, target size, and trial index.
+- `FocusPointingTaskManager` manages the target-selection trial list.
+- `Display A` and `Display B` are assignable from the Inspector.
+- Main-task trials are generated as 2 conditions x 2 displays x 6 target positions x 4 repetitions = 96 trials.
+- Each condition contains 48 trials: 12 positions x 4 repetitions.
+- The 6 target positions per display are generated as a 2-column x 3-row normalized grid.
+- Condition order is selectable from the Inspector as `AThenB` or `BThenA`.
+- `ConditionA` maps to `RaycastBaseline` by default, and `ConditionB` maps to `ExplicitDisplayFocus` by default.
 - A visible `FocusPointingTarget` is generated on the active target display.
+- `TargetSelectable` can be attached to a target prefab; when selected it calls `FocusPointingTaskManager.OnTargetSelected(this)`.
+- The task is input-method independent: calling `SelectCurrentTarget()` advances the current trial.
+- Starting Training or Main Task first shows a centered `START` button on `Display_B_Back`; pressing it starts a 3-second countdown before the first target appears.
 - `ClickDispatcher` reports click attempts to the task layer for both `RaycastBaseline` and `ExplicitDisplayFocus`.
 - `ErrorEvaluator` classifies clicks as `Correct`, `DisplayError`, `TargetError`, or `Miss`.
 - `Logger` writes `TrialResult` rows with participant/session placeholders, target info, click info, result flags, start time, click time, and completion time.
+- A compatibility target-selection CSV is written to `Application.persistentDataPath/Logs/target_selection_*.csv` with correct target selections.
+- The analysis-oriented T1 CSV is written to `Application.persistentDataPath/Logs/t1_results_*.csv`. It records every click attempt, including `Correct`, `DisplayError`, `TargetError`, and `Miss`, with participant/session ids, task phase, condition, layout, target position, clicked position, attempt index, response time, and analysis flags.
 
-This is a task skeleton only. It does not implement T2 scroll tasks, T3 attention-focus tasks, participant flow, questionnaires, or counterbalancing.
+This does not implement T2 scroll tasks, T3 attention-focus tasks, questionnaires, or full participant-flow screens.
 
 `GazeProvider` supports `HmdForward` for development only and an `EyeTracking` placeholder source for a later Meta Quest Pro eye-tracking adapter. HMD forward should not be used for experiments.
 
@@ -132,5 +142,37 @@ To use real Quest Pro gaze:
 If the OpenXR eye-gaze device is not available or not tracked, `GazeProvider` logs a warning and falls back to `HmdForward` for development only.
 
 CSV logs are written under `Application.persistentDataPath/Logs` with a `prototype_*.csv` filename.
+
+## Pulling Quest Logs To Mac
+
+When the app runs on Quest, `Application.persistentDataPath` is on the headset, not in the Unity project folder. Use these helper scripts to copy logs into the local project.
+
+Manual copy:
+
+```bash
+Tools/pull_quest_logs.sh --open
+```
+
+This copies Quest logs from:
+
+```text
+/sdcard/Android/data/com.DefaultCompany.SupineVRDisplayInteraction/files/Logs
+```
+
+to:
+
+```text
+Logs/Quest
+```
+
+and opens the folder in Finder.
+
+For a lightweight auto-copy workflow, start this watcher before connecting the Quest:
+
+```bash
+Tools/watch_quest_logs.sh
+```
+
+It waits for an adb device, copies logs to `Logs/Quest`, opens Finder, then waits for the next reconnect. Stop it with `Ctrl+C`.
 
 To rebuild the development scene wiring, run Unity menu item `Prototype > Build Dev Prototype Scene`.

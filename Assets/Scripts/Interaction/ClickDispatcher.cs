@@ -29,6 +29,21 @@ public class ClickDispatcher : MonoBehaviour
             return;
         }
 
+        if (vrTaskMenuManager != null && raycastPointer != null && vrTaskMenuManager.TryHandleWorldClick(raycastPointer.CurrentRay))
+        {
+            LastClickResult = "WorldMenu menu=True";
+            return;
+        }
+
+        if (focusPointingTaskManager != null
+            && raycastPointer != null
+            && displayManager.TryGetForemostHit(raycastPointer.CurrentRay, out DisplayHit taskControlHit)
+            && focusPointingTaskManager.TryHandleTaskControlClick(taskControlHit.DisplayId, taskControlHit.Normalized))
+        {
+            LastClickResult = $"{taskControlHit.DisplayId} taskControl=True";
+            return;
+        }
+
         if (inputManager.CurrentCondition == InteractionCondition.RaycastBaseline)
         {
             DispatchRaycastBaselineClick();
@@ -57,6 +72,12 @@ public class ClickDispatcher : MonoBehaviour
             return;
         }
 
+        if (focusPointingTaskManager != null && focusPointingTaskManager.TryHandleTaskControlClick(hit.DisplayId, hit.Normalized))
+        {
+            LastClickResult = $"{hit.DisplayId} taskControl=True";
+            return;
+        }
+
         string targetId = string.Empty;
         bool validTarget = hit.Display != null && hit.Display.TryClickDebugTarget(hit.Normalized, out targetId);
         LastClickResult = $"{hit.DisplayId} valid={validTarget} target={targetId}";
@@ -79,6 +100,12 @@ public class ClickDispatcher : MonoBehaviour
         if (vrTaskMenuManager != null && vrTaskMenuManager.TryHandleClick(focusedDisplay.name, normalized))
         {
             LastClickResult = $"{focusedDisplay.name} menu=True";
+            return;
+        }
+
+        if (focusPointingTaskManager != null && focusPointingTaskManager.TryHandleTaskControlClick(focusedDisplay.name, normalized))
+        {
+            LastClickResult = $"{focusedDisplay.name} taskControl=True";
             return;
         }
 

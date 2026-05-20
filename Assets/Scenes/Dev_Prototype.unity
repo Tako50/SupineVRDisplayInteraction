@@ -468,10 +468,6 @@ MonoBehaviour:
   debugTargetId: DebugTarget
   scrollPixelsPerUnit: 160
   maxScrollPixels: 420
-  focusHighlightColor: {r: 0.2, g: 1, b: 0.45, a: 1}
-  candidateHighlightColor: {r: 1, g: 0.92, b: 0.2, a: 1}
-  normalAlpha: 0.86
-  overlapPreviewAlpha: 0.36
 --- !u!4 &528464814
 Transform:
   m_ObjectHideFlags: 0
@@ -1020,10 +1016,6 @@ MonoBehaviour:
   debugTargetId: DebugTarget
   scrollPixelsPerUnit: 160
   maxScrollPixels: 420
-  focusHighlightColor: {r: 0.2, g: 1, b: 0.45, a: 1}
-  candidateHighlightColor: {r: 1, g: 0.92, b: 0.2, a: 1}
-  normalAlpha: 0.86
-  overlapPreviewAlpha: 0.36
 --- !u!4 &1035063438
 Transform:
   m_ObjectHideFlags: 0
@@ -1117,7 +1109,7 @@ MonoBehaviour:
   overlayText: {fileID: 0}
   showWorldConditionLabel: 1
   worldConditionLabelAnchorDisplayId: Display_B_Back
-  worldConditionLabelNormalizedAnchor: {x: 0.5, y: 1.08}
+  worldConditionLabelNormalizedAnchor: {x: 0.5, y: 1.3}
   worldConditionLabelForwardOffset: -0.01
   worldConditionLabelSize: {x: 520, y: 72}
   worldConditionLabelScale: 0.0015
@@ -1340,7 +1332,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a57199c0593c4ff398e1a593da04291, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gazeSource: 2
+  gazeSource: 1
   hmdCamera: {fileID: 2098682403}
   eyeTrackingAdapter: {fileID: 1045802453}
   eyeTrackingRaySource: {fileID: 1790858881}
@@ -1481,6 +1473,8 @@ MonoBehaviour:
   displayManager: {fileID: 1045802448}
   errorEvaluator: {fileID: 1045802455}
   logger: {fileID: 1045802441}
+  displayA: {fileID: 528464814}
+  displayB: {fileID: 1035063438}
   participantId: P000
   sessionId: S000
   autoStartOnPlay: 0
@@ -1488,14 +1482,23 @@ MonoBehaviour:
   returnToConditionSelectionAfterMainTask: 1
   selectedCondition: 0
   selectedLayout: 2
+  conditionOrder: 0
+  conditionAName: ConditionA
+  conditionBName: ConditionB
+  conditionAInteraction: 0
+  conditionBInteraction: 1
   targetColor: {r: 0.1, g: 1, b: 0.3, a: 0.95}
   inactiveTargetColor: {r: 0.1, g: 1, b: 0.3, a: 0.35}
-  targetSizesNormalized:
-  - 0.1
-  - 0.14
-  targetPositionsNormalized:
-  - {x: 0.25, y: 0.35}
-  - {x: 0.72, y: 0.62}
+  targetSizeNormalized: 0.1
+  repetitionsPerTargetPosition: 4
+  targetColumns: 2
+  targetRows: 3
+  gridMinNormalized: {x: 0.25, y: 0.22}
+  gridMaxNormalized: {x: 0.75, y: 0.78}
+  autoGenerateTrials: 1
+  rebuildTrialsOnStart: 1
+  randomizeTrialsWithinCondition: 0
+  randomSeed: 20260519
   trials: []
 --- !u!114 &1045802457
 MonoBehaviour:
@@ -1794,7 +1797,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1172880933
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2272,7 +2275,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1619621304
 RectTransform:
   m_ObjectHideFlags: 0
