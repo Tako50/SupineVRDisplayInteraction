@@ -1,16 +1,26 @@
 using UnityEngine;
 
 [DisallowMultipleComponent]
+/// <summary>
+/// スクロール入力を現在の条件に応じて配送する。
+/// BaselineはRayが当たっている表示、ExplicitDisplayFocusはフォーカス済み表示だけをスクロール対象にする。
+/// </summary>
 public class ScrollController : MonoBehaviour
 {
     [SerializeField] private PrototypeInputManager inputManager;
     [SerializeField] private DisplayManager displayManager;
     [SerializeField] private RaycastPointer raycastPointer;
+    [SerializeField] private FocusManager focusManager;
+    [SerializeField] private VirtualCursorController virtualCursorController;
+    [SerializeField] private GazeProvider gazeProvider;
     [SerializeField] private Logger logger;
     [SerializeField] private float scrollLogInterval = 0.12f;
     [SerializeField] private float stickScrollDeadzone = 0.05f;
 
     private float lastScrollLogTime;
+
+    public float LastScrollAmount { get; private set; }
+    public string LastScrollDisplayId { get; private set; } = "None";
 
     private void Awake()
     {
@@ -26,11 +36,20 @@ public class ScrollController : MonoBehaviour
             return;
         }
 
-        if (inputManager.CurrentCondition != InteractionCondition.RaycastBaseline)
+        if (inputManager.CurrentCondition == InteractionCondition.RaycastBaseline)
         {
+            ScrollRaycastBaseline();
             return;
         }
 
+        if (inputManager.CurrentCondition == InteractionCondition.ExplicitDisplayFocus)
+        {
+            ScrollExplicitFocus();
+        }
+    }
+
+    private void ScrollRaycastBaseline()
+    {
         if (!displayManager.HasCurrentRaycastHit)
         {
             return;
@@ -54,6 +73,9 @@ public class ScrollController : MonoBehaviour
             return;
         }
 
+        LastScrollAmount = appliedScroll;
+        LastScrollDisplayId = hit.DisplayId;
+
         if (Time.time - lastScrollLogTime >= scrollLogInterval)
         {
             lastScrollLogTime = Time.time;
@@ -65,6 +87,63 @@ public class ScrollController : MonoBehaviour
             else
             {
                 Debug.Log($"[ScrollController] condition={inputManager.CurrentCondition}, displayId={hit.DisplayId}, normalized={Format(hit.Normalized)}, scrollAmount={appliedScroll:0.000}");
+            }
+        }
+    }
+
+    private void ScrollExplicitFocus()
+    {
+        // ExplicitDisplayFocusでは、視線が別表示へ移ってもスクロール先はロック済み表示のまま。
+        if (!inputManager.TriggerHeld)
+        {
+            return;
+        }
+
+        float stickVertical = inputManager.Stick.y;
+        if (Mathf.Abs(stickVertical) < stickScrollDeadzone)
+        {
+            return;
+        }
+
+        DisplaySurface focusedDisplay = displayManager.FocusedDisplay;
+        if (focusedDisplay == null)
+        {
+            return;
+        }
+
+        float appliedScroll = focusedDisplay.Scroll(stickVertical, Time.deltaTime);
+        if (Mathf.Approximately(appliedScroll, 0f))
+        {
+            return;
+        }
+
+        LastScrollAmount = appliedScroll;
+        LastScrollDisplayId = focusedDisplay.name;
+
+        if (Time.time - lastScrollLogTime >= scrollLogInterval)
+        {
+            lastScrollLogTime = Time.time;
+            Vector2 normalized = virtualCursorController != null
+                ? virtualCursorController.NormalizedPosition
+                : new Vector2(0.5f, 0.5f);
+            Ray gazeRay = gazeProvider != null ? gazeProvider.GetGazeRay() : default;
+            bool gazeOnDifferentDisplay = focusManager != null && focusManager.IsGazeOnDifferentDisplay(focusedDisplay);
+            if (logger != null)
+            {
+                logger.LogExplicitScroll(
+                    inputManager.CurrentCondition,
+                    gazeProvider != null ? gazeProvider.CurrentGazeSource : GazeSource.HmdForward,
+                    focusManager != null ? focusManager.CurrentCandidateIds : "None",
+                    focusedDisplay.name,
+                    normalized,
+                    appliedScroll,
+                    gazeOnDifferentDisplay,
+                    gazeRay.origin,
+                    gazeRay.direction);
+            }
+            else
+            {
+                Debug.Log($"[ScrollController] condition={inputManager.CurrentCondition}, focusedDisplay={focusedDisplay.name}, normalized={Format(normalized)}, scrollAmount={appliedScroll:0.000}, gazeOnDifferentDisplay={gazeOnDifferentDisplay}");
             }
         }
     }
@@ -88,6 +167,21 @@ public class ScrollController : MonoBehaviour
         if (raycastPointer == null)
         {
             raycastPointer = FindObjectOfType<RaycastPointer>();
+        }
+
+        if (focusManager == null)
+        {
+            focusManager = FindObjectOfType<FocusManager>();
+        }
+
+        if (virtualCursorController == null)
+        {
+            virtualCursorController = FindObjectOfType<VirtualCursorController>();
+        }
+
+        if (gazeProvider == null)
+        {
+            gazeProvider = FindObjectOfType<GazeProvider>();
         }
 
         if (logger == null)

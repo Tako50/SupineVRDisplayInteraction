@@ -1,6 +1,10 @@
 using UnityEngine;
 
 [DisallowMultipleComponent]
+/// <summary>
+/// RaycastBaseline用の右コントローラRay。
+/// Physics.Raycast 1回で最前面のDisplaySurfaceだけを操作対象にし、遮蔽を再現する。
+/// </summary>
 public class RaycastPointer : MonoBehaviour
 {
     [SerializeField] private PrototypeInputManager inputManager;
@@ -11,6 +15,7 @@ public class RaycastPointer : MonoBehaviour
     [SerializeField] private float rayStartWidth = 0.0035f;
     [SerializeField] private float rayEndWidth = 0.001f;
     [SerializeField] private Color rayColor = Color.cyan;
+    [SerializeField] private bool showRayLine = true;
 
     public Ray CurrentRay { get; private set; }
 
@@ -26,18 +31,22 @@ public class RaycastPointer : MonoBehaviour
 
         if (inputManager == null || displayManager == null)
         {
-            SetRayVisible(false);
-            return;
-        }
-
-        if (inputManager.CurrentCondition != InteractionCondition.RaycastBaseline)
-        {
+            CurrentRay = GetPointerRay();
             SetRayVisible(false);
             return;
         }
 
         Ray pointerRay = GetPointerRay();
         CurrentRay = pointerRay;
+
+        if (inputManager.CurrentCondition != InteractionCondition.RaycastBaseline)
+        {
+            // ExplicitDisplayFocus中はBaselineのRayヒット状態を消す。外部ボタン用にCurrentRayだけは更新しておく。
+            displayManager.ClearCurrentRaycastHit();
+            SetRayVisible(false);
+            return;
+        }
+
         Vector3 lineEnd = pointerRay.origin + pointerRay.direction * visibleRayLength;
 
         if (displayManager.TryGetFirstDisplayHit(pointerRay, out DisplayHit hit))
@@ -118,7 +127,13 @@ public class RaycastPointer : MonoBehaviour
         EnsureLineRenderer();
         rayLine.SetPosition(0, start);
         rayLine.SetPosition(1, end);
-        SetRayVisible(true);
+        SetRayVisible(showRayLine);
+    }
+
+    public void SetRayLineVisible(bool visible)
+    {
+        showRayLine = visible;
+        SetRayVisible(visible);
     }
 
     private void SetRayVisible(bool visible)

@@ -1,9 +1,10 @@
 using UnityEngine;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-#endif
 
 [DisallowMultipleComponent]
+/// <summary>
+/// プロトタイプ全体の現在条件・配置プリセット・デバッグ状態を束ねる軽い管理役。
+/// タスク本体はFocusPointingTaskManagerに任せ、ここでは条件とレイアウトの適用を中心に扱う。
+/// </summary>
 public class ExperimentManager : MonoBehaviour
 {
     [Header("References")]
@@ -12,6 +13,8 @@ public class ExperimentManager : MonoBehaviour
     [SerializeField] private DisplayManager displayManager;
     [SerializeField] private DisplayLayoutManager layoutManager;
     [SerializeField] private RaycastPointer raycastPointer;
+    [SerializeField] private FocusManager focusManager;
+    [SerializeField] private EditorDebugInputProvider debugInputProvider;
     [SerializeField] private Logger logger;
 
     [Header("Experiment State")]
@@ -51,11 +54,18 @@ public class ExperimentManager : MonoBehaviour
 
     public void ApplyLayout(DisplayLayoutPreset preset)
     {
+        // 通常は開始時HMD基準で固定。必要なときだけHMD正面リセットで配置基準を取り直す。
         currentLayout = preset;
         if (layoutManager != null)
         {
-            layoutManager.ApplyLayout(preset);
-            layoutManager.enabled = !lockDisplaysAfterStart;
+            if (lockDisplaysAfterStart)
+            {
+                layoutManager.ApplyLayout(preset);
+            }
+            else
+            {
+                layoutManager.ResetLayoutFromCurrentHmd(preset);
+            }
         }
 
         Debug.Log($"[ExperimentManager] layout={preset}");
@@ -63,15 +73,20 @@ public class ExperimentManager : MonoBehaviour
 
     private void HandleKeyboardShortcuts()
     {
-        if (GetKeyDown(KeyCode.Alpha1))
+        if (debugInputProvider == null || !debugInputProvider.IsEnabled)
+        {
+            return;
+        }
+
+        if (debugInputProvider.NoOcclusionPressed)
         {
             ApplyLayout(DisplayLayoutPreset.NoOcclusion);
         }
-        else if (GetKeyDown(KeyCode.Alpha2))
+        else if (debugInputProvider.PartialOcclusionPressed)
         {
             ApplyLayout(DisplayLayoutPreset.PartialOcclusion);
         }
-        else if (GetKeyDown(KeyCode.Alpha3))
+        else if (debugInputProvider.StrongOcclusionPressed)
         {
             ApplyLayout(DisplayLayoutPreset.StrongOcclusion);
         }
@@ -101,7 +116,9 @@ public class ExperimentManager : MonoBehaviour
             nextDebugLogTime = Time.time + debugLogIntervalSeconds;
             string rayDisplay = hasRayHit ? $"{rayHit.DisplayId} {Format(rayHit.Normalized)}" : "None";
             string focusDisplay = displayManager.FocusedDisplay != null ? displayManager.FocusedDisplay.name : "None";
-            Debug.Log($"[ExperimentManager] condition={inputManager.CurrentCondition}, layout={currentLayout}, rayHit={rayDisplay}, focused={focusDisplay}, controllerRayOrigin={controllerRay.origin}, controllerRayDirection={controllerRay.direction}");
+            string focusState = focusManager != null ? focusManager.CurrentState.ToString() : "Unknown";
+            string candidateIds = focusManager != null ? focusManager.CurrentCandidateIds : "None";
+            Debug.Log($"[ExperimentManager] condition={inputManager.CurrentCondition}, layout={currentLayout}, rayHit={rayDisplay}, focused={focusDisplay}, focusState={focusState}, gazeCandidates={candidateIds}, controllerRayOrigin={controllerRay.origin}, controllerRayDirection={controllerRay.direction}");
         }
     }
 
@@ -132,6 +149,16 @@ public class ExperimentManager : MonoBehaviour
             raycastPointer = FindObjectOfType<RaycastPointer>();
         }
 
+        if (focusManager == null)
+        {
+            focusManager = FindObjectOfType<FocusManager>();
+        }
+
+        if (debugInputProvider == null)
+        {
+            debugInputProvider = FindObjectOfType<EditorDebugInputProvider>();
+        }
+
         if (logger == null)
         {
             logger = FindObjectOfType<Logger>();
@@ -143,28 +170,4 @@ public class ExperimentManager : MonoBehaviour
         return $"({value.x:0.000}, {value.y:0.000})";
     }
 
-    private static bool GetKeyDown(KeyCode keyCode)
-    {
-#if ENABLE_INPUT_SYSTEM
-        Keyboard keyboard = Keyboard.current;
-        if (keyboard == null)
-        {
-            return false;
-        }
-
-        switch (keyCode)
-        {
-            case KeyCode.Alpha1:
-                return keyboard.digit1Key.wasPressedThisFrame;
-            case KeyCode.Alpha2:
-                return keyboard.digit2Key.wasPressedThisFrame;
-            case KeyCode.Alpha3:
-                return keyboard.digit3Key.wasPressedThisFrame;
-            default:
-                return false;
-        }
-#else
-        return Input.GetKeyDown(keyCode);
-#endif
-    }
 }

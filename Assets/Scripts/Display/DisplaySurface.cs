@@ -1,7 +1,19 @@
 using UnityEngine;
 using UnityEngine.UI;
 
+public enum DisplayContentMode
+{
+    Debug,
+    ConditionSelection,
+    PointingTask,
+    ScrollTask
+}
+
 [DisallowMultipleComponent]
+/// <summary>
+/// 1枚の仮想ディスプレイを表す。
+/// World Space Canvas、透明HitPlane、カーソル、疑似コンテンツをまとめ、ワールド座標と表示内正規化座標を変換する。
+/// </summary>
 public class DisplaySurface : MonoBehaviour
 {
     [Header("Display Parts")]
@@ -20,11 +32,15 @@ public class DisplaySurface : MonoBehaviour
     [SerializeField] private Vector2 cursorPixelSize = new Vector2(10f, 10f);
 
     [Header("Debug Content")]
+    [SerializeField] private DisplayContentMode contentMode = DisplayContentMode.Debug;
     [SerializeField] private string debugTargetId = "DebugTarget";
     [SerializeField] private float scrollPixelsPerUnit = 160f;
     [SerializeField] private float maxScrollPixels = 420f;
 
     private float scrollOffsetPixels;
+    private Image visiblePanelImage;
+    private Color basePanelColor = Color.white;
+    private bool hasCachedBasePanelColor;
 
     public Canvas WorldSpaceCanvas => worldSpaceCanvas;
     public RectTransform VisiblePanel => visiblePanel;
@@ -34,6 +50,12 @@ public class DisplaySurface : MonoBehaviour
     public RectTransform DebugClickTarget => debugClickTarget;
     public Vector2 PhysicalSizeMeters => physicalSizeMeters;
     public Vector2 CanvasPixelSize => canvasPixelSize;
+    public DisplayContentMode ContentMode => contentMode;
+
+    private void Awake()
+    {
+        CachePanelImage();
+    }
 
     public void AssignParts(Canvas canvas, RectTransform panel, BoxCollider hitPlane, RectTransform cursorRect)
     {
@@ -49,6 +71,44 @@ public class DisplaySurface : MonoBehaviour
         scrollContent = contentRoot;
         debugClickTarget = clickTarget;
         ApplyScrollOffset();
+        ApplyContentMode();
+    }
+
+    public void SetContentMode(DisplayContentMode mode)
+    {
+        contentMode = mode;
+        ApplyContentMode();
+        BringCursorToFront();
+    }
+
+    public void BringCursorToFront()
+    {
+        if (cursor != null)
+        {
+            cursor.SetAsLastSibling();
+        }
+    }
+
+    public void SetFocusVisual(bool focused)
+    {
+        CachePanelImage();
+        if (visiblePanelImage == null)
+        {
+            return;
+        }
+
+        visiblePanelImage.color = WithAlpha(basePanelColor, basePanelColor.a);
+    }
+
+    public void SetCandidateVisual(bool candidate, bool overlapPreview)
+    {
+        CachePanelImage();
+        if (visiblePanelImage == null)
+        {
+            return;
+        }
+
+        visiblePanelImage.color = WithAlpha(basePanelColor, basePanelColor.a);
     }
 
     public void SetSize(Vector2 sizeMeters, Vector2 pixelSize)
@@ -106,6 +166,7 @@ public class DisplaySurface : MonoBehaviour
             cursor.sizeDelta = cursorPixelSize;
             cursor.localScale = Vector3.one;
             cursor.localRotation = Quaternion.identity;
+            cursor.SetAsLastSibling();
         }
 
         ApplyScrollOffset();
@@ -113,6 +174,7 @@ public class DisplaySurface : MonoBehaviour
 
     public Vector2 WorldToNormalized(Vector3 worldPoint)
     {
+        // Displayのローカル平面上の位置を0-1へ変換する。外側は端へクランプする。
         Vector3 localPoint = transform.InverseTransformPoint(worldPoint);
         if (physicalSizeMeters.x <= 0f || physicalSizeMeters.y <= 0f)
         {
@@ -124,10 +186,30 @@ public class DisplaySurface : MonoBehaviour
             Mathf.Clamp01(localPoint.y / physicalSizeMeters.y + 0.5f));
     }
 
+    public bool TryRayToClampedNormalized(Ray ray, out Vector2 normalized)
+    {
+        // 視線が表示のHitPlane外を向いていても、表示平面との交点を使って一番近い端へ寄せる。
+        normalized = new Vector2(0.5f, 0.5f);
+        if (physicalSizeMeters.x <= 0f || physicalSizeMeters.y <= 0f || ray.direction == Vector3.zero)
+        {
+            return false;
+        }
+
+        Plane displayPlane = new Plane(transform.forward, transform.position);
+        if (!displayPlane.Raycast(ray, out float enter) || enter < 0f)
+        {
+            return false;
+        }
+
+        Vector3 worldPoint = ray.GetPoint(enter);
+        normalized = WorldToNormalized(worldPoint);
+        return true;
+    }
+
     public bool TryClickDebugTarget(Vector2 normalized, out string targetId)
     {
         targetId = debugTargetId;
-        if (debugClickTarget == null || worldSpaceCanvas == null)
+        if (debugClickTarget == null || worldSpaceCanvas == null || !debugClickTarget.gameObject.activeInHierarchy)
         {
             return false;
         }
@@ -163,7 +245,7 @@ public class DisplaySurface : MonoBehaviour
 
     public float Scroll(float stickVertical, float deltaTime)
     {
-        if (scrollContent == null)
+        if (scrollContent == null || !scrollContent.gameObject.activeInHierarchy)
         {
             return 0f;
         }
@@ -188,8 +270,41 @@ public class DisplaySurface : MonoBehaviour
         }
     }
 
+    private void ApplyContentMode()
+    {
+        // T1ポインティング中はスクロール用の疑似文章を消し、スクロール課題だけで再表示できるようにする。
+        if (scrollContent == null)
+        {
+            return;
+        }
+
+        bool showPseudoContent = contentMode == DisplayContentMode.Debug || contentMode == DisplayContentMode.ScrollTask;
+        scrollContent.gameObject.SetActive(showPseudoContent);
+    }
+
+    private void CachePanelImage()
+    {
+        if (visiblePanelImage == null && visiblePanel != null)
+        {
+            visiblePanelImage = visiblePanel.GetComponent<Image>();
+        }
+
+        if (!hasCachedBasePanelColor && visiblePanelImage != null)
+        {
+            basePanelColor = visiblePanelImage.color;
+            hasCachedBasePanelColor = true;
+        }
+    }
+
+    private static Color WithAlpha(Color color, float alpha)
+    {
+        color.a = alpha;
+        return color;
+    }
+
     private void OnValidate()
     {
         ApplyConfiguration();
+        ApplyContentMode();
     }
 }

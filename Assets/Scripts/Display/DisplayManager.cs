@@ -2,6 +2,10 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [DisallowMultipleComponent]
+/// <summary>
+/// DisplaySurfaceの一覧、現在のRayヒット、明示フォーカス中の表示を管理する。
+/// RaycastBaselineとExplicitDisplayFocusの両方が同じDisplaySurface操作APIを使えるようにする中継役。
+/// </summary>
 public class DisplayManager : MonoBehaviour
 {
     public static DisplayManager Instance { get; private set; }
@@ -52,6 +56,7 @@ public class DisplayManager : MonoBehaviour
 
     public bool TryGetFirstDisplayHit(Ray ray, out DisplayHit displayHit)
     {
+        // BaselineではPhysics.Raycast 1回だけで、最前面の操作対象を決める。
         if (!Physics.Raycast(ray, out RaycastHit physicsHit, maxRayDistance, raycastLayers, QueryTriggerInteraction.Collide))
         {
             displayHit = default;
@@ -72,6 +77,7 @@ public class DisplayManager : MonoBehaviour
 
     public DisplayHit[] GetDisplayHitsAll(Ray ray)
     {
+        // ExplicitDisplayFocusでは重なった表示候補を全部集めるためRaycastAllを使う。
         reusableHits.Clear();
 
         RaycastHit[] physicsHits = Physics.RaycastAll(
@@ -116,6 +122,7 @@ public class DisplayManager : MonoBehaviour
     public void SetFocusedDisplay(DisplaySurface display)
     {
         focusedDisplay = display;
+        ApplyFocusVisuals(null);
     }
 
     public Vector2 GetNormalizedFromWorldPoint(DisplaySurface display, Vector3 worldPoint)
@@ -141,11 +148,14 @@ public class DisplayManager : MonoBehaviour
             return;
         }
 
+        display.BringCursorToFront();
+
         RectTransform canvasRect = display.WorldSpaceCanvas != null
             ? display.WorldSpaceCanvas.GetComponent<RectTransform>()
             : null;
 
         Vector2 canvasSize = canvasRect != null ? canvasRect.sizeDelta : new Vector2(800f, 450f);
+        // 画面外入力は表示端へ寄せ、カーソルがディスプレイ外へ消えないようにする。
         Vector2 clamped = new Vector2(Mathf.Clamp01(normalized.x), Mathf.Clamp01(normalized.y));
         display.Cursor.anchoredPosition = new Vector2(
             (clamped.x - 0.5f) * canvasSize.x,
@@ -166,8 +176,122 @@ public class DisplayManager : MonoBehaviour
             {
                 bool visible = display == primary || display == secondary;
                 display.Cursor.gameObject.SetActive(visible);
+                if (visible)
+                {
+                    display.BringCursorToFront();
+                }
             }
         }
+    }
+
+    public void HideAllCursors()
+    {
+        SetOnlyCursorsVisible(null, null);
+    }
+
+    public void ApplyFocusVisuals(DisplayHit[] gazeCandidates, bool showOverlapPreview = true)
+    {
+        if (displays == null)
+        {
+            return;
+        }
+
+        bool hasMultipleCandidates = showOverlapPreview && gazeCandidates != null && gazeCandidates.Length > 1;
+        for (int i = 0; i < displays.Length; i++)
+        {
+            DisplaySurface display = displays[i];
+            if (display == null)
+            {
+                continue;
+            }
+
+            if (display == focusedDisplay)
+            {
+                display.SetFocusVisual(true);
+                continue;
+            }
+
+            bool isCandidate = ContainsDisplay(gazeCandidates, display);
+            bool overlapPreview = hasMultipleCandidates && gazeCandidates[0].Display == display;
+            display.SetCandidateVisual(isCandidate, overlapPreview);
+        }
+    }
+
+    public void ResetDisplayVisuals()
+    {
+        if (displays == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < displays.Length; i++)
+        {
+            if (displays[i] != null)
+            {
+                displays[i].SetCandidateVisual(false, false);
+            }
+        }
+    }
+
+    public void SetAllDisplayContentMode(DisplayContentMode mode)
+    {
+        if (displays == null || displays.Length == 0)
+        {
+            RefreshDisplays();
+        }
+
+        if (displays == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < displays.Length; i++)
+        {
+            if (displays[i] != null)
+            {
+                displays[i].SetContentMode(mode);
+                displays[i].BringCursorToFront();
+            }
+        }
+    }
+
+    public static string FormatDisplayIds(DisplayHit[] hits)
+    {
+        if (hits == null || hits.Length == 0)
+        {
+            return "None";
+        }
+
+        System.Text.StringBuilder builder = new System.Text.StringBuilder();
+        for (int i = 0; i < hits.Length; i++)
+        {
+            if (i > 0)
+            {
+                builder.Append('|');
+            }
+
+            builder.Append(hits[i].DisplayId);
+        }
+
+        return builder.ToString();
+    }
+
+    private static bool ContainsDisplay(DisplayHit[] hits, DisplaySurface display)
+    {
+        if (hits == null || display == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            if (hits[i].Display == display)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
 
@@ -178,6 +302,7 @@ public struct DisplayHit
     public readonly Vector2 Normalized;
 
     public float Distance => Hit.distance;
+    public Vector3 WorldPosition => Hit.point;
     public string DisplayId => Display != null ? Display.name : "None";
 
     public DisplayHit(DisplaySurface display, RaycastHit hit, Vector2 normalized)
