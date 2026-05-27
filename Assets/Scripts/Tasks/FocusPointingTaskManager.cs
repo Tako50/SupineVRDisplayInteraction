@@ -6,6 +6,9 @@ using UnityEngine;
 using UnityEngine.UI;
 
 [Serializable]
+/// <summary>
+/// T1の1試行ぶんの設定。どの条件・どの表示・どの正規化位置にターゲットを出すかを持つ。
+/// </summary>
 public class FocusPointingTrialConfig
 {
     public int trialIndex;
@@ -64,6 +67,10 @@ public enum TargetSelectionConditionOrder
 }
 
 [DisallowMultipleComponent]
+/// <summary>
+/// T1 FocusPointingタスクを管理する。
+/// 条件選択、Training/Mainの開始、ターゲット生成、クリック評価、CSV保存までを担当する。
+/// </summary>
 public class FocusPointingTaskManager : MonoBehaviour
 {
     [Header("References")]
@@ -98,8 +105,8 @@ public class FocusPointingTaskManager : MonoBehaviour
     [SerializeField] private int repetitionsPerTargetPosition = 4;
     [SerializeField] private int targetColumns = 2;
     [SerializeField] private int targetRows = 3;
-    [SerializeField] private Vector2 gridMinNormalized = new Vector2(0.25f, 0.22f);
-    [SerializeField] private Vector2 gridMaxNormalized = new Vector2(0.75f, 0.78f);
+    [SerializeField] private Vector2 gridMinNormalized = new Vector2(0.15f, 0.08f);
+    [SerializeField] private Vector2 gridMaxNormalized = new Vector2(0.85f, 0.92f);
     [SerializeField] private bool autoGenerateTrials = true;
     [SerializeField] private bool rebuildTrialsOnStart = true;
     [SerializeField] private bool randomizeTrialsWithinCondition = false;
@@ -128,6 +135,7 @@ public class FocusPointingTaskManager : MonoBehaviour
     private StreamWriter t1ResultsWriter;
     private string t1ResultsCsvPath;
     private int currentTrialAttemptIndex;
+    private InteractionCondition activeTaskCondition;
     private RectTransform startGateRect;
     private Image startGateImage;
     private Text startGateText;
@@ -217,6 +225,7 @@ public class FocusPointingTaskManager : MonoBehaviour
         currentPhase = FocusPointingTaskPhase.ConditionSelection;
         waitingForStartButton = false;
         startCountdownRunning = false;
+        activeTaskCondition = selectedCondition;
         HideStartGate();
         HideAllTargets();
         SetDisplayContentMode(DisplayContentMode.ConditionSelection);
@@ -233,6 +242,7 @@ public class FocusPointingTaskManager : MonoBehaviour
 
     private void BeginTask(FocusPointingTaskPhase phase, bool lockCondition)
     {
+        // 本タスクでは開始時の条件をロックし、1条件48試行が終わるまで途中変更させない。
         ResolveReferences();
         if (rebuildTrialsOnStart)
         {
@@ -248,19 +258,18 @@ public class FocusPointingTaskManager : MonoBehaviour
 
         currentPhase = phase;
         taskRunning = true;
-        currentTrialListIndex = -1;
+        activeTaskCondition = selectedCondition;
+        currentTrialListIndex = FindIndexBeforeFirstTrialForCondition(activeTaskCondition);
 
         if (inputManager != null)
         {
             if (lockCondition)
             {
-                InteractionCondition firstCondition = trials.Count > 0 ? trials[0].condition : selectedCondition;
-                inputManager.LockCondition(firstCondition);
+                inputManager.LockCondition(activeTaskCondition);
             }
             else
             {
-                InteractionCondition firstCondition = trials.Count > 0 ? trials[0].condition : selectedCondition;
-                inputManager.SetCondition(firstCondition, true);
+                inputManager.SetCondition(activeTaskCondition, true);
             }
         }
 
@@ -269,9 +278,10 @@ public class FocusPointingTaskManager : MonoBehaviour
             experimentManager.ApplyLayout(selectedLayout);
         }
 
-        Debug.Log($"[FocusPointingTask] begin phase={currentPhase}, condition={selectedCondition}, layout={selectedLayout}, lockCondition={lockCondition}");
+        Debug.Log($"[FocusPointingTask] begin phase={currentPhase}, condition={activeTaskCondition}, layout={selectedLayout}, lockCondition={lockCondition}");
         if (requireStartButtonBeforeTask)
         {
+            // 実験開始前の構えを揃えるため、中央Startボタンと3秒カウントダウンを挟む。
             ShowStartGate();
             return;
         }
@@ -324,6 +334,13 @@ public class FocusPointingTaskManager : MonoBehaviour
             currentTrialListIndex = 0;
         }
 
+        if (trials[currentTrialListIndex].condition != activeTaskCondition)
+        {
+            Debug.Log($"[FocusPointingTask] completed condition block condition={activeTaskCondition}, phase={currentPhase}");
+            CompleteCurrentTask();
+            return;
+        }
+
         currentTrial = trials[currentTrialListIndex];
         if (currentTrial.trialIndex <= 0)
         {
@@ -346,6 +363,7 @@ public class FocusPointingTaskManager : MonoBehaviour
 
     public void HandleClick(FocusPointingClickEvent clickEvent)
     {
+        // ClickDispatcherから条件に依存しないクリックイベントとして受け取り、同じ評価器で判定する。
         ResolveReferences();
 
         if (!trialRunning || currentTrial == null)
@@ -392,6 +410,7 @@ public class FocusPointingTaskManager : MonoBehaviour
 
         if (!evaluation.IsCorrect)
         {
+            // 誤反応も分析できるようにCSVへ残すが、試行は正答するまで続ける。
             if (logger != null)
             {
                 logger.LogFocusPointingTrial(result);
@@ -497,6 +516,7 @@ public class FocusPointingTaskManager : MonoBehaviour
 
     private void EnsureDefaultTrials()
     {
+        // 2条件それぞれに対して、2表示 x 2列 x 3行 x 4反復 = 48試行を生成する。
         if (!autoGenerateTrials)
         {
             if (trials.Count == 0)
@@ -603,6 +623,7 @@ public class FocusPointingTaskManager : MonoBehaviour
 
     private List<Vector2> GenerateGridPositions()
     {
+        // Inspectorのmin/maxでターゲット配置範囲を調整できる。現在は端寄り配置。
         List<Vector2> positions = new List<Vector2>();
         int columns = Mathf.Max(1, targetColumns);
         int rows = Mathf.Max(1, targetRows);
@@ -638,6 +659,20 @@ public class FocusPointingTaskManager : MonoBehaviour
             list[i] = list[swapIndex];
             list[swapIndex] = temp;
         }
+    }
+
+    private int FindIndexBeforeFirstTrialForCondition(InteractionCondition condition)
+    {
+        for (int i = 0; i < trials.Count; i++)
+        {
+            if (trials[i] != null && trials[i].condition == condition)
+            {
+                return i - 1;
+            }
+        }
+
+        Debug.LogWarning($"[FocusPointingTask] No trials found for condition={condition}. Falling back to the first trial.");
+        return -1;
     }
 
     private void EnsureTargets()

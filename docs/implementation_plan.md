@@ -105,7 +105,7 @@ Requirements:
 - Right controller ray selects the first DisplaySurface hit.
 - The closest hit display becomes the implicit input target.
 - Show cursor at the ray hit position on that display.
-- A button clicks the target under the ray cursor.
+- A button or right trigger short press clicks the target under the ray cursor.
 - Right stick vertical scrolls the display only while the ray is hitting it.
 - In StrongOcclusion layout, the front display should block interaction with the back display if the ray hits the front display first.
 - Log click events, scroll events, hit display ID, and controller pose samples.
@@ -141,7 +141,8 @@ Requirements:
 - Focus confirmation also warps the virtual cursor to the gaze hit position on that display.
 - Gaze alone must not change focus.
 - After focus is confirmed, stick movement controls the virtual cursor on the focused display.
-- A button clicks at the virtual cursor position.
+- A button or right trigger short press clicks at the virtual cursor position.
+- Trigger release does not click if trigger+stick scrolling occurred during that trigger press.
 - Trigger + stick vertical scrolls the focused display.
 - The focused display remains the input target even if gaze moves to another display.
 - Grip can be pressed again to refocus based on the current gaze candidate.
@@ -152,7 +153,7 @@ Done when:
 - I can focus a display with gaze + grip.
 - Cursor warps to gaze position.
 - Stick moves the cursor.
-- A button clicks.
+- A button or right trigger short press clicks.
 - Trigger + stick scrolls the focused display.
 - Input focus remains locked until grip is pressed again.
 ```

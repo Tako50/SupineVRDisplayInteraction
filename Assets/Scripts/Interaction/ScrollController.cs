@@ -1,6 +1,10 @@
 using UnityEngine;
 
 [DisallowMultipleComponent]
+/// <summary>
+/// スクロール入力を現在の条件に応じて配送する。
+/// BaselineはRayが当たっている表示、ExplicitDisplayFocusはフォーカス済み表示だけをスクロール対象にする。
+/// </summary>
 public class ScrollController : MonoBehaviour
 {
     [SerializeField] private PrototypeInputManager inputManager;
@@ -89,6 +93,7 @@ public class ScrollController : MonoBehaviour
 
     private void ScrollExplicitFocus()
     {
+        // ExplicitDisplayFocusでは、視線が別表示へ移ってもスクロール先はロック済み表示のまま。
         if (!inputManager.TriggerHeld)
         {
             return;

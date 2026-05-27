@@ -17,6 +17,10 @@ public struct FocusPointingEvaluation
 }
 
 [DisallowMultipleComponent]
+/// <summary>
+/// T1クリック結果をCorrect / DisplayError / TargetError / Missへ分類する。
+/// 入力方式に依存せず、クリックされた表示IDと正規化座標だけで判定する。
+/// </summary>
 public class ErrorEvaluator : MonoBehaviour
 {
     public FocusPointingEvaluation EvaluateFocusPointingClick(

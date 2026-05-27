@@ -1,6 +1,10 @@
 using UnityEngine;
 
 [DisallowMultipleComponent]
+/// <summary>
+/// RaycastBaseline用の右コントローラRay。
+/// Physics.Raycast 1回で最前面のDisplaySurfaceだけを操作対象にし、遮蔽を再現する。
+/// </summary>
 public class RaycastPointer : MonoBehaviour
 {
     [SerializeField] private PrototypeInputManager inputManager;
@@ -37,6 +41,7 @@ public class RaycastPointer : MonoBehaviour
 
         if (inputManager.CurrentCondition != InteractionCondition.RaycastBaseline)
         {
+            // ExplicitDisplayFocus中はBaselineのRayヒット状態を消す。外部ボタン用にCurrentRayだけは更新しておく。
             displayManager.ClearCurrentRaycastHit();
             SetRayVisible(false);
             return;

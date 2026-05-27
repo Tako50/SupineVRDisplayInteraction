@@ -9,6 +9,10 @@ using UnityEngine.InputSystem.Controls;
 
 [DefaultExecutionOrder(-200)]
 [DisallowMultipleComponent]
+/// <summary>
+/// Quest実機なしでEditor上の操作を検証するためのキーボード入力。
+/// 本番入力とはPrototypeInputManagerで統合し、実験ロジック側には直接キー入力を書かない。
+/// </summary>
 public class EditorDebugInputProvider : MonoBehaviour
 {
     [Header("Activation")]
@@ -45,6 +49,7 @@ public class EditorDebugInputProvider : MonoBehaviour
     public bool GripHeld { get; private set; }
     public bool TriggerPressed { get; private set; }
     public bool TriggerHeld { get; private set; }
+    public bool TriggerReleased { get; private set; }
     public bool ToggleConditionPressed { get; private set; }
     public bool ResetFocusPressed { get; private set; }
     public bool NoOcclusionPressed { get; private set; }
@@ -77,6 +82,7 @@ public class EditorDebugInputProvider : MonoBehaviour
         GripHeld = GetKey(gripKey);
         TriggerHeld = GetKey(triggerKey);
         TriggerPressed = GetKeyDown(triggerKey);
+        TriggerReleased = GetKeyUp(triggerKey);
         ToggleConditionPressed = GetKeyDown(toggleConditionKey);
         ResetFocusPressed = GetKeyDown(resetFocusKey);
         NoOcclusionPressed = GetKeyDown(noOcclusionKey);
@@ -98,6 +104,7 @@ public class EditorDebugInputProvider : MonoBehaviour
         GripHeld = false;
         TriggerHeld = false;
         TriggerPressed = false;
+        TriggerReleased = false;
         ToggleConditionPressed = false;
         ResetFocusPressed = false;
         NoOcclusionPressed = false;
@@ -137,6 +144,11 @@ public class EditorDebugInputProvider : MonoBehaviour
             Debug.Log("[EditorDebugInput] TriggerPressed");
         }
 
+        if (TriggerReleased)
+        {
+            Debug.Log("[EditorDebugInput] TriggerReleased");
+        }
+
         if (ResetFocusPressed)
         {
             Debug.Log("[EditorDebugInput] Reset focus");
@@ -170,6 +182,16 @@ public class EditorDebugInputProvider : MonoBehaviour
         return key != null && key.wasPressedThisFrame;
 #else
         return UnityEngine.Input.GetKeyDown(keyCode);
+#endif
+    }
+
+    private static bool GetKeyUp(KeyCode keyCode)
+    {
+#if ENABLE_INPUT_SYSTEM
+        KeyControl key = GetInputSystemKey(keyCode);
+        return key != null && key.wasReleasedThisFrame;
+#else
+        return UnityEngine.Input.GetKeyUp(keyCode);
 #endif
     }
 

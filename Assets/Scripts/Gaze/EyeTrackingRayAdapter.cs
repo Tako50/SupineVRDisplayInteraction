@@ -13,6 +13,10 @@ using UnityEngine.XR.OpenXR.Features.Interactions;
 
 [DefaultExecutionOrder(-100)]
 [DisallowMultipleComponent]
+/// <summary>
+/// OpenXR/Input SystemのEyeGazeDeviceからQuest Proの視線Rayを取り出すAdapter。
+/// GazeProviderから参照され、権限・トラッキング可否・RaySource Transformの更新をここに閉じ込める。
+/// </summary>
 public class EyeTrackingRayAdapter : MonoBehaviour
 {
     [SerializeField] private Transform raySource;
@@ -62,6 +66,7 @@ public class EyeTrackingRayAdapter : MonoBehaviour
 
     private void RequestEyeTrackingPermissionIfNeeded()
     {
+        // Android実機ではMeta QuestのEye Tracking権限を要求する。Editorでは常に許可扱い。
 #if UNITY_ANDROID && !UNITY_EDITOR
         if (!requestMetaQuestEyeTrackingPermission || string.IsNullOrEmpty(metaQuestEyeTrackingPermission))
         {
@@ -95,6 +100,7 @@ public class EyeTrackingRayAdapter : MonoBehaviour
 
     private void UpdateEyeTrackingRay()
     {
+        // Input SystemのEyeGazeDeviceがtrackedの時だけ、実験用のEyeTracking Rayとして有効にする。
 #if ENABLE_INPUT_SYSTEM
         EyeGazeInteraction.EyeGazeDevice eyeGazeDevice = InputSystem.GetDevice<EyeGazeInteraction.EyeGazeDevice>();
         LastDeviceName = eyeGazeDevice != null ? eyeGazeDevice.displayName : "None";

@@ -11,6 +11,10 @@ public enum DisplayLayoutPreset
 
 [ExecuteAlways]
 [DisallowMultipleComponent]
+/// <summary>
+/// HMD姿勢を基準に2枚の仮想ディスプレイ配置を決める。
+/// 実験中は参加者が自由に動かすのではなく、プリセットとHMD正面リセットだけで配置を固定する。
+/// </summary>
 public class DisplayLayoutManager : MonoBehaviour
 {
     private static readonly Vector2 BasePhysicalSizeMeters = new Vector2(0.80f, 0.45f);
@@ -130,6 +134,7 @@ public class DisplayLayoutManager : MonoBehaviour
             return;
         }
 
+        // Play中は開始時またはリセンター時のHMD姿勢を基準に固定し、毎フレーム頭へ追従させない。
         if (Application.isPlaying && !hasRuntimeAnchor)
         {
             CaptureCurrentHmdAsLayoutAnchor();
@@ -263,12 +268,14 @@ public class DisplayLayoutManager : MonoBehaviour
         right = NormalizeOrFallback(right, Vector3.right);
         up = Vector3.Cross(forward, right).normalized;
 
+        // HMD基準のforward/right/upで、距離・横・縦オフセットをワールド座標へ変換する。
         Vector3 targetPosition = origin
             + forward * config.DistanceFromHmd
             + right * config.HorizontalOffset
             + up * config.VerticalOffset;
 
         Vector3 directionFromHmd = targetPosition - origin;
+        // まずディスプレイがHMD側を向く姿勢を作り、そのあとプリセットのpitch/yaw/rollを足す。
         Quaternion hmdFacingRotation = directionFromHmd.sqrMagnitude > 0.0001f
             ? Quaternion.LookRotation(directionFromHmd.normalized, up)
             : Quaternion.LookRotation(forward, up);
@@ -305,21 +312,35 @@ public class DisplayLayoutConfig
 
     public static DisplayLayoutConfig NoOcclusionDefaults()
     {
+        // 上下配置のみ。距離差と角度差をなくして、遮蔽が起きない確認用にする。
         DisplayLayoutConfig config = new DisplayLayoutConfig();
         config.displayAFront = DisplayPlacementConfig.FrontDefaults();
-        config.displayAFront.HorizontalOffset = -0.55f;
+        config.displayAFront.DistanceFromHmd = 1.25f;
+        config.displayAFront.VerticalOffset = -0.45f;
+        config.displayAFront.HorizontalOffset = 0f;
+        config.displayAFront.PitchDegrees = 0f;
         config.displayBBack = DisplayPlacementConfig.BackDefaults();
-        config.displayBBack.HorizontalOffset = 0.55f;
+        config.displayBBack.DistanceFromHmd = 1.25f;
+        config.displayBBack.VerticalOffset = 0.45f;
+        config.displayBBack.HorizontalOffset = 0f;
+        config.displayBBack.PitchDegrees = 0f;
         return config;
     }
 
     public static DisplayLayoutConfig PartialOcclusionDefaults()
     {
+        // 上下配置に少しだけ前後差をつける。角度差はつけず、Strongより弱い遮蔽確認に使う。
         DisplayLayoutConfig config = new DisplayLayoutConfig();
         config.displayAFront = DisplayPlacementConfig.FrontDefaults();
-        config.displayAFront.HorizontalOffset = -0.18f;
+        config.displayAFront.DistanceFromHmd = 1.15f;
+        config.displayAFront.VerticalOffset = -0.30f;
+        config.displayAFront.HorizontalOffset = 0f;
+        config.displayAFront.PitchDegrees = 0f;
         config.displayBBack = DisplayPlacementConfig.BackDefaults();
-        config.displayBBack.HorizontalOffset = 0.18f;
+        config.displayBBack.DistanceFromHmd = 1.45f;
+        config.displayBBack.VerticalOffset = 0.20f;
+        config.displayBBack.HorizontalOffset = 0f;
+        config.displayBBack.PitchDegrees = 0f;
         return config;
     }
 

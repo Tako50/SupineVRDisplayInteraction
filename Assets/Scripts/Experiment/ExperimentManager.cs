@@ -1,6 +1,10 @@
 using UnityEngine;
 
 [DisallowMultipleComponent]
+/// <summary>
+/// プロトタイプ全体の現在条件・配置プリセット・デバッグ状態を束ねる軽い管理役。
+/// タスク本体はFocusPointingTaskManagerに任せ、ここでは条件とレイアウトの適用を中心に扱う。
+/// </summary>
 public class ExperimentManager : MonoBehaviour
 {
     [Header("References")]
@@ -50,6 +54,7 @@ public class ExperimentManager : MonoBehaviour
 
     public void ApplyLayout(DisplayLayoutPreset preset)
     {
+        // 通常は開始時HMD基準で固定。必要なときだけHMD正面リセットで配置基準を取り直す。
         currentLayout = preset;
         if (layoutManager != null)
         {

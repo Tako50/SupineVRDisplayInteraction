@@ -11,6 +11,10 @@ public enum RayVisualizationMode
 }
 
 [DisallowMultipleComponent]
+/// <summary>
+/// 開発用のRay・候補・フォーカス・条件表示を描画する。
+/// 実験ロジックには影響せず、Editor/実機で状態を確認するためだけに使う。
+/// </summary>
 public class PrototypeDebugVisualizer : MonoBehaviour
 {
     [SerializeField] private PrototypeInputManager inputManager;

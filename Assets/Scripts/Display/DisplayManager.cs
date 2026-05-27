@@ -2,6 +2,10 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [DisallowMultipleComponent]
+/// <summary>
+/// DisplaySurfaceの一覧、現在のRayヒット、明示フォーカス中の表示を管理する。
+/// RaycastBaselineとExplicitDisplayFocusの両方が同じDisplaySurface操作APIを使えるようにする中継役。
+/// </summary>
 public class DisplayManager : MonoBehaviour
 {
     public static DisplayManager Instance { get; private set; }
@@ -52,6 +56,7 @@ public class DisplayManager : MonoBehaviour
 
     public bool TryGetFirstDisplayHit(Ray ray, out DisplayHit displayHit)
     {
+        // BaselineではPhysics.Raycast 1回だけで、最前面の操作対象を決める。
         if (!Physics.Raycast(ray, out RaycastHit physicsHit, maxRayDistance, raycastLayers, QueryTriggerInteraction.Collide))
         {
             displayHit = default;
@@ -72,6 +77,7 @@ public class DisplayManager : MonoBehaviour
 
     public DisplayHit[] GetDisplayHitsAll(Ray ray)
     {
+        // ExplicitDisplayFocusでは重なった表示候補を全部集めるためRaycastAllを使う。
         reusableHits.Clear();
 
         RaycastHit[] physicsHits = Physics.RaycastAll(
@@ -149,6 +155,7 @@ public class DisplayManager : MonoBehaviour
             : null;
 
         Vector2 canvasSize = canvasRect != null ? canvasRect.sizeDelta : new Vector2(800f, 450f);
+        // 画面外入力は表示端へ寄せ、カーソルがディスプレイ外へ消えないようにする。
         Vector2 clamped = new Vector2(Mathf.Clamp01(normalized.x), Mathf.Clamp01(normalized.y));
         display.Cursor.anchoredPosition = new Vector2(
             (clamped.x - 0.5f) * canvasSize.x,

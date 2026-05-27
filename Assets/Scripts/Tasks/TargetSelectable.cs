@@ -2,6 +2,10 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 
 [DisallowMultipleComponent]
+/// <summary>
+/// ターゲットPrefab側につける薄い通知コンポーネント。
+/// Unity UIのクリック/選択を受けたら、入力方式に関係なくTaskManagerへ「このターゲットが選ばれた」と伝える。
+/// </summary>
 public class TargetSelectable : MonoBehaviour, IPointerClickHandler, ISelectHandler
 {
     [SerializeField] private FocusPointingTaskManager manager;

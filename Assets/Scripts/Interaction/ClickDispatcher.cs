@@ -1,6 +1,10 @@
 using UnityEngine;
 
 [DisallowMultipleComponent]
+/// <summary>
+/// Aボタン/トリガー短押しを、現在の条件に応じたクリックイベントへ変換する。
+/// BaselineではRayヒット位置、ExplicitDisplayFocusではフォーカス表示上の仮想カーソル位置でクリックする。
+/// </summary>
 public class ClickDispatcher : MonoBehaviour
 {
     [SerializeField] private PrototypeInputManager inputManager;
@@ -12,8 +16,11 @@ public class ClickDispatcher : MonoBehaviour
     [SerializeField] private FocusPointingTaskManager focusPointingTaskManager;
     [SerializeField] private VRTaskMenuManager vrTaskMenuManager;
     [SerializeField] private Logger logger;
+    [SerializeField] private float triggerScrollDeadzone = 0.05f;
 
     public string LastClickResult { get; private set; } = "None";
+
+    private bool triggerGestureScrolled;
 
     private void Awake()
     {
@@ -24,12 +31,19 @@ public class ClickDispatcher : MonoBehaviour
     {
         ResolveReferences();
 
-        if (inputManager == null || displayManager == null || !inputManager.SubmitPressed)
+        if (inputManager == null || displayManager == null)
         {
             return;
         }
 
-        if (vrTaskMenuManager != null && raycastPointer != null && vrTaskMenuManager.TryHandleWorldClick(raycastPointer.CurrentRay))
+        UpdateTriggerClickState();
+        bool submitRequested = ShouldDispatchClickThisFrame();
+        if (!submitRequested)
+        {
+            return;
+        }
+
+        if (vrTaskMenuManager != null && TryGetWorldMenuRay(out Ray menuRay) && vrTaskMenuManager.TryHandleWorldClick(menuRay))
         {
             LastClickResult = "WorldMenu menu=True";
             return;
@@ -54,6 +68,31 @@ public class ClickDispatcher : MonoBehaviour
         {
             DispatchExplicitFocusClick();
         }
+    }
+
+    private void UpdateTriggerClickState()
+    {
+        if (inputManager.TriggerPressed)
+        {
+            triggerGestureScrolled = false;
+        }
+
+        if (inputManager.TriggerHeld && Mathf.Abs(inputManager.Stick.y) >= triggerScrollDeadzone)
+        {
+            triggerGestureScrolled = true;
+        }
+    }
+
+    private bool ShouldDispatchClickThisFrame()
+    {
+        // トリガーをスクロールに使った場合は、離した瞬間のクリックとして扱わない。
+        bool triggerClick = inputManager.TriggerReleased && !triggerGestureScrolled;
+        if (inputManager.TriggerReleased)
+        {
+            triggerGestureScrolled = false;
+        }
+
+        return inputManager.SubmitPressed || triggerClick;
     }
 
     private void DispatchRaycastBaselineClick()
@@ -88,6 +127,7 @@ public class ClickDispatcher : MonoBehaviour
 
     private void DispatchExplicitFocusClick()
     {
+        // 明示フォーカス条件では、視線位置ではなくロック済み表示の仮想カーソル位置をクリックする。
         DisplaySurface focusedDisplay = displayManager.FocusedDisplay;
         if (focusedDisplay == null || virtualCursorController == null)
         {
@@ -215,6 +255,27 @@ public class ClickDispatcher : MonoBehaviour
         {
             Debug.Log($"[ClickDispatcher] condition={inputManager.CurrentCondition}, displayId={displayId}, normalized={Format(normalized)}, validTarget={validTarget}, targetId={targetId}");
         }
+    }
+
+    private bool TryGetWorldMenuRay(out Ray ray)
+    {
+        // ディスプレイ外のEnd Training等は、視線条件では視線Ray、BaselineではコントローラRayで押す。
+        if (inputManager != null
+            && inputManager.CurrentCondition == InteractionCondition.ExplicitDisplayFocus
+            && gazeProvider != null)
+        {
+            ray = gazeProvider.GetGazeRay();
+            return ray.direction != Vector3.zero;
+        }
+
+        if (raycastPointer != null)
+        {
+            ray = raycastPointer.CurrentRay;
+            return ray.direction != Vector3.zero;
+        }
+
+        ray = default;
+        return false;
     }
 
     private static string Format(Vector2 value)

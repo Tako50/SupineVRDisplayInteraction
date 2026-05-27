@@ -5,6 +5,10 @@ using XRInputDevice = UnityEngine.XR.InputDevice;
 using XRCommonUsages = UnityEngine.XR.CommonUsages;
 
 [DisallowMultipleComponent]
+/// <summary>
+/// VR実機入力とEditorデバッグ入力を1つの入力状態にまとめる。
+/// 実験中は条件をロックし、タスク途中で条件が変わらないようにする。
+/// </summary>
 public class PrototypeInputManager : MonoBehaviour
 {
     public static PrototypeInputManager Instance { get; private set; }
@@ -27,6 +31,7 @@ public class PrototypeInputManager : MonoBehaviour
     public bool GripHeld { get; private set; }
     public bool TriggerPressed { get; private set; }
     public bool TriggerHeld { get; private set; }
+    public bool TriggerReleased { get; private set; }
     public bool ConditionTogglePressed { get; private set; }
     public bool RayVisualizationTogglePressed { get; private set; }
     public bool ResetFocusPressed => debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.ResetFocusPressed;
@@ -100,6 +105,7 @@ public class PrototypeInputManager : MonoBehaviour
 
     private void ReadInputs()
     {
+        // まずXRの右手コントローラ入力を読む。取得できないEditor実行時は既定値のまま進む。
         Vector2 xrStick = Vector2.zero;
         bool xrPrimary = false;
         bool xrSecondary = false;
@@ -122,6 +128,7 @@ public class PrototypeInputManager : MonoBehaviour
             ? debugInputProvider.Stick
             : Vector2.zero;
 
+        // Editor検証ではキーボード入力を優先できるよう、入力の大きい方を採用する。
         Stick = debugStick.sqrMagnitude > xrStick.sqrMagnitude ? debugStick : xrStick;
         if (Stick.magnitude < stickDeadzone)
         {
@@ -133,20 +140,24 @@ public class PrototypeInputManager : MonoBehaviour
         bool debugGripHeld = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.GripHeld;
         bool debugTriggerHeld = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.TriggerHeld;
         bool debugTriggerPressed = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.TriggerPressed;
+        bool debugTriggerReleased = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.TriggerReleased;
         bool debugConditionToggle = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.ToggleConditionPressed;
+        bool xrTriggerHeld = xrTriggerButton || xrTriggerValue > 0.5f;
 
+        // Pressed/Released はこのフレームだけtrueになるイベントとして扱う。
         SubmitPressed = debugSubmit || (xrPrimary && !previousPrimaryButton);
         GripPressed = debugGrip || (xrGrip && !previousGripButton);
         GripHeld = debugGripHeld || xrGrip;
-        TriggerHeld = debugTriggerHeld || xrTriggerButton || xrTriggerValue > 0.5f;
-        TriggerPressed = debugTriggerPressed || ((xrTriggerButton || xrTriggerValue > 0.5f) && !previousTriggerButton);
+        TriggerHeld = debugTriggerHeld || xrTriggerHeld;
+        TriggerPressed = debugTriggerPressed || (xrTriggerHeld && !previousTriggerButton);
+        TriggerReleased = debugTriggerReleased || (!xrTriggerHeld && previousTriggerButton);
         ConditionTogglePressed = debugConditionToggle || (xrSecondary && !previousSecondaryButton);
         RayVisualizationTogglePressed = false;
 
         previousPrimaryButton = xrPrimary;
         previousSecondaryButton = xrSecondary;
         previousGripButton = xrGrip;
-        previousTriggerButton = xrTriggerButton || xrTriggerValue > 0.5f;
+        previousTriggerButton = xrTriggerHeld;
     }
 
     private void ResolveReferences()

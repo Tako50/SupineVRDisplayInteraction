@@ -1,10 +1,15 @@
 using UnityEngine;
 
 [DisallowMultipleComponent]
+/// <summary>
+/// ExplicitDisplayFocus用の仮想カーソルを動かす。
+/// 通常は右スティックで動き、グリップ保持中だけ視線位置へ追従する。
+/// </summary>
 public class VirtualCursorController : MonoBehaviour
 {
     [SerializeField] private PrototypeInputManager inputManager;
     [SerializeField] private DisplayManager displayManager;
+    [SerializeField] private GazeProvider gazeProvider;
     [SerializeField] private float cursorSpeed = 0.55f;
     [SerializeField] private float deadzone = 0.08f;
     [SerializeField] private float acceleration = 0f;
@@ -40,7 +45,15 @@ public class VirtualCursorController : MonoBehaviour
             return;
         }
 
-        if (inputManager.GripHeld || !allowStickCursorMovement)
+        if (inputManager.GripHeld)
+        {
+            // グリップ中は視線でカーソルを置き直す。表示外ならDisplaySurface側で端へクランプされる。
+            UpdateCursorFromGaze(focusedDisplay);
+            displayManager.SetCursorNormalized(focusedDisplay, NormalizedPosition, true);
+            return;
+        }
+
+        if (!allowStickCursorMovement)
         {
             displayManager.SetCursorNormalized(focusedDisplay, NormalizedPosition, true);
             return;
@@ -49,6 +62,7 @@ public class VirtualCursorController : MonoBehaviour
         Vector2 stick = inputManager.Stick;
         if (stick.magnitude < deadzone || inputManager.TriggerHeld)
         {
+            // トリガー中はスクロール操作を優先し、カーソル移動と競合させない。
             stick = Vector2.zero;
         }
 
@@ -94,6 +108,25 @@ public class VirtualCursorController : MonoBehaviour
             displayManager = DisplayManager.Instance != null
                 ? DisplayManager.Instance
                 : FindObjectOfType<DisplayManager>();
+        }
+
+        if (gazeProvider == null)
+        {
+            gazeProvider = FindObjectOfType<GazeProvider>();
+        }
+    }
+
+    private void UpdateCursorFromGaze(DisplaySurface focusedDisplay)
+    {
+        if (focusedDisplay == null || gazeProvider == null)
+        {
+            return;
+        }
+
+        Ray gazeRay = gazeProvider.GetGazeRay();
+        if (focusedDisplay.TryRayToClampedNormalized(gazeRay, out Vector2 clampedNormalized))
+        {
+            NormalizedPosition = clampedNormalized;
         }
     }
 

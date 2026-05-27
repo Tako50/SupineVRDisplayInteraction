@@ -8,6 +8,10 @@ public enum GazeSource
 }
 
 [DisallowMultipleComponent]
+/// <summary>
+/// 視線Rayの入口。実験ではEyeTrackingを使い、HMD/Camera forwardは開発用フォールバックとしてだけ使う。
+/// FocusManagerなどはこのクラスだけを見ればよいようにして、実機視線とEditor検証の差を閉じ込める。
+/// </summary>
 public class GazeProvider : MonoBehaviour
 {
     [SerializeField] private GazeSource gazeSource = GazeSource.HmdForward;
@@ -38,6 +42,7 @@ public class GazeProvider : MonoBehaviour
 
     public Ray GetGazeRay()
     {
+        // EditorでQuestなしに検証するためのCamera forwardモード。
         if (gazeSource == GazeSource.DebugCameraForward)
         {
             Camera debugCamera = Camera.main != null ? Camera.main : hmdCamera;
@@ -46,6 +51,7 @@ public class GazeProvider : MonoBehaviour
             return new Ray(debugSource.position, debugSource.forward);
         }
 
+        // 実験用の本命経路。Adapterが有効でトラッキングできる場合だけEyeTrackingとして返す。
         if (gazeSource == GazeSource.EyeTracking && TryGetEyeTrackingRay(out Ray eyeRay))
         {
             activeGazeSource = GazeSource.EyeTracking;
@@ -58,6 +64,7 @@ public class GazeProvider : MonoBehaviour
             Debug.LogWarning("[GazeProvider] EyeTracking is selected, but eye tracking is unavailable or untracked. Falling back to HMD forward for development only.");
         }
 
+        // 視線が取れないときは開発用にHMD forwardへ落とす。ログ上ではHmdForwardとして区別される。
         Camera cameraForRay = hmdCamera != null ? hmdCamera : Camera.main;
         Transform source = cameraForRay != null ? cameraForRay.transform : transform;
         activeGazeSource = GazeSource.HmdForward;

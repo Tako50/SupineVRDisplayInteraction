@@ -476,8 +476,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 528464812}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.23283026, y: -0, z: -0, w: 0.97251743}
-  m_LocalPosition: {x: 0, y: 1.0114399, z: 1.15}
+  m_LocalRotation: {x: 0.23631565, y: 0.000012469518, z: -0.0009031764, w: 0.97167593}
+  m_LocalPosition: {x: -0.000075962365, y: 1.1116583, z: 0.80006826}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -555,7 +555,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: A Front
+  m_Text: 
 --- !u!222 &534414697
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -1024,8 +1024,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1035063436}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.08292986, y: -0, z: -0, w: 0.9965554}
-  m_LocalPosition: {x: 0, y: 1.5114399, z: 1.9}
+  m_LocalRotation: {x: -0.04995, y: 0.00026895825, z: -0.0008622903, w: 0.99875134}
+  m_LocalPosition: {x: 0.00093981234, y: 1.5118486, z: 1.4999588}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1150,6 +1150,7 @@ MonoBehaviour:
   focusPointingTaskManager: {fileID: 1045802456}
   vrTaskMenuManager: {fileID: 1045802458}
   logger: {fileID: 1045802441}
+  triggerScrollDeadzone: 0.05
 --- !u!114 &1045802443
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1185,6 +1186,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   inputManager: {fileID: 1045802450}
   displayManager: {fileID: 1045802448}
+  gazeProvider: {fileID: 0}
   cursorSpeed: 0.55
   deadzone: 0.08
   acceleration: 0
@@ -1251,53 +1253,53 @@ MonoBehaviour:
   logLayoutResetEvents: 1
   noOcclusion:
     displayAFront:
-      distanceFromHmd: 1.15
-      verticalOffset: -0.35
-      horizontalOffset: -0.55
+      distanceFromHmd: 1.25
+      verticalOffset: -0.45
+      horizontalOffset: 0
       scale: 0.75
-      pitchDegrees: 10
+      pitchDegrees: 0
       yawDegrees: 0
       rollDegrees: 0
     displayBBack:
-      distanceFromHmd: 1.9
-      verticalOffset: 0.15
-      horizontalOffset: 0.55
+      distanceFromHmd: 1.25
+      verticalOffset: 0.45
+      horizontalOffset: 0
       scale: 1.25
-      pitchDegrees: -5
+      pitchDegrees: 0
       yawDegrees: 0
       rollDegrees: 0
   partialOcclusion:
     displayAFront:
       distanceFromHmd: 1.15
-      verticalOffset: -0.35
-      horizontalOffset: -0.18
+      verticalOffset: -0.3
+      horizontalOffset: 0
       scale: 0.75
-      pitchDegrees: 10
+      pitchDegrees: 0
       yawDegrees: 0
       rollDegrees: 0
     displayBBack:
-      distanceFromHmd: 1.9
-      verticalOffset: 0.15
-      horizontalOffset: 0.18
+      distanceFromHmd: 1.45
+      verticalOffset: 0.2
+      horizontalOffset: 0
       scale: 1.25
-      pitchDegrees: -5
+      pitchDegrees: 0
       yawDegrees: 0
       rollDegrees: 0
   strongOcclusion:
     displayAFront:
-      distanceFromHmd: 1.15
-      verticalOffset: -0.35
+      distanceFromHmd: 0.8
+      verticalOffset: -0.25
       horizontalOffset: 0
       scale: 0.75
       pitchDegrees: 10
       yawDegrees: 0
       rollDegrees: 0
     displayBBack:
-      distanceFromHmd: 1.9
+      distanceFromHmd: 1.5
       verticalOffset: 0.15
       horizontalOffset: 0
       scale: 1.25
-      pitchDegrees: -5
+      pitchDegrees: 0
       yawDegrees: 0
       rollDegrees: 0
 --- !u!114 &1045802448
@@ -1493,13 +1495,20 @@ MonoBehaviour:
   repetitionsPerTargetPosition: 4
   targetColumns: 2
   targetRows: 3
-  gridMinNormalized: {x: 0.25, y: 0.22}
-  gridMaxNormalized: {x: 0.75, y: 0.78}
+  gridMinNormalized: {x: 0.15, y: 0.08}
+  gridMaxNormalized: {x: 0.85, y: 0.92}
   autoGenerateTrials: 1
   rebuildTrialsOnStart: 1
   randomizeTrialsWithinCondition: 0
   randomSeed: 20260519
   trials: []
+  requireStartButtonBeforeTask: 1
+  startGateDisplayId: Display_B_Back
+  startButtonNormalizedPosition: {x: 0.5, y: 0.5}
+  startButtonNormalizedSize: {x: 0.28, y: 0.14}
+  startCountdownSeconds: 3
+  startGateButtonColor: {r: 0.1, g: 0.7, b: 0.32, a: 0.95}
+  startGateCountdownColor: {r: 0.15, g: 0.48, b: 0.85, a: 0.95}
 --- !u!114 &1045802457
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1542,12 +1551,15 @@ MonoBehaviour:
   experimentManager: {fileID: 1045802451}
   displayManager: {fileID: 1045802448}
   focusPointingTaskManager: {fileID: 1045802456}
+  raycastPointer: {fileID: 0}
+  gazeProvider: {fileID: 0}
   menuDisplayId: Display_B_Back
   showMenuInConditionSelection: 1
   panelColor: {r: 0.04, g: 0.05, b: 0.06, a: 0.82}
   buttonColor: {r: 0.16, g: 0.18, b: 0.2, a: 0.92}
   selectedButtonColor: {r: 0.15, g: 0.48, b: 0.85, a: 0.95}
   startButtonColor: {r: 0.1, g: 0.7, b: 0.32, a: 0.95}
+  hoveredButtonColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   textColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &1054095178
 GameObject:
@@ -2465,7 +2477,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: B Back
+  m_Text: 
 --- !u!222 &1800657494
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -2674,43 +2686,43 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4134505312059479865, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0
+      value: -0.0023813262
       objectReference: {fileID: 0}
     - target: {fileID: 4134505312059479865, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 0.0000021457672
       objectReference: {fileID: 0}
     - target: {fileID: 4134505312059479865, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0
+      value: 0.00037216785
       objectReference: {fileID: 0}
     - target: {fileID: 4134505312059479865, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 1
+      value: 0.9999996
       objectReference: {fileID: 0}
     - target: {fileID: 4134505312059479865, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0
+      value: -0.00013648826
       objectReference: {fileID: 0}
     - target: {fileID: 4134505312059479865, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
       propertyPath: m_LocalRotation.y
-      value: 0
+      value: 0.00022567043
       objectReference: {fileID: 0}
     - target: {fileID: 4134505312059479865, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
       propertyPath: m_LocalRotation.z
-      value: 0
+      value: -0.0008746175
       objectReference: {fileID: 0}
     - target: {fileID: 4134505312059479865, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
+      value: -0.016
       objectReference: {fileID: 0}
     - target: {fileID: 4134505312059479865, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
+      value: 0.026
       objectReference: {fileID: 0}
     - target: {fileID: 4134505312059479865, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
+      value: -0.1
       objectReference: {fileID: 0}
     - target: {fileID: 4224636915255053766, guid: 895f6f3c2d334633b5800312285058d2, type: 3}
       propertyPath: m_IsActive

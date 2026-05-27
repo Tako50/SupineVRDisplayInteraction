@@ -10,6 +10,10 @@ public enum DisplayContentMode
 }
 
 [DisallowMultipleComponent]
+/// <summary>
+/// 1枚の仮想ディスプレイを表す。
+/// World Space Canvas、透明HitPlane、カーソル、疑似コンテンツをまとめ、ワールド座標と表示内正規化座標を変換する。
+/// </summary>
 public class DisplaySurface : MonoBehaviour
 {
     [Header("Display Parts")]
@@ -170,6 +174,7 @@ public class DisplaySurface : MonoBehaviour
 
     public Vector2 WorldToNormalized(Vector3 worldPoint)
     {
+        // Displayのローカル平面上の位置を0-1へ変換する。外側は端へクランプする。
         Vector3 localPoint = transform.InverseTransformPoint(worldPoint);
         if (physicalSizeMeters.x <= 0f || physicalSizeMeters.y <= 0f)
         {
@@ -179,6 +184,26 @@ public class DisplaySurface : MonoBehaviour
         return new Vector2(
             Mathf.Clamp01(localPoint.x / physicalSizeMeters.x + 0.5f),
             Mathf.Clamp01(localPoint.y / physicalSizeMeters.y + 0.5f));
+    }
+
+    public bool TryRayToClampedNormalized(Ray ray, out Vector2 normalized)
+    {
+        // 視線が表示のHitPlane外を向いていても、表示平面との交点を使って一番近い端へ寄せる。
+        normalized = new Vector2(0.5f, 0.5f);
+        if (physicalSizeMeters.x <= 0f || physicalSizeMeters.y <= 0f || ray.direction == Vector3.zero)
+        {
+            return false;
+        }
+
+        Plane displayPlane = new Plane(transform.forward, transform.position);
+        if (!displayPlane.Raycast(ray, out float enter) || enter < 0f)
+        {
+            return false;
+        }
+
+        Vector3 worldPoint = ray.GetPoint(enter);
+        normalized = WorldToNormalized(worldPoint);
+        return true;
     }
 
     public bool TryClickDebugTarget(Vector2 normalized, out string targetId)
@@ -247,6 +272,7 @@ public class DisplaySurface : MonoBehaviour
 
     private void ApplyContentMode()
     {
+        // T1ポインティング中はスクロール用の疑似文章を消し、スクロール課題だけで再表示できるようにする。
         if (scrollContent == null)
         {
             return;

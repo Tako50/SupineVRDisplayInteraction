@@ -3,6 +3,10 @@ using System.IO;
 using UnityEngine;
 
 [DisallowMultipleComponent]
+/// <summary>
+/// プロトタイプ全体のイベントCSVロガー。
+/// フレームサンプル、クリック、スクロール、フォーカス、T1結果を同じ形式で追記できるようにする。
+/// </summary>
 public class Logger : MonoBehaviour
 {
     [SerializeField] private bool writeCsv = true;

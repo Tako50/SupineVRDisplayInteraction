@@ -10,6 +10,10 @@ public enum FocusState
 }
 
 [DisallowMultipleComponent]
+/// <summary>
+/// ExplicitDisplayFocusの中心ロジック。
+/// 視線で候補ディスプレイを集め、グリップ入力があった時だけ候補をフォーカスとして確定する。
+/// </summary>
 public class FocusManager : MonoBehaviour
 {
     [SerializeField] private PrototypeInputManager inputManager;
@@ -102,6 +106,7 @@ public class FocusManager : MonoBehaviour
 
     private void UpdateCandidates()
     {
+        // 視線Rayでは重なり候補を全部拾う。フォーカス済みなら候補が変わっても入力対象は変えない。
         Ray gazeRay = gazeProvider.GetGazeRay();
         currentCandidates = displayManager.GetDisplayHitsAll(gazeRay);
 
@@ -136,6 +141,7 @@ public class FocusManager : MonoBehaviour
 
     private void UpdateFocusFromCurrentGaze(bool logFocusEvent)
     {
+        // Phase 3 MVPでは複数候補のうち最も近い候補を選ぶ。将来ここを候補選択UIへ差し替える。
         if (currentCandidates.Length == 0)
         {
             return;

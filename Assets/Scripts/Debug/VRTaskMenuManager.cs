@@ -3,6 +3,10 @@ using UnityEngine;
 using UnityEngine.UI;
 
 [DisallowMultipleComponent]
+/// <summary>
+/// VR内の条件選択・Training/Main開始・End/Abortボタンを生成する。
+/// 条件選択中はディスプレイ内メニュー、タスク中は誤操作しにくい外部ボタンとして扱う。
+/// </summary>
 public class VRTaskMenuManager : MonoBehaviour
 {
     private enum MenuAction
@@ -34,6 +38,7 @@ public class VRTaskMenuManager : MonoBehaviour
     [SerializeField] private DisplayManager displayManager;
     [SerializeField] private FocusPointingTaskManager focusPointingTaskManager;
     [SerializeField] private RaycastPointer raycastPointer;
+    [SerializeField] private GazeProvider gazeProvider;
 
     [Header("Menu")]
     [SerializeField] private string menuDisplayId = "Display_B_Back";
@@ -105,6 +110,7 @@ public class VRTaskMenuManager : MonoBehaviour
 
     public bool TryHandleWorldClick(Ray ray, float maxDistance = 10f)
     {
+        // End Training / Abort Mainはディスプレイ外に置くため、表示内正規化座標ではなくColliderで判定する。
         if (!IsMenuVisible() || ray.direction == Vector3.zero)
         {
             return false;
@@ -472,16 +478,39 @@ public class VRTaskMenuManager : MonoBehaviour
     {
         if (button.Root == null
             || !button.Root.activeInHierarchy
-            || button.WorldCollider == null
-            || raycastPointer == null)
+            || button.WorldCollider == null)
         {
             return false;
         }
 
-        Ray ray = raycastPointer.CurrentRay;
+        if (!TryGetHoverRay(out Ray ray))
+        {
+            return false;
+        }
+
         return ray.direction != Vector3.zero
             && Physics.Raycast(ray, out RaycastHit hit, 10f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide)
             && hit.collider == button.WorldCollider;
+    }
+
+    private bool TryGetHoverRay(out Ray ray)
+    {
+        if (inputManager != null
+            && inputManager.CurrentCondition == InteractionCondition.ExplicitDisplayFocus
+            && gazeProvider != null)
+        {
+            ray = gazeProvider.GetGazeRay();
+            return ray.direction != Vector3.zero;
+        }
+
+        if (raycastPointer != null)
+        {
+            ray = raycastPointer.CurrentRay;
+            return ray.direction != Vector3.zero;
+        }
+
+        ray = default;
+        return false;
     }
 
     private bool IsSelected(MenuAction action)
@@ -544,6 +573,11 @@ public class VRTaskMenuManager : MonoBehaviour
         if (raycastPointer == null)
         {
             raycastPointer = FindObjectOfType<RaycastPointer>();
+        }
+
+        if (gazeProvider == null)
+        {
+            gazeProvider = FindObjectOfType<GazeProvider>();
         }
     }
 }
