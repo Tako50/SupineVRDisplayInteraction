@@ -7,6 +7,7 @@ public class PrototypeControlPanel : MonoBehaviour
     [Header("Use This Panel")]
     [SerializeField] private InteractionCondition condition = InteractionCondition.RaycastBaseline;
     [SerializeField] private DisplayLayoutPreset layout = DisplayLayoutPreset.StrongOcclusion;
+    [SerializeField] private bool applyLayout = false;
     [SerializeField] private GazeSource gazeSource = GazeSource.EyeTracking;
     [SerializeField] private RayVisualizationMode rayMode = RayVisualizationMode.Hidden;
 
@@ -68,7 +69,7 @@ public class PrototypeControlPanel : MonoBehaviour
             inputManager.SetCondition(condition);
         }
 
-        if (canChangeConditionAndLayout && experimentManager != null)
+        if (applyLayout && canChangeConditionAndLayout && experimentManager != null)
         {
             experimentManager.ApplyLayout(layout);
         }
@@ -130,7 +131,7 @@ public class PrototypeControlPanel : MonoBehaviour
     {
         if (!hasApplied
             || appliedCondition != condition
-            || appliedLayout != layout
+            || (applyLayout && appliedLayout != layout)
             || appliedGazeSource != gazeSource
             || appliedRayMode != rayMode
             || appliedShowDebugOverlay != showDebugOverlay

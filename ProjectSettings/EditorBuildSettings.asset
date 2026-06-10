@@ -8,6 +8,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Dev_Prototype.unity
     guid: 3edb82b20e934440fa575174b18c815e
+  - enabled: 0
+    path: Assets/Scenes/LayoutPreferenceStudy.unity
+    guid: d1523babefcd4127ba6a52524f3edca3
   m_configObjects:
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 2ab7cf81c93c642d3bd3df4738dcdfd9, type: 2}
     com.unity.xr.openxr.settings4: {fileID: 11400000, guid: af050cee650ea4aa4be5036da895c602, type: 2}

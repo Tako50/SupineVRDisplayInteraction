@@ -1,6 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public enum DisplayLayoutPreset
 {
@@ -28,6 +31,7 @@ public class DisplayLayoutManager : MonoBehaviour
 
     [Header("Layout")]
     [SerializeField] private DisplayLayoutPreset initialPreset = DisplayLayoutPreset.StrongOcclusion;
+    [SerializeField] private bool useFixedSceneLayout = false;
     [SerializeField] private bool applyOnStart = true;
     [SerializeField] private bool resetLayoutOnXrRecenter = true;
     [SerializeField] private bool logLayoutResetEvents = true;
@@ -53,6 +57,16 @@ public class DisplayLayoutManager : MonoBehaviour
         }
     }
 
+    public void SetApplyOnStart(bool enabled)
+    {
+        applyOnStart = enabled;
+    }
+
+    public void SetUseFixedSceneLayout(bool enabled)
+    {
+        useFixedSceneLayout = enabled;
+    }
+
     private void Reset()
     {
         AutoAssignReferences();
@@ -72,7 +86,7 @@ public class DisplayLayoutManager : MonoBehaviour
 
     private void Start()
     {
-        if (applyOnStart)
+        if (applyOnStart && !useFixedSceneLayout)
         {
             CaptureCurrentHmdAsLayoutAnchor();
             ApplyLayout(initialPreset);
@@ -84,8 +98,14 @@ public class DisplayLayoutManager : MonoBehaviour
         EnsurePresetDefaults();
         AutoAssignReferences();
 
-        if (!Application.isPlaying)
+        if (!Application.isPlaying && applyOnStart && !useFixedSceneLayout)
         {
+#if UNITY_EDITOR
+            if (BuildPipeline.isBuildingPlayer)
+            {
+                return;
+            }
+#endif
             ApplyLayout(initialPreset);
         }
     }
@@ -128,6 +148,12 @@ public class DisplayLayoutManager : MonoBehaviour
         AutoAssignReferences();
         currentPreset = preset;
 
+        if (useFixedSceneLayout)
+        {
+            Debug.Log($"[DisplayLayoutManager] fixed scene layout is enabled. Ignored preset apply: {preset}");
+            return;
+        }
+
         Transform hmd = hmdCamera != null ? hmdCamera.transform : null;
         if (hmd == null || displayAFront == null || displayBBack == null)
         {
@@ -159,6 +185,12 @@ public class DisplayLayoutManager : MonoBehaviour
 
     public void ResetLayoutFromCurrentHmd()
     {
+        if (useFixedSceneLayout)
+        {
+            Debug.Log("[DisplayLayoutManager] fixed scene layout is enabled. Ignored XR recenter layout reset.");
+            return;
+        }
+
         CaptureCurrentHmdAsLayoutAnchor();
         ApplyLayout(currentPreset);
         if (logLayoutResetEvents)

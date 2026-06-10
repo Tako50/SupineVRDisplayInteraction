@@ -29,7 +29,6 @@ public class EditorDebugInputProvider : MonoBehaviour
     [SerializeField] private KeyCode noOcclusionKey = KeyCode.Alpha1;
     [SerializeField] private KeyCode partialOcclusionKey = KeyCode.Alpha2;
     [SerializeField] private KeyCode strongOcclusionKey = KeyCode.Alpha3;
-    [SerializeField] private KeyCode toggleRayVisualizationKey = KeyCode.V;
 
     [Header("Stick Keys")]
     [SerializeField] private KeyCode stickLeftKey = KeyCode.A;
@@ -55,7 +54,6 @@ public class EditorDebugInputProvider : MonoBehaviour
     public bool NoOcclusionPressed { get; private set; }
     public bool PartialOcclusionPressed { get; private set; }
     public bool StrongOcclusionPressed { get; private set; }
-    public bool ToggleRayVisualizationPressed { get; private set; }
 
     private void Update()
     {
@@ -88,7 +86,6 @@ public class EditorDebugInputProvider : MonoBehaviour
         NoOcclusionPressed = GetKeyDown(noOcclusionKey);
         PartialOcclusionPressed = GetKeyDown(partialOcclusionKey);
         StrongOcclusionPressed = GetKeyDown(strongOcclusionKey);
-        ToggleRayVisualizationPressed = GetKeyDown(toggleRayVisualizationKey);
 
         if (logDebugInputEvents)
         {
@@ -110,7 +107,6 @@ public class EditorDebugInputProvider : MonoBehaviour
         NoOcclusionPressed = false;
         PartialOcclusionPressed = false;
         StrongOcclusionPressed = false;
-        ToggleRayVisualizationPressed = false;
     }
 
     private bool IsPlatformEnabled()
@@ -159,10 +155,6 @@ public class EditorDebugInputProvider : MonoBehaviour
             Debug.Log("[EditorDebugInput] Layout preset shortcut");
         }
 
-        if (ToggleRayVisualizationPressed)
-        {
-            Debug.Log("[EditorDebugInput] Toggle ray visualization");
-        }
     }
 
     private static bool GetKey(KeyCode keyCode)

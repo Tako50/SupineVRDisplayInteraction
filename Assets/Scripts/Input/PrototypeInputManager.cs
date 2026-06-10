@@ -33,7 +33,6 @@ public class PrototypeInputManager : MonoBehaviour
     public bool TriggerHeld { get; private set; }
     public bool TriggerReleased { get; private set; }
     public bool ConditionTogglePressed { get; private set; }
-    public bool RayVisualizationTogglePressed { get; private set; }
     public bool ResetFocusPressed => debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.ResetFocusPressed;
     public bool DebugInputEnabled => debugInputProvider != null && debugInputProvider.IsEnabled;
     public bool IsConditionLocked { get; private set; }
@@ -152,7 +151,6 @@ public class PrototypeInputManager : MonoBehaviour
         TriggerPressed = debugTriggerPressed || (xrTriggerHeld && !previousTriggerButton);
         TriggerReleased = debugTriggerReleased || (!xrTriggerHeld && previousTriggerButton);
         ConditionTogglePressed = debugConditionToggle || (xrSecondary && !previousSecondaryButton);
-        RayVisualizationTogglePressed = false;
 
         previousPrimaryButton = xrPrimary;
         previousSecondaryButton = xrSecondary;

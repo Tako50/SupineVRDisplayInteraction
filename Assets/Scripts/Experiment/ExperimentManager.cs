@@ -20,6 +20,8 @@ public class ExperimentManager : MonoBehaviour
     [Header("Experiment State")]
     [SerializeField] private InteractionCondition startingCondition = InteractionCondition.RaycastBaseline;
     [SerializeField] private DisplayLayoutPreset startingLayout = DisplayLayoutPreset.StrongOcclusion;
+    [SerializeField] private bool applyStartingLayoutOnStart = true;
+    [SerializeField] private bool allowLayoutSwitching = false;
     [SerializeField] private bool lockDisplaysAfterStart = true;
     [SerializeField] private float debugLogIntervalSeconds = 0.5f;
 
@@ -42,7 +44,10 @@ public class ExperimentManager : MonoBehaviour
 
     private void Start()
     {
-        ApplyLayout(startingLayout);
+        if (applyStartingLayoutOnStart)
+        {
+            ApplyLayout(startingLayout);
+        }
     }
 
     private void Update()
@@ -56,6 +61,12 @@ public class ExperimentManager : MonoBehaviour
     {
         // 通常は開始時HMD基準で固定。必要なときだけHMD正面リセットで配置基準を取り直す。
         currentLayout = preset;
+        if (!allowLayoutSwitching)
+        {
+            Debug.Log($"[ExperimentManager] layout switching disabled. Kept fixed display transforms. requested={preset}");
+            return;
+        }
+
         if (layoutManager != null)
         {
             if (lockDisplaysAfterStart)
@@ -71,9 +82,19 @@ public class ExperimentManager : MonoBehaviour
         Debug.Log($"[ExperimentManager] layout={preset}");
     }
 
+    public void SetApplyStartingLayoutOnStart(bool enabled)
+    {
+        applyStartingLayoutOnStart = enabled;
+    }
+
+    public void SetAllowLayoutSwitching(bool enabled)
+    {
+        allowLayoutSwitching = enabled;
+    }
+
     private void HandleKeyboardShortcuts()
     {
-        if (debugInputProvider == null || !debugInputProvider.IsEnabled)
+        if (!allowLayoutSwitching || debugInputProvider == null || !debugInputProvider.IsEnabled)
         {
             return;
         }

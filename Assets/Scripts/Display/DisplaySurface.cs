@@ -22,7 +22,6 @@ public class DisplaySurface : MonoBehaviour
     [SerializeField] private BoxCollider transparentHitPlane;
     [SerializeField] private RectTransform cursor;
     [SerializeField] private RectTransform scrollContent;
-    [SerializeField] private RectTransform debugClickTarget;
 
     [Header("Sizing")]
     [SerializeField] private Vector2 physicalSizeMeters = new Vector2(0.8f, 0.45f);
@@ -33,7 +32,6 @@ public class DisplaySurface : MonoBehaviour
 
     [Header("Debug Content")]
     [SerializeField] private DisplayContentMode contentMode = DisplayContentMode.Debug;
-    [SerializeField] private string debugTargetId = "DebugTarget";
     [SerializeField] private float scrollPixelsPerUnit = 160f;
     [SerializeField] private float maxScrollPixels = 420f;
 
@@ -47,10 +45,10 @@ public class DisplaySurface : MonoBehaviour
     public BoxCollider TransparentHitPlane => transparentHitPlane;
     public RectTransform Cursor => cursor;
     public RectTransform ScrollContent => scrollContent;
-    public RectTransform DebugClickTarget => debugClickTarget;
     public Vector2 PhysicalSizeMeters => physicalSizeMeters;
     public Vector2 CanvasPixelSize => canvasPixelSize;
     public DisplayContentMode ContentMode => contentMode;
+    public float ScrollOffsetPixels => scrollOffsetPixels;
 
     private void Awake()
     {
@@ -66,10 +64,9 @@ public class DisplaySurface : MonoBehaviour
         ApplyConfiguration();
     }
 
-    public void AssignDebugContent(RectTransform contentRoot, RectTransform clickTarget)
+    public void AssignScrollContent(RectTransform contentRoot)
     {
         scrollContent = contentRoot;
-        debugClickTarget = clickTarget;
         ApplyScrollOffset();
         ApplyContentMode();
     }
@@ -206,43 +203,6 @@ public class DisplaySurface : MonoBehaviour
         return true;
     }
 
-    public bool TryClickDebugTarget(Vector2 normalized, out string targetId)
-    {
-        targetId = debugTargetId;
-        if (debugClickTarget == null || worldSpaceCanvas == null || !debugClickTarget.gameObject.activeInHierarchy)
-        {
-            return false;
-        }
-
-        RectTransform canvasRect = worldSpaceCanvas.GetComponent<RectTransform>();
-        if (canvasRect == null)
-        {
-            return false;
-        }
-
-        Vector2 canvasSize = canvasRect.sizeDelta;
-        Vector2 canvasPoint = new Vector2(
-            (Mathf.Clamp01(normalized.x) - 0.5f) * canvasSize.x,
-            (Mathf.Clamp01(normalized.y) - 0.5f) * canvasSize.y);
-
-        Vector3[] worldCorners = new Vector3[4];
-        debugClickTarget.GetWorldCorners(worldCorners);
-
-        Vector2 min = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
-        Vector2 max = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
-        for (int i = 0; i < worldCorners.Length; i++)
-        {
-            Vector3 local = canvasRect.InverseTransformPoint(worldCorners[i]);
-            min = Vector2.Min(min, local);
-            max = Vector2.Max(max, local);
-        }
-
-        return canvasPoint.x >= min.x
-            && canvasPoint.x <= max.x
-            && canvasPoint.y >= min.y
-            && canvasPoint.y <= max.y;
-    }
-
     public float Scroll(float stickVertical, float deltaTime)
     {
         if (scrollContent == null || !scrollContent.gameObject.activeInHierarchy)
@@ -260,6 +220,19 @@ public class DisplaySurface : MonoBehaviour
         scrollOffsetPixels = Mathf.Clamp(scrollOffsetPixels + deltaPixels, -maxScrollPixels, maxScrollPixels);
         ApplyScrollOffset();
         return scrollOffsetPixels - previous;
+    }
+
+    public void ResetScroll()
+    {
+        scrollOffsetPixels = 0f;
+        ApplyScrollOffset();
+    }
+
+    public void SetMaxScrollPixels(float value)
+    {
+        maxScrollPixels = Mathf.Max(0f, value);
+        scrollOffsetPixels = Mathf.Clamp(scrollOffsetPixels, -maxScrollPixels, maxScrollPixels);
+        ApplyScrollOffset();
     }
 
     private void ApplyScrollOffset()

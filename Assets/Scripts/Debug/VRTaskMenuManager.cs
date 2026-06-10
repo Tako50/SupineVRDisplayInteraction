@@ -9,8 +9,18 @@ using UnityEngine.UI;
 /// </summary>
 public class VRTaskMenuManager : MonoBehaviour
 {
+    private enum PrototypeTask
+    {
+        T1FocusPointing,
+        T2AReferenceList
+    }
+
     private enum MenuAction
     {
+        SelectT1FocusPointing,
+        SelectT2AReferenceList,
+        SelectT1FixedOrder,
+        SelectT1RandomOrder,
         SelectRaycastBaseline,
         SelectExplicitDisplayFocus,
         SelectNoOcclusion,
@@ -37,12 +47,15 @@ public class VRTaskMenuManager : MonoBehaviour
     [SerializeField] private ExperimentManager experimentManager;
     [SerializeField] private DisplayManager displayManager;
     [SerializeField] private FocusPointingTaskManager focusPointingTaskManager;
+    [SerializeField] private ReferenceListTaskManager referenceListTaskManager;
     [SerializeField] private RaycastPointer raycastPointer;
     [SerializeField] private GazeProvider gazeProvider;
 
     [Header("Menu")]
     [SerializeField] private string menuDisplayId = "Display_B_Back";
     [SerializeField] private bool showMenuInConditionSelection = true;
+    [SerializeField] private bool showLayoutButtons = false;
+    [SerializeField] private bool applySelectedLayout = false;
     [SerializeField] private Color panelColor = new Color(0.04f, 0.05f, 0.06f, 0.82f);
     [SerializeField] private Color buttonColor = new Color(0.16f, 0.18f, 0.20f, 0.92f);
     [SerializeField] private Color selectedButtonColor = new Color(0.15f, 0.48f, 0.85f, 0.95f);
@@ -56,6 +69,8 @@ public class VRTaskMenuManager : MonoBehaviour
     private Text statusText;
     private InteractionCondition selectedCondition = InteractionCondition.RaycastBaseline;
     private DisplayLayoutPreset selectedLayout = DisplayLayoutPreset.StrongOcclusion;
+    private PrototypeTask selectedTask = PrototypeTask.T1FocusPointing;
+    private bool randomizeT1Trials;
 
     private void Awake()
     {
@@ -88,6 +103,11 @@ public class VRTaskMenuManager : MonoBehaviour
             return false;
         }
 
+        if (!TryConvertDisplayToMenuNormalized(normalizedPosition, out Vector2 menuNormalizedPosition))
+        {
+            return false;
+        }
+
         for (int i = 0; i < buttons.Count; i++)
         {
             MenuButton button = buttons[i];
@@ -96,7 +116,7 @@ public class VRTaskMenuManager : MonoBehaviour
                 continue;
             }
 
-            if (!button.NormalizedRect.Contains(normalizedPosition))
+            if (!button.NormalizedRect.Contains(menuNormalizedPosition))
             {
                 continue;
             }
@@ -145,6 +165,20 @@ public class VRTaskMenuManager : MonoBehaviour
     {
         switch (action)
         {
+            case MenuAction.SelectT1FocusPointing:
+                selectedTask = PrototypeTask.T1FocusPointing;
+                break;
+            case MenuAction.SelectT2AReferenceList:
+                selectedTask = PrototypeTask.T2AReferenceList;
+                break;
+            case MenuAction.SelectT1FixedOrder:
+                randomizeT1Trials = false;
+                ApplySelectionsToManagers();
+                break;
+            case MenuAction.SelectT1RandomOrder:
+                randomizeT1Trials = true;
+                ApplySelectionsToManagers();
+                break;
             case MenuAction.SelectRaycastBaseline:
                 selectedCondition = InteractionCondition.RaycastBaseline;
                 ApplySelectionsToManagers();
@@ -167,34 +201,36 @@ public class VRTaskMenuManager : MonoBehaviour
                 break;
             case MenuAction.BeginTraining:
                 ApplySelectionsToManagers();
-                if (focusPointingTaskManager != null)
+                if (selectedTask == PrototypeTask.T2AReferenceList)
                 {
-                    focusPointingTaskManager.BeginTrainingTask();
+                    referenceListTaskManager?.BeginTrainingTask();
+                }
+                else
+                {
+                    focusPointingTaskManager?.BeginTrainingTask();
                 }
                 break;
             case MenuAction.BeginMain:
                 ApplySelectionsToManagers();
-                if (focusPointingTaskManager != null)
+                if (selectedTask == PrototypeTask.T2AReferenceList)
                 {
-                    focusPointingTaskManager.BeginMainTask();
+                    referenceListTaskManager?.BeginMainTask();
+                }
+                else
+                {
+                    focusPointingTaskManager?.BeginMainTask();
                 }
                 break;
             case MenuAction.EndTraining:
-                if (focusPointingTaskManager != null)
-                {
-                    focusPointingTaskManager.ReturnToConditionSelection();
-                }
+                ReturnActiveTaskToSelection();
                 break;
             case MenuAction.AbortMainTask:
-                if (focusPointingTaskManager != null)
-                {
-                    focusPointingTaskManager.ReturnToConditionSelection();
-                }
+                ReturnActiveTaskToSelection();
                 break;
         }
 
         UpdateVisualState();
-        Debug.Log($"[VRTaskMenu] action={action}, condition={selectedCondition}, layout={selectedLayout}");
+        Debug.Log($"[VRTaskMenu] action={action}, task={selectedTask}, condition={selectedCondition}, layout={selectedLayout}");
     }
 
     private void ApplySelectionsToManagers()
@@ -203,6 +239,13 @@ public class VRTaskMenuManager : MonoBehaviour
         {
             focusPointingTaskManager.SetSelectedCondition(selectedCondition);
             focusPointingTaskManager.SetSelectedLayout(selectedLayout);
+            focusPointingTaskManager.SetRandomizeTrialsWithinCondition(randomizeT1Trials);
+        }
+
+        if (referenceListTaskManager != null)
+        {
+            referenceListTaskManager.SetSelectedCondition(selectedCondition);
+            referenceListTaskManager.SetSelectedLayout(selectedLayout);
         }
 
         if (inputManager != null && !inputManager.IsConditionLocked)
@@ -210,7 +253,7 @@ public class VRTaskMenuManager : MonoBehaviour
             inputManager.SetCondition(selectedCondition);
         }
 
-        if (experimentManager != null && (inputManager == null || !inputManager.IsConditionLocked))
+        if (applySelectedLayout && experimentManager != null && (inputManager == null || !inputManager.IsConditionLocked))
         {
             experimentManager.ApplyLayout(selectedLayout);
         }
@@ -226,6 +269,11 @@ public class VRTaskMenuManager : MonoBehaviour
         if (experimentManager != null)
         {
             selectedLayout = experimentManager.CurrentLayout;
+        }
+
+        if (focusPointingTaskManager != null)
+        {
+            randomizeT1Trials = focusPointingTaskManager.RandomizeTrialsWithinCondition;
         }
     }
 
@@ -243,12 +291,24 @@ public class VRTaskMenuManager : MonoBehaviour
             {
                 focusPointingTaskManager.SetSelectedCondition(selectedCondition);
             }
+
+            referenceListTaskManager?.SetSelectedCondition(selectedCondition);
         }
     }
 
     private void EnsureMenu()
     {
-        if (menuRoot != null || displayManager == null)
+        if (menuRoot != null)
+        {
+            if (buttons.Count == 0)
+            {
+                RestoreButtonBindings();
+            }
+
+            return;
+        }
+
+        if (displayManager == null)
         {
             return;
         }
@@ -275,13 +335,21 @@ public class VRTaskMenuManager : MonoBehaviour
         menuPanel = rootObject.AddComponent<Image>();
         menuPanel.color = panelColor;
 
-        statusText = CreateText(menuRoot, "Status", "Select condition and start task", new Rect(0.04f, 0.90f, 0.58f, 0.09f), 26, TextAnchor.MiddleLeft);
+        statusText = CreateText(menuRoot, "Status", "Select condition and start task", new Rect(0.04f, 0.84f, 0.92f, 0.15f), 20, TextAnchor.MiddleLeft);
 
-        CreateButton(MenuAction.SelectRaycastBaseline, "RaycastBaseline", new Rect(0.08f, 0.58f, 0.40f, 0.12f));
-        CreateButton(MenuAction.SelectExplicitDisplayFocus, "ExplicitDisplayFocus", new Rect(0.52f, 0.58f, 0.40f, 0.12f));
-        CreateButton(MenuAction.SelectNoOcclusion, "NoOcclusion", new Rect(0.08f, 0.40f, 0.26f, 0.11f));
-        CreateButton(MenuAction.SelectPartialOcclusion, "Partial", new Rect(0.37f, 0.40f, 0.26f, 0.11f));
-        CreateButton(MenuAction.SelectStrongOcclusion, "Strong", new Rect(0.66f, 0.40f, 0.26f, 0.11f));
+        CreateButton(MenuAction.SelectT1FocusPointing, "T1 Pointing", new Rect(0.08f, 0.72f, 0.40f, 0.10f));
+        CreateButton(MenuAction.SelectT2AReferenceList, "T2-A Reference List", new Rect(0.52f, 0.72f, 0.40f, 0.10f));
+        CreateButton(MenuAction.SelectRaycastBaseline, "RaycastBaseline", new Rect(0.08f, 0.55f, 0.40f, 0.11f));
+        CreateButton(MenuAction.SelectExplicitDisplayFocus, "ExplicitDisplayFocus", new Rect(0.52f, 0.55f, 0.40f, 0.11f));
+        CreateButton(MenuAction.SelectT1FixedOrder, "Fixed Order", new Rect(0.08f, 0.38f, 0.40f, 0.10f));
+        CreateButton(MenuAction.SelectT1RandomOrder, "Random Order", new Rect(0.52f, 0.38f, 0.40f, 0.10f));
+        if (showLayoutButtons)
+        {
+            CreateButton(MenuAction.SelectNoOcclusion, "NoOcclusion", new Rect(0.08f, 0.31f, 0.26f, 0.07f));
+            CreateButton(MenuAction.SelectPartialOcclusion, "Partial", new Rect(0.37f, 0.31f, 0.26f, 0.07f));
+            CreateButton(MenuAction.SelectStrongOcclusion, "Strong", new Rect(0.66f, 0.31f, 0.26f, 0.07f));
+        }
+
         CreateButton(MenuAction.BeginTraining, "Start Training", new Rect(0.08f, 0.16f, 0.40f, 0.14f));
         CreateButton(MenuAction.BeginMain, "Start Main Task", new Rect(0.52f, 0.16f, 0.40f, 0.14f));
         CreateButton(MenuAction.EndTraining, "End Training", new Rect(0.68f, 1.34f, 0.28f, 0.09f));
@@ -289,6 +357,47 @@ public class VRTaskMenuManager : MonoBehaviour
 
         UpdateVisibility();
         UpdateVisualState();
+    }
+
+    private void RestoreButtonBindings()
+    {
+        AddExistingButton(MenuAction.SelectT1FocusPointing, "T1 Pointing", new Rect(0.08f, 0.72f, 0.40f, 0.10f));
+        AddExistingButton(MenuAction.SelectT2AReferenceList, "T2-A Reference List", new Rect(0.52f, 0.72f, 0.40f, 0.10f));
+        AddExistingButton(MenuAction.SelectRaycastBaseline, "RaycastBaseline", new Rect(0.08f, 0.55f, 0.40f, 0.11f));
+        AddExistingButton(MenuAction.SelectExplicitDisplayFocus, "ExplicitDisplayFocus", new Rect(0.52f, 0.55f, 0.40f, 0.11f));
+        AddExistingButton(MenuAction.SelectT1FixedOrder, "Fixed Order", new Rect(0.08f, 0.38f, 0.40f, 0.10f));
+        AddExistingButton(MenuAction.SelectT1RandomOrder, "Random Order", new Rect(0.52f, 0.38f, 0.40f, 0.10f));
+
+        if (showLayoutButtons)
+        {
+            AddExistingButton(MenuAction.SelectNoOcclusion, "NoOcclusion", new Rect(0.08f, 0.31f, 0.26f, 0.07f));
+            AddExistingButton(MenuAction.SelectPartialOcclusion, "Partial", new Rect(0.37f, 0.31f, 0.26f, 0.07f));
+            AddExistingButton(MenuAction.SelectStrongOcclusion, "Strong", new Rect(0.66f, 0.31f, 0.26f, 0.07f));
+        }
+
+        AddExistingButton(MenuAction.BeginTraining, "Start Training", new Rect(0.08f, 0.16f, 0.40f, 0.14f));
+        AddExistingButton(MenuAction.BeginMain, "Start Main Task", new Rect(0.52f, 0.16f, 0.40f, 0.14f));
+        AddExistingButton(MenuAction.EndTraining, "End Training", new Rect(0.68f, 1.34f, 0.28f, 0.09f));
+        AddExistingButton(MenuAction.AbortMainTask, "Abort Main", new Rect(0.72f, 1.34f, 0.24f, 0.08f));
+    }
+
+    private void AddExistingButton(MenuAction action, string objectName, Rect normalizedRect)
+    {
+        Transform child = menuRoot.Find(objectName);
+        if (child == null)
+        {
+            return;
+        }
+
+        buttons.Add(new MenuButton
+        {
+            Action = action,
+            NormalizedRect = normalizedRect,
+            Root = child.gameObject,
+            Image = child.GetComponent<Image>(),
+            Text = child.GetComponentInChildren<Text>(true),
+            WorldCollider = child.GetComponent<BoxCollider>()
+        });
     }
 
     private void CreateButton(MenuAction action, string label, Rect normalizedRect)
@@ -356,6 +465,35 @@ public class VRTaskMenuManager : MonoBehaviour
         rectTransform.pivot = new Vector2(0.5f, 0.5f);
     }
 
+    private bool TryConvertDisplayToMenuNormalized(
+        Vector2 displayNormalizedPosition,
+        out Vector2 menuNormalizedPosition)
+    {
+        menuNormalizedPosition = Vector2.zero;
+        DisplaySurface display = FindMenuDisplay();
+        if (display == null || display.WorldSpaceCanvas == null || menuRoot == null)
+        {
+            return false;
+        }
+
+        RectTransform canvasRect = display.WorldSpaceCanvas.GetComponent<RectTransform>();
+        if (canvasRect == null || menuRoot.rect.width <= 0f || menuRoot.rect.height <= 0f)
+        {
+            return false;
+        }
+
+        Vector2 canvasPoint = new Vector2(
+            (Mathf.Clamp01(displayNormalizedPosition.x) - 0.5f) * canvasRect.rect.width,
+            (Mathf.Clamp01(displayNormalizedPosition.y) - 0.5f) * canvasRect.rect.height);
+        Vector3 worldPoint = canvasRect.TransformPoint(canvasPoint);
+        Vector2 menuPoint = menuRoot.InverseTransformPoint(worldPoint);
+
+        menuNormalizedPosition = new Vector2(
+            Mathf.InverseLerp(menuRoot.rect.xMin, menuRoot.rect.xMax, menuPoint.x),
+            Mathf.InverseLerp(menuRoot.rect.yMin, menuRoot.rect.yMax, menuPoint.y));
+        return true;
+    }
+
     private void UpdateVisibility()
     {
         if (menuRoot != null)
@@ -379,26 +517,35 @@ public class VRTaskMenuManager : MonoBehaviour
 
     private bool IsTaskRunning()
     {
-        return focusPointingTaskManager != null
-            && focusPointingTaskManager.CurrentPhase != FocusPointingTaskPhase.ConditionSelection;
+        return (focusPointingTaskManager != null
+                && focusPointingTaskManager.CurrentPhase != FocusPointingTaskPhase.ConditionSelection)
+            || (referenceListTaskManager != null
+                && referenceListTaskManager.CurrentPhase != ReferenceListTaskPhase.ConditionSelection);
     }
 
     private bool IsConditionSelectionVisible()
     {
-        return focusPointingTaskManager == null
+        bool t1Idle = focusPointingTaskManager == null
             || focusPointingTaskManager.CurrentPhase == FocusPointingTaskPhase.ConditionSelection;
+        bool t2Idle = referenceListTaskManager == null
+            || referenceListTaskManager.CurrentPhase == ReferenceListTaskPhase.ConditionSelection;
+        return t1Idle && t2Idle;
     }
 
     private bool IsTrainingVisible()
     {
-        return focusPointingTaskManager != null
-            && focusPointingTaskManager.CurrentPhase == FocusPointingTaskPhase.Training;
+        return (focusPointingTaskManager != null
+                && focusPointingTaskManager.CurrentPhase == FocusPointingTaskPhase.Training)
+            || (referenceListTaskManager != null
+                && referenceListTaskManager.CurrentPhase == ReferenceListTaskPhase.Training);
     }
 
     private bool IsMainTaskVisible()
     {
-        return focusPointingTaskManager != null
-            && focusPointingTaskManager.CurrentPhase == FocusPointingTaskPhase.MainTask;
+        return (focusPointingTaskManager != null
+                && focusPointingTaskManager.CurrentPhase == FocusPointingTaskPhase.MainTask)
+            || (referenceListTaskManager != null
+                && referenceListTaskManager.CurrentPhase == ReferenceListTaskPhase.MainTask);
     }
 
     private void SetConditionSelectionContentMode()
@@ -440,7 +587,11 @@ public class VRTaskMenuManager : MonoBehaviour
         if (statusText != null)
         {
             statusText.gameObject.SetActive(IsConditionSelectionVisible());
-            statusText.text = $"Condition: {selectedCondition}\nLayout: {selectedLayout}\nB toggles condition";
+            string trialOrder = randomizeT1Trials
+                ? $"Random (seed {focusPointingTaskManager?.RandomSeed ?? 0})"
+                : "Fixed";
+            statusText.text =
+                $"Task: {selectedTask}\nCondition: {selectedCondition}\nT1 Order: {trialOrder}";
         }
 
         if (menuPanel != null)
@@ -463,7 +614,18 @@ public class VRTaskMenuManager : MonoBehaviour
 
         if (IsConditionSelectionVisible())
         {
-            return action != MenuAction.EndTraining && action != MenuAction.AbortMainTask;
+            if (action == MenuAction.EndTraining || action == MenuAction.AbortMainTask)
+            {
+                return false;
+            }
+
+            if ((action == MenuAction.SelectT1FixedOrder || action == MenuAction.SelectT1RandomOrder)
+                && selectedTask != PrototypeTask.T1FocusPointing)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         return false;
@@ -515,7 +677,11 @@ public class VRTaskMenuManager : MonoBehaviour
 
     private bool IsSelected(MenuAction action)
     {
-        return (action == MenuAction.SelectRaycastBaseline && selectedCondition == InteractionCondition.RaycastBaseline)
+        return (action == MenuAction.SelectT1FocusPointing && selectedTask == PrototypeTask.T1FocusPointing)
+            || (action == MenuAction.SelectT2AReferenceList && selectedTask == PrototypeTask.T2AReferenceList)
+            || (action == MenuAction.SelectT1FixedOrder && !randomizeT1Trials)
+            || (action == MenuAction.SelectT1RandomOrder && randomizeT1Trials)
+            || (action == MenuAction.SelectRaycastBaseline && selectedCondition == InteractionCondition.RaycastBaseline)
             || (action == MenuAction.SelectExplicitDisplayFocus && selectedCondition == InteractionCondition.ExplicitDisplayFocus)
             || (action == MenuAction.SelectNoOcclusion && selectedLayout == DisplayLayoutPreset.NoOcclusion)
             || (action == MenuAction.SelectPartialOcclusion && selectedLayout == DisplayLayoutPreset.PartialOcclusion)
@@ -570,6 +736,11 @@ public class VRTaskMenuManager : MonoBehaviour
             focusPointingTaskManager = FindObjectOfType<FocusPointingTaskManager>();
         }
 
+        if (referenceListTaskManager == null)
+        {
+            referenceListTaskManager = FindObjectOfType<ReferenceListTaskManager>();
+        }
+
         if (raycastPointer == null)
         {
             raycastPointer = FindObjectOfType<RaycastPointer>();
@@ -578,6 +749,21 @@ public class VRTaskMenuManager : MonoBehaviour
         if (gazeProvider == null)
         {
             gazeProvider = FindObjectOfType<GazeProvider>();
+        }
+    }
+
+    private void ReturnActiveTaskToSelection()
+    {
+        if (focusPointingTaskManager != null
+            && focusPointingTaskManager.CurrentPhase != FocusPointingTaskPhase.ConditionSelection)
+        {
+            focusPointingTaskManager.ReturnToConditionSelection();
+        }
+
+        if (referenceListTaskManager != null
+            && referenceListTaskManager.CurrentPhase != ReferenceListTaskPhase.ConditionSelection)
+        {
+            referenceListTaskManager.ReturnToConditionSelection();
         }
     }
 }

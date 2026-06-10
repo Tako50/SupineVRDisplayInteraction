@@ -106,10 +106,9 @@ public class Logger : MonoBehaviour
         WriteBaselineEvent("RaycastHit", condition, displayId, normalized, string.Empty, 0f, rayOrigin, rayDirection);
     }
 
-    public void LogRaycastClick(InteractionCondition condition, string displayId, Vector2 normalized, bool validTarget, string targetId, Vector3 rayOrigin, Vector3 rayDirection)
+    public void LogRaycastClick(InteractionCondition condition, string displayId, Vector2 normalized, Vector3 rayOrigin, Vector3 rayDirection)
     {
-        string details = $"validTarget={validTarget};targetId={targetId}";
-        WriteBaselineEvent("Click", condition, displayId, normalized, details, 0f, rayOrigin, rayDirection);
+        WriteBaselineEvent("Click", condition, displayId, normalized, string.Empty, 0f, rayOrigin, rayDirection);
     }
 
     public void LogRaycastScroll(InteractionCondition condition, string displayId, Vector2 normalized, float scrollAmount, Vector3 rayOrigin, Vector3 rayDirection)
@@ -162,14 +161,11 @@ public class Logger : MonoBehaviour
         string candidateDisplayIds,
         string focusedDisplayId,
         Vector2 normalized,
-        bool validTarget,
-        string targetId,
         bool gazeOnDifferentDisplay,
         Vector3 gazeRayOrigin,
         Vector3 gazeRayDirection)
     {
-        string details = $"validTarget={validTarget};targetId={targetId}";
-        WriteExplicitEvent("Click", condition, gazeSource, candidateDisplayIds, focusedDisplayId, normalized, focusedDisplayId, details, 0f, gazeOnDifferentDisplay, FocusState.FocusedLocked, gazeRayOrigin, gazeRayDirection);
+        WriteExplicitEvent("Click", condition, gazeSource, candidateDisplayIds, focusedDisplayId, normalized, focusedDisplayId, string.Empty, 0f, gazeOnDifferentDisplay, FocusState.FocusedLocked, gazeRayOrigin, gazeRayDirection);
     }
 
     public void LogExplicitScroll(
@@ -210,6 +206,9 @@ public class Logger : MonoBehaviour
                 result.ParticipantId,
                 result.SessionId,
                 result.TrialIndex,
+                result.TrialSetId,
+                result.TrialIndexInSet,
+                result.OcclusionType,
                 result.TargetDisplayId,
                 FormatVector(result.TargetNormalizedPosition),
                 result.TargetSizeNormalized.ToString("0.000", CultureInfo.InvariantCulture),
@@ -224,7 +223,7 @@ public class Logger : MonoBehaviour
                 result.CompletionTime.ToString("0.000", CultureInfo.InvariantCulture)));
         }
 
-        Debug.Log($"[Logger] trialResult participant={result.ParticipantId}, session={result.SessionId}, trial={result.TrialIndex}, condition={result.Condition}, layout={result.LayoutPreset}, targetDisplay={result.TargetDisplayId}, target={FormatVector(result.TargetNormalizedPosition)}, size={result.TargetSizeNormalized:0.000}, clickedDisplay={result.ClickedDisplayId}, clicked={FormatVector(result.ClickedNormalizedPosition)}, result={result.ResultType}, correct={result.IsCorrect}, displayError={result.IsDisplayError}, targetError={result.IsTargetError}, completion={result.CompletionTime:0.000}");
+        Debug.Log($"[Logger] trialResult participant={result.ParticipantId}, session={result.SessionId}, trial={result.TrialIndex}, trialSetId={result.TrialSetId}, condition={result.Condition}, layout={result.LayoutPreset}, occlusion={result.OcclusionType}, targetDisplay={result.TargetDisplayId}, target={FormatVector(result.TargetNormalizedPosition)}, size={result.TargetSizeNormalized:0.000}, clickedDisplay={result.ClickedDisplayId}, clicked={FormatVector(result.ClickedNormalizedPosition)}, result={result.ResultType}, correct={result.IsCorrect}, displayError={result.IsDisplayError}, targetError={result.IsTargetError}, completion={result.CompletionTime:0.000}");
     }
 
     private void Open()
@@ -240,7 +239,7 @@ public class Logger : MonoBehaviour
         string timestamp = System.DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
         string path = Path.Combine(directory, $"{filePrefix}_{timestamp}.csv");
         writer = new StreamWriter(path);
-        writer.WriteLine("time,rowType,condition,layoutPresetOrEvent,gazeSourceOrDetails,displayId,normalized,gazeDisplay,gazeNormalized,focusedDisplay,scrollAmount,rayOrigin,rayDirection,candidateDisplayIds,focusState,gazeOnDifferentDisplay,participantId,sessionId,trialIndex,targetDisplayId,targetNormalized,targetSize,clickedDisplayId,clickedNormalized,resultType,isCorrect,displayError,targetError,trialStartTime,clickTime,completionTime");
+        writer.WriteLine("time,rowType,condition,layoutPresetOrEvent,gazeSourceOrDetails,displayId,normalized,gazeDisplay,gazeNormalized,focusedDisplay,scrollAmount,rayOrigin,rayDirection,candidateDisplayIds,focusState,gazeOnDifferentDisplay,participantId,sessionId,trialIndex,trialSetId,trialIndexInSet,occlusion_type,targetDisplayId,targetNormalized,targetSize,clickedDisplayId,clickedNormalized,resultType,isCorrect,displayError,targetError,trialStartTime,clickTime,completionTime");
         Debug.Log($"[Logger] CSV logging to {path}");
     }
 
