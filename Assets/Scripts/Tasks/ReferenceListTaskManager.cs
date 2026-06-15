@@ -55,12 +55,21 @@ public class ReferenceListTaskManager : MonoBehaviour
     [SerializeField] private Color alternatingRowColor = new Color(0.16f, 0.21f, 0.30f, 0.98f);
     [SerializeField] private Color rowTextColor = Color.white;
 
+    [Header("Task Start Gate")]
+    [SerializeField] private bool requireStartButtonBeforeTask = true;
+    [SerializeField] private string startGateDisplayId = "Display_B_Back";
+    [SerializeField] private Vector2 startButtonNormalizedPosition = new Vector2(0.5f, 0.5f);
+    [SerializeField] private Vector2 startButtonNormalizedSize = new Vector2(0.28f, 0.14f);
+    [SerializeField] private float startCountdownSeconds = 3f;
+    [SerializeField] private Color startGateButtonColor = new Color(0.10f, 0.70f, 0.32f, 0.95f);
+    [SerializeField] private Color startGateCountdownColor = new Color(0.15f, 0.48f, 0.85f, 0.95f);
+
     private readonly List<TrialConfig> trials = new List<TrialConfig>();
     private readonly Dictionary<DisplaySurface, DisplayUi> displayUis =
         new Dictionary<DisplaySurface, DisplayUi>();
 
     private InteractionCondition selectedCondition = InteractionCondition.RaycastBaseline;
-    private DisplayLayoutPreset selectedLayout = DisplayLayoutPreset.StrongOcclusion;
+    private DisplayLayoutPreset selectedLayout = DisplayLayoutPreset.UpDownDepth;
     private InteractionCondition activeCondition = InteractionCondition.RaycastBaseline;
     private ReferenceListTaskPhase currentPhase = ReferenceListTaskPhase.ConditionSelection;
 
@@ -71,6 +80,7 @@ public class ReferenceListTaskManager : MonoBehaviour
     private float wrongDisplayScrollAmount;
     private float trialStartTime;
     private bool trialRunning;
+    private TaskStartGate startGate;
 
     private string currentGestureDisplayId = string.Empty;
     private bool currentGestureIsWrong;
@@ -124,6 +134,7 @@ public class ReferenceListTaskManager : MonoBehaviour
 
     private void OnDisable()
     {
+        HideStartGate();
         EndScrollGesture(Time.time);
         CloseLogs();
     }
@@ -176,6 +187,7 @@ public class ReferenceListTaskManager : MonoBehaviour
         currentPhase = ReferenceListTaskPhase.ConditionSelection;
         currentTrialListIndex = -1;
         trials.Clear();
+        HideStartGate();
 
         if (inputManager != null)
         {
@@ -236,6 +248,11 @@ public class ReferenceListTaskManager : MonoBehaviour
         }
 
         lastScrollEventTime = eventTime;
+    }
+
+    public bool TryHandleTaskControlClick(string displayId, Vector2 normalizedPosition)
+    {
+        return startGate != null && startGate.TryHandleClick(displayId, normalizedPosition);
     }
 
     public void HandleClick(
@@ -332,6 +349,7 @@ public class ReferenceListTaskManager : MonoBehaviour
         OpenLogs();
         currentTrialListIndex = -1;
         trialRunning = false;
+        HideTaskUiForStartGate();
 
         if (logger != null)
         {
@@ -340,6 +358,12 @@ public class ReferenceListTaskManager : MonoBehaviour
                 activeCondition,
                 string.Empty,
                 Vector2.zero);
+        }
+
+        if (requireStartButtonBeforeTask)
+        {
+            ShowStartGate();
+            return;
         }
 
         StartNextTrial();
@@ -372,6 +396,8 @@ public class ReferenceListTaskManager : MonoBehaviour
 
     private void StartNextTrial()
     {
+        HideStartGate();
+        SetTaskUiActive(true);
         currentTrialListIndex++;
         if (currentTrialListIndex >= trials.Count)
         {
@@ -416,7 +442,6 @@ public class ReferenceListTaskManager : MonoBehaviour
         float scrollRange = Mathf.Max(420f, itemCount * itemHeightPixels * 0.5f);
         displayA.SetMaxScrollPixels(scrollRange);
         displayB.SetMaxScrollPixels(scrollRange);
-        SetTaskUiActive(true);
     }
 
     private void EnsureDisplayUi(DisplaySurface display)
@@ -567,6 +592,49 @@ public class ReferenceListTaskManager : MonoBehaviour
         }
     }
 
+    private void HideTaskUiForStartGate()
+    {
+        foreach (DisplayUi ui in displayUis.Values)
+        {
+            if (ui.ExistingScrollText != null)
+            {
+                ui.ExistingScrollText.enabled = false;
+            }
+
+            ui.InstructionRoot.SetActive(false);
+            ui.ListRoot.SetActive(false);
+        }
+    }
+
+    private void ShowStartGate()
+    {
+        DisplaySurface display = FindDisplay(startGateDisplayId);
+        startGate = TaskStartGate.GetOrCreate(display);
+        if (startGate == null)
+        {
+            Debug.LogWarning("[ReferenceListTask] Start gate display was not found. Starting task without start gate.");
+            StartNextTrial();
+            return;
+        }
+
+        startGate.Show(
+            display,
+            startButtonNormalizedPosition,
+            startButtonNormalizedSize,
+            startCountdownSeconds,
+            startGateButtonColor,
+            startGateCountdownColor,
+            StartNextTrial,
+            "[ReferenceListTask]");
+
+        Debug.Log($"[ReferenceListTask] waiting for start button phase={currentPhase}, display={startGateDisplayId}");
+    }
+
+    private void HideStartGate()
+    {
+        startGate?.Hide();
+    }
+
     private string FindClickedItemId(DisplaySurface display, Vector2 normalizedPosition)
     {
         if (display == null || !displayUis.TryGetValue(display, out DisplayUi ui))
@@ -575,9 +643,7 @@ public class ReferenceListTaskManager : MonoBehaviour
         }
 
         RectTransform canvasRect = display.WorldSpaceCanvas.GetComponent<RectTransform>();
-        Vector2 canvasPoint = new Vector2(
-            (Mathf.Clamp01(normalizedPosition.x) - 0.5f) * canvasRect.rect.width,
-            (Mathf.Clamp01(normalizedPosition.y) - 0.5f) * canvasRect.rect.height);
+        Vector2 canvasPoint = display.NormalizedToCanvasPosition(normalizedPosition);
 
         Vector3[] corners = new Vector3[4];
         for (int index = 0; index < ui.Rows.Count; index++)

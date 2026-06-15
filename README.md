@@ -32,10 +32,11 @@ The scene contains:
   - `Display_A_Front`: near, lower, smaller
   - `Display_B_Back`: far, upper, larger
 - transparent `TransparentHitPlane` colliders on both displays
-- layout presets: `NoOcclusion`, `PartialOcclusion`, `StrongOcclusion`
-  - `NoOcclusion`: vertical placement, no depth difference, no rotation offset
-  - `PartialOcclusion`: vertical placement, slight depth difference, no rotation offset
-  - `StrongOcclusion`: front/back occlusion placement for the main ray-blocking condition
+- display-facing `A Front` / `B Back` captions are hidden; the internal object ids remain unchanged for task configuration and logs
+- angle-based layout presets: `UpDownDepth`, `LeftRight`, and `UpDown`
+  - `UpDownDepth`: Layout 1. The existing T1 ray-occlusion geometry.
+  - `LeftRight`: Layout 2. Initial left/right values that can be tuned in the Inspector.
+  - `UpDown`: Layout 3. Initial upper/lower values that can be tuned in the Inspector.
 
 Display placement is calculated from the HMD pose when the experiment starts. Displays are fixed during play by default, so participants cannot freely move them.
 
@@ -47,11 +48,11 @@ Display placement is calculated from the HMD pose when the experiment starts. Di
 
 Useful development controls:
 
-- `1`: apply `NoOcclusion`
-- `2`: apply `PartialOcclusion`
-- `3`: apply `StrongOcclusion`
+- `1`: apply Layout 1 `UpDownDepth`
+- `2`: apply Layout 2 `LeftRight`
+- `3`: apply Layout 3 `UpDown`
 - `WASD` or arrow keys: stick fallback for cursor movement
-- `Space`: submit/click fallback
+- Release `Space`: submit/click fallback
 - `Tab`: switch between `RaycastBaseline` and `ExplicitDisplayFocus`
 - `G`: grip fallback for focus confirmation
 - `Left Shift`: trigger fallback for ExplicitDisplayFocus selection and trigger+stick scrolling
@@ -63,9 +64,9 @@ Useful development controls:
 - the right controller ray uses a single `Physics.Raycast`
 - only the first `DisplaySurface` hit receives input
 - the cursor follows the ray hit position on the hit display
-- A button / right trigger release / `Space` / `Left Shift` release clicks at the ray-hit position
+- Releasing A / right trigger / `Space` / `Left Shift` clicks at the ray-hit position
 - right stick vertical / `W` / `S` scrolls only the currently hit display
-- `StrongOcclusion` preserves input-ray occlusion, so the front display blocks the back display when it is hit first
+- `UpDownDepth` preserves the existing T1 front/back ray-occlusion geometry
 
 ## Phase 3 ExplicitDisplayFocus MVP
 
@@ -79,12 +80,43 @@ Useful development controls:
 - focus remains locked until grip is pressed again on another candidate
 - cursor warps to the gaze hit position when focus is confirmed
 - right stick / `WASD` moves the virtual cursor inside the focused display
-- A button / right trigger release, or `Space` / `Left Shift` release, clicks at the virtual cursor on the focused display
+- Releasing A / right trigger / `Space` / `Left Shift` clicks at the virtual cursor on the focused display
 - right trigger + right stick vertical, or `Left Shift` + `W` / `S`, scrolls the focused display
 - if trigger+stick scrolling occurred during a trigger press, releasing the trigger does not also click
 - moving gaze to another display after focus is locked does not redirect click or scroll input
 
-The debug overlay shows the current condition, focus state, focused display, and gaze candidate ids. Candidate and focus visuals are intentionally simple: candidate displays are highlighted, overlapping gaze candidates make the nearest display semi-transparent, and the focused display is highlighted.
+The debug overlay shows the current condition, focus state, focused display, and gaze candidate ids. Gaze highlight is managed separately from interaction focus by `GazeDisplayFocusManager`.
+
+## Independent Gaze Highlight Conditions
+
+`GazeDisplayFocusManager` highlights the current pointing target as visual feedback only:
+
+- `RaycastBaseline`: the first display hit by the controller Ray
+- `ExplicitDisplayFocus`: the foremost display under the gaze ray
+
+It does not change the input target, explicit input focus, cursor, click, or scroll destination.
+
+The existing `InteractionCondition` and the independent `highlightEnabled` flag form these four experiment conditions:
+
+- `RaycastBaseline` + highlight OFF
+- `RaycastBaseline` + highlight ON
+- `ExplicitDisplayFocus` + highlight OFF
+- `ExplicitDisplayFocus` + highlight ON
+
+At the start of a condition, call either:
+
+```csharp
+gazeDisplayFocusManager.SetHighlightEnabled(true);
+experimentManager.SetInteractionAndHighlight(
+    InteractionCondition.RaycastBaseline,
+    false);
+```
+
+In the in-app task menu, select `Highlight OFF` or `Highlight ON` before starting Training or Main. The selected state is displayed in the menu status card and is applied independently of the interaction method.
+
+In `Dev_Prototype`, attach `GazeDisplayFocusManager` to `Prototype_Managers` and assign `PrototypeInputManager`, `GazeProvider`, `DisplayManager`, and `EditorDebugInputProvider`. `Highlight Enabled` controls the initial state, `Debug Toggle With Keyboard` enables the Editor-only `H` shortcut, and `Log State Changes` logs only target or enabled-state changes. Each display uses its existing `DisplaySurface`; its `Visible Panel` must reference the panel `Image`.
+
+Turning highlight OFF immediately calls `SetFocused(false)` for every `DisplaySurface`. The display is a uGUI `Image`, so the highlight uses `Image.color` rather than changing a shared material; `MaterialPropertyBlock` is not applicable to this UI component.
 
 ## Phase 3.5 Editor Validation
 
@@ -112,16 +144,20 @@ For editor validation:
 
 - `FocusPointingTaskManager` manages the target-selection trial list.
 - `Display A` and `Display B` are assignable from the Inspector.
-- Main-task trials are generated as 2 conditions x 80 trials = 160 trials total.
-- Each condition uses the same 80-trial set: `Front` 40 trials, `BackClear` 20 trials, and `BackOccluded` 20 trials.
-- `BackOccluded` trials place targets on the back display in the lower/central region intended to remain visually visible while being difficult for controller raycasting because the front display hit plane can occlude the ray.
-- Starting a task runs only the currently selected condition block. After that 80-trial block finishes, the task returns to condition selection instead of automatically continuing to the next condition.
-- Trial rows include `trialSetId`, `trialIndexInSet`, and `occlusion_type` so the matching RaycastBaseline and ExplicitDisplayFocus trials can be compared directly.
-- Target positions for the experiment set are configured on `FocusPointingTaskManager` as Front, BackClear, and BackOccluded normalized position lists.
+- Main-task trials are loaded from `Assets/Resources/T1/target_orders_ABCDE.csv`.
+- Lists `A` through `D` each contain 108 main trials: 2 displays x 9 positions x 3 sizes x 2 cycles.
+- List `E` contains 108 training trials.
+- The current development configuration assigns List `A` to both interaction conditions.
+- `Condition A Main Order` and `Condition B Main Order` are separate Inspector fields so lists `A` through `D` can be assigned per condition without changing task code.
+- Starting a task runs only the currently selected condition block. After its 108-trial main block finishes, the task returns to condition selection instead of automatically continuing to the next condition.
+- Training uses all 108 trials from List `E` and loops after trial 108 until the experimenter ends training.
+- Target positions use the normalized 3 x 3 grid at x/y values `0.1`, `0.5`, and `0.9`.
+- Back-display positions on the lower row (`y = 0.1`) are logged as `BackOccluded`; the other back-display positions are `BackClear`.
+- Target sizes `Small`, `Medium`, and `Large` are rendered at approximately 1, 2, and 3 degrees based on the current head-to-display-center distance.
+- Trial rows include the source list, cycle, position id, size, repetition, and transition metadata from the generated order CSV.
 - Condition order is selectable from the Inspector as `AThenB` or `BThenA`.
-- Trial order is selectable from the VR menu as `Fixed Order` or `Random Order`.
-- Random order uses the Inspector-configurable seed and applies the same shuffled 80-trial sequence to both interaction conditions.
-- T1 result CSVs include `trialOrder` and `randomSeed` for reproducibility.
+- The VR menu shows the configured main/training list for the selected interaction condition; ad hoc Fixed/Random reshuffling is disabled.
+- T1 result CSVs retain `trialOrder` and `randomSeed` compatibility columns and also record `targetOrderList`.
 - `ConditionA` maps to `RaycastBaseline` by default, and `ConditionB` maps to `ExplicitDisplayFocus` by default.
 - A visible `FocusPointingTarget` is generated on the active target display.
 - Starting Training or Main Task first shows a centered `START` button on `Display_B_Back`; pressing it starts a 3-second countdown before the first target appears.
@@ -138,6 +174,7 @@ This does not implement T2-B seek-bar adjustment, questionnaires, or full partic
 `Dev_Prototype` includes an MVP of the updated T2-A task:
 
 - Select `T2-A Reference List` from the VR task menu, then choose Training or Main Task.
+- As in T1, the task shows a centered `START` button on `Display_B_Back`; pressing it starts a 3-second countdown before the first trial appears.
 - One display shows the requested item id while the other shows a 40-item scrollable list.
 - The list and instruction displays alternate between `Display_A_Front` and `Display_B_Back`.
 - Training uses four looping trials by default.
@@ -161,12 +198,32 @@ The result CSV records every click attempt and trial-level wrong-display scroll 
 
 `T1RayOcclusionLayoutProbe` on `Prototype_Managers` helps tune the T1 front/back display geometry:
 
+- The current `h1=1.90`, `h2=1.15`, `eta2=25 degrees` geometry is Layout 1 (`UpDownDepth`).
 - `Search Best T1 Ray Occlusion Layout` scans `h1`, `h2`, and `eta2Degrees` for a layout close to the target ray-occlusion ratio.
 - `Search Best And Apply To Displays` searches and applies the best D1/D2 pose and angular-size-derived physical size to `Display_B_Back` and `Display_A_Front`.
-- `Apply Current T1 Layout To Displays` applies the current Inspector values.
+- `Apply Current T1 Layout To Displays` always applies the current Inspector values for manual tuning and warns when the experiment validation targets are not met.
 - The key log fields are `projectedOcclusionRatio`, `visualOcclusionRatio`, `visualOcclusionClear`, and `nearTarget30Percent`.
 
 Use the context menu after entering Play Mode if `DisplayLayoutManager` has just applied its normal startup layout.
+
+## Dev Task Display Layouts
+
+Edit the three normal task layouts on `Prototype_Managers > DisplayLayoutManager`.
+
+Each display has:
+
+- `Distance Meters`: distance from the HMD anchor.
+- `Horizontal Angle Degrees`: negative is left, positive is right.
+- `Vertical Angle Degrees`: negative is lower, positive is upper.
+- `Rotation Offset Degrees`: optional pitch, yaw, and roll adjustment.
+
+`Apparent Width Degrees` and `Apparent Height Degrees` control the shared visual angle. Physical display size is recalculated from each display's distance, so layouts at different depths keep approximately the same apparent size. `Preserve Display Aspect Ratio` is initially off so Layout 1 exactly matches the previous T1 probe's independent `40 x 22.5 degree` sizing.
+
+`DisplaySurface` applies the calculated physical size to both the visible World Space Canvas and its transparent HitPlane. The rendered display boundary and ray-hit boundary therefore remain aligned when distance or apparent size changes.
+
+Shared apparent-size, HMD-anchor, angular-pose, and display-coordinate calculations live in `DisplayGeometry` and `DisplaySurface` so task and study scenes use the same geometry rules.
+
+Use `DisplayLayoutManager > Apply Selected Layout Now` from the component context menu to preview the selected `Initial Preset` outside Play Mode.
 
 `GazeProvider` supports `HmdForward` for development only and an `EyeTracking` placeholder source for a later Meta Quest Pro eye-tracking adapter. HMD forward should not be used for experiments.
 
@@ -260,7 +317,7 @@ Then run:
 
 Controls:
 
-- A / RightArrow / Space: next layout
+- Release A / RightArrow / Space: next layout
 - B / LeftArrow / Backspace: previous layout
 - R: recenter the current layout from the current HMD pose
 - Hold Menu: recenter on Quest, if the runtime exposes the menu button through Unity XR input

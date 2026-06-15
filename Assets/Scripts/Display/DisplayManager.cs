@@ -149,17 +149,8 @@ public class DisplayManager : MonoBehaviour
         }
 
         display.BringCursorToFront();
-
-        RectTransform canvasRect = display.WorldSpaceCanvas != null
-            ? display.WorldSpaceCanvas.GetComponent<RectTransform>()
-            : null;
-
-        Vector2 canvasSize = canvasRect != null ? canvasRect.sizeDelta : new Vector2(800f, 450f);
         // 画面外入力は表示端へ寄せ、カーソルがディスプレイ外へ消えないようにする。
-        Vector2 clamped = new Vector2(Mathf.Clamp01(normalized.x), Mathf.Clamp01(normalized.y));
-        display.Cursor.anchoredPosition = new Vector2(
-            (clamped.x - 0.5f) * canvasSize.x,
-            (clamped.y - 0.5f) * canvasSize.y);
+        display.Cursor.anchoredPosition = display.NormalizedToCanvasPosition(normalized);
     }
 
     public void SetOnlyCursorsVisible(DisplaySurface primary, DisplaySurface secondary)

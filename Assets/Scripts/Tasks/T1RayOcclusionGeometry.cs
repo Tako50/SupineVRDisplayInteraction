@@ -23,9 +23,9 @@ public struct DisplayPlane
     public DisplayPlane(Vector3 center, Vector3 normal, Vector3 u, Vector3 v, float width, float height)
     {
         Center = center;
-        Normal = NormalizeOrFallback(normal, Vector3.back);
-        U = NormalizeOrFallback(u, Vector3.right);
-        V = NormalizeOrFallback(v, Vector3.up);
+        Normal = DisplayGeometry.NormalizeOrFallback(normal, Vector3.back);
+        U = DisplayGeometry.NormalizeOrFallback(u, Vector3.right);
+        V = DisplayGeometry.NormalizeOrFallback(v, Vector3.up);
         Width = Mathf.Max(0f, width);
         Height = Mathf.Max(0f, height);
     }
@@ -54,10 +54,6 @@ public struct DisplayPlane
         };
     }
 
-    private static Vector3 NormalizeOrFallback(Vector3 value, Vector3 fallback)
-    {
-        return value.sqrMagnitude > 0.000001f ? value.normalized : fallback.normalized;
-    }
 }
 
 public struct T1RayOcclusionLayout
@@ -84,8 +80,8 @@ public struct T1RayOcclusionLayout
 
 public static class T1RayOcclusionGeometry
 {
-    public const float AlphaHDegrees = 40f;
-    public const float AlphaVDegrees = 22.5f;
+    public const float AlphaHDegrees = DisplayGeometry.DefaultApparentWidthDegrees;
+    public const float AlphaVDegrees = DisplayGeometry.DefaultApparentHeightDegrees;
     public const float EyeToElbowMeters = 0.40f;
     public const float ElbowToHandMeters = 0.30f;
     public const float HandSampleOffsetMeters = 0.05f;
@@ -156,8 +152,8 @@ public static class T1RayOcclusionGeometry
 
     public static Vector3 ComputeHandCenter(Vector3 eye, Vector3 forward, Vector3 d1Vertical, float verticalSign)
     {
-        Vector3 f = NormalizeOrFallback(forward, Vector3.forward);
-        Vector3 v1 = NormalizeOrFallback(Vector3.ProjectOnPlane(d1Vertical, f), Vector3.up);
+        Vector3 f = DisplayGeometry.NormalizeOrFallback(forward, Vector3.forward);
+        Vector3 v1 = DisplayGeometry.NormalizeOrFallback(Vector3.ProjectOnPlane(d1Vertical, f), Vector3.up);
         float signedDirection = verticalSign >= 0f ? 1f : -1f;
 
         // 目-肘の線分はD1と平行に置く。Unityのv1が上向きの場合、signedDirection=-1で下側の腕姿勢を試せる。
@@ -174,9 +170,9 @@ public static class T1RayOcclusionGeometry
 
     public static Vector3[] GenerateHandSamples(Vector3 handCenter, Vector3 u1, Vector3 v1, Vector3 forward, bool includeCombinations)
     {
-        Vector3 u = NormalizeOrFallback(u1, Vector3.right);
-        Vector3 v = NormalizeOrFallback(v1, Vector3.up);
-        Vector3 f = NormalizeOrFallback(forward, Vector3.forward);
+        Vector3 u = DisplayGeometry.NormalizeOrFallback(u1, Vector3.right);
+        Vector3 v = DisplayGeometry.NormalizeOrFallback(v1, Vector3.up);
+        Vector3 f = DisplayGeometry.NormalizeOrFallback(forward, Vector3.forward);
         float offset = HandSampleOffsetMeters;
         if (includeCombinations)
         {
@@ -342,15 +338,15 @@ public static class T1RayOcclusionGeometry
         float handVerticalSign,
         float visualEyeSampleOffsetMeters)
     {
-        Vector3 f = NormalizeOrFallback(forward, Vector3.forward);
-        Vector3 v1 = NormalizeOrFallback(Vector3.ProjectOnPlane(d1Vertical, f), Vector3.up);
-        Vector3 u1 = NormalizeOrFallback(Vector3.Cross(v1, f), d1Horizontal);
-        v1 = NormalizeOrFallback(Vector3.Cross(f, u1), v1);
+        Vector3 f = DisplayGeometry.NormalizeOrFallback(forward, Vector3.forward);
+        Vector3 v1 = DisplayGeometry.NormalizeOrFallback(Vector3.ProjectOnPlane(d1Vertical, f), Vector3.up);
+        Vector3 u1 = DisplayGeometry.NormalizeOrFallback(Vector3.Cross(v1, f), d1Horizontal);
+        v1 = DisplayGeometry.NormalizeOrFallback(Vector3.Cross(f, u1), v1);
         h1 = Mathf.Max(0.01f, h1);
         h2 = Mathf.Max(0.01f, h2);
 
-        Vector2 d1Size = ComputeDisplaySize(h1);
-        Vector2 d2Size = ComputeDisplaySize(h2);
+        Vector2 d1Size = DisplayGeometry.ComputePhysicalSize(h1, AlphaHDegrees, AlphaVDegrees);
+        Vector2 d2Size = DisplayGeometry.ComputePhysicalSize(h2, AlphaHDegrees, AlphaVDegrees);
 
         DisplayPlane d1 = new DisplayPlane(
             eye + h1 * f,
@@ -362,10 +358,12 @@ public static class T1RayOcclusionGeometry
 
         float etaRadians = eta2Degrees * Mathf.Deg2Rad;
         // eta2 > 0 はD2をD1より下方向へ離す。Scene viewでの調整と直感を合わせる。
-        Vector3 d2Direction = NormalizeOrFallback(Mathf.Cos(etaRadians) * f - Mathf.Sin(etaRadians) * v1, f);
+        Vector3 d2Direction = DisplayGeometry.NormalizeOrFallback(
+            Mathf.Cos(etaRadians) * f - Mathf.Sin(etaRadians) * v1,
+            f);
         Vector3 d2Normal = -d2Direction;
         Vector3 u2 = u1;
-        Vector3 v2 = NormalizeOrFallback(Vector3.Cross(u2, d2Normal), v1);
+        Vector3 v2 = DisplayGeometry.NormalizeOrFallback(Vector3.Cross(u2, d2Normal), v1);
         DisplayPlane d2 = new DisplayPlane(
             eye + h2 * d2Direction,
             d2Normal,
@@ -425,13 +423,6 @@ public static class T1RayOcclusionGeometry
             $"visualOcclusionClear={layout.VisualOcclusionClear}, " +
             $"d2CenterAngleValid={layout.D2CenterAngleValid}, " +
             $"d2BelowD1={layout.D2BelowD1}";
-    }
-
-    private static Vector2 ComputeDisplaySize(float distance)
-    {
-        float width = 2f * distance * Mathf.Tan(AlphaHDegrees * 0.5f * Mathf.Deg2Rad);
-        float height = 2f * distance * Mathf.Tan(AlphaVDegrees * 0.5f * Mathf.Deg2Rad);
-        return new Vector2(width, height);
     }
 
     private static Vector3[] GenerateVisualEyeSamples(Vector3 eye, Vector3 u1, Vector3 v1, float sampleOffsetMeters)
@@ -572,11 +563,6 @@ public static class T1RayOcclusionGeometry
         }
 
         return area * 0.5f;
-    }
-
-    private static Vector3 NormalizeOrFallback(Vector3 value, Vector3 fallback)
-    {
-        return value.sqrMagnitude > 0.000001f ? value.normalized : fallback.normalized;
     }
 
     private static string FormatVector(Vector3 value)

@@ -15,6 +15,21 @@ using UnityEditor.SceneManagement;
 /// </summary>
 public class T1RayOcclusionLayoutProbe : MonoBehaviour
 {
+    private struct LayoutValidation
+    {
+        public bool NearTarget;
+        public bool VisualOcclusionAccepted;
+        public bool VerticalGapAccepted;
+        public bool D2CenterAngleAccepted;
+        public bool D2BelowAccepted;
+
+        public bool GeometryAccepted =>
+            VisualOcclusionAccepted
+            && VerticalGapAccepted
+            && D2CenterAngleAccepted
+            && D2BelowAccepted;
+    }
+
     [Header("References")]
     [SerializeField] private Camera hmdCamera;
     [SerializeField] private DisplaySurface d1BackDisplay;
@@ -53,7 +68,7 @@ public class T1RayOcclusionLayoutProbe : MonoBehaviour
     [Header("Apply To Displays")]
     [SerializeField] private bool applyDisplaySize = true;
     [SerializeField] private bool applyDisplayPose = true;
-    [SerializeField] private Vector2 baseCanvasPixelSize = new Vector2(800f, 450f);
+    [SerializeField] private Vector2 baseCanvasPixelSize = DisplayGeometry.DefaultCanvasPixelSize;
 
     [Header("Debug")]
     [Tooltip("When the app starts, place D1/D2 from the current h1/h2/eta2 Inspector parameters instead of relying on saved scene transforms.")]
@@ -178,7 +193,9 @@ public class T1RayOcclusionLayoutProbe : MonoBehaviour
     public void ApplyCurrentLayoutToDisplays()
     {
         LastLayout = BuildCurrentLayout();
-        ApplyLayoutToDisplaysIfAllowed(LastLayout, "current layout");
+        ApplyLayoutToDisplays(LastLayout);
+        LogManualLayoutValidationWarnings(LastLayout);
+        Debug.Log($"{T1RayOcclusionGeometry.FormatLayoutDebug(LastLayout)}, appliedToDisplays=True, validationRequired=False");
     }
 
     [ContextMenu("Log T1 Ray Occlusion Layout")]
@@ -201,17 +218,13 @@ public class T1RayOcclusionLayoutProbe : MonoBehaviour
 
     public T1RayOcclusionLayout BuildCurrentLayout()
     {
-        Transform eyeTransform = ResolveEyeTransform();
-        Vector3 eye = eyeTransform.position;
-        Vector3 forward = NormalizeOrFallback(eyeTransform.forward, Vector3.forward);
-        Vector3 u1 = NormalizeOrFallback(eyeTransform.right, Vector3.right);
-        Vector3 v1 = NormalizeOrFallback(eyeTransform.up, Vector3.up);
+        DisplayAnchorFrame eyeFrame = DisplayAnchorFrame.FromTransform(ResolveEyeTransform());
 
         return T1RayOcclusionGeometry.BuildLayout(
-            eye,
-            forward,
-            u1,
-            v1,
+            eyeFrame.Position,
+            eyeFrame.Forward,
+            eyeFrame.Right,
+            eyeFrame.Up,
             h1,
             h2,
             eta2Degrees,
@@ -230,11 +243,7 @@ public class T1RayOcclusionLayoutProbe : MonoBehaviour
         evaluatedCount = 0;
         acceptedCount = 0;
 
-        Transform eyeTransform = ResolveEyeTransform();
-        Vector3 eye = eyeTransform.position;
-        Vector3 forward = NormalizeOrFallback(eyeTransform.forward, Vector3.forward);
-        Vector3 u1 = NormalizeOrFallback(eyeTransform.right, Vector3.right);
-        Vector3 v1 = NormalizeOrFallback(eyeTransform.up, Vector3.up);
+        DisplayAnchorFrame eyeFrame = DisplayAnchorFrame.FromTransform(ResolveEyeTransform());
 
         float clampedH1Step = Mathf.Max(0.001f, h1Step);
         float clampedH2Step = Mathf.Max(0.001f, h2Step);
@@ -254,32 +263,18 @@ public class T1RayOcclusionLayoutProbe : MonoBehaviour
                 {
                     evaluatedCount++;
                     T1RayOcclusionLayout candidate = T1RayOcclusionGeometry.BuildLayout(
-                        eye,
-                        forward,
-                        u1,
-                        v1,
+                        eyeFrame.Position,
+                        eyeFrame.Forward,
+                        eyeFrame.Right,
+                        eyeFrame.Up,
                         candidateH1,
                         candidateH2,
                         candidateEta,
                         handVerticalSign,
                         visualEyeSampleOffsetMeters);
 
-                    if (requireVisualOcclusionClear && !candidate.VisualOcclusionClear)
-                    {
-                        continue;
-                    }
-
-                    if (requireMinimumVisualVerticalGap && candidate.VisualVerticalGapMeters < minVisualVerticalGapMeters)
-                    {
-                        continue;
-                    }
-
-                    if (requireD2CenterAngleValid && !candidate.D2CenterAngleValid)
-                    {
-                        continue;
-                    }
-
-                    if (requireD2BelowD1 && !candidate.D2BelowD1)
+                    LayoutValidation validation = EvaluateLayout(candidate);
+                    if (!validation.GeometryAccepted)
                     {
                         continue;
                     }
@@ -391,47 +386,76 @@ public class T1RayOcclusionLayoutProbe : MonoBehaviour
 
     private void ApplyLayoutToDisplaysIfAllowed(T1RayOcclusionLayout layout, string label)
     {
-        bool nearTarget = T1RayOcclusionGeometry.IsNearTargetRayOcclusionRatio(
-            layout.SampledOcclusionRatio,
-            targetRayOcclusionRatio,
-            targetRatioTolerance);
-
-        if (applyOnlyWhenNearTargetRatio && !nearTarget)
+        LayoutValidation validation = EvaluateLayout(layout);
+        bool accepted = validation.GeometryAccepted
+            && (!applyOnlyWhenNearTargetRatio || validation.NearTarget);
+        if (!accepted)
         {
-            Debug.LogWarning(
-                $"[T1RayOcclusion] {label} was not applied because nearTarget30Percent=False. " +
-                $"{T1RayOcclusionGeometry.FormatLayoutDebug(layout)}");
-            return;
-        }
-
-        if (requireVisualOcclusionClear && !layout.VisualOcclusionClear)
-        {
-            Debug.LogWarning($"[T1RayOcclusion] {label} was not applied because visualOcclusionClear=False.");
-            return;
-        }
-
-        if (requireMinimumVisualVerticalGap && layout.VisualVerticalGapMeters < minVisualVerticalGapMeters)
-        {
-            Debug.LogWarning(
-                $"[T1RayOcclusion] {label} was not applied because visualVerticalGapMeters is too small. " +
-                $"required={minVisualVerticalGapMeters:0.000}, {T1RayOcclusionGeometry.FormatLayoutDebug(layout)}");
-            return;
-        }
-
-        if (requireD2CenterAngleValid && !layout.D2CenterAngleValid)
-        {
-            Debug.LogWarning($"[T1RayOcclusion] {label} was not applied because d2CenterAngleValid=False.");
-            return;
-        }
-
-        if (requireD2BelowD1 && !layout.D2BelowD1)
-        {
-            Debug.LogWarning($"[T1RayOcclusion] {label} was not applied because d2BelowD1=False.");
+            LogValidationIssues(layout, validation, $"{label} was not applied", applyOnlyWhenNearTargetRatio);
             return;
         }
 
         ApplyLayoutToDisplays(layout);
         Debug.Log($"{T1RayOcclusionGeometry.FormatLayoutDebug(layout)}, appliedToDisplays=True");
+    }
+
+    private void LogManualLayoutValidationWarnings(T1RayOcclusionLayout layout)
+    {
+        LayoutValidation validation = EvaluateLayout(layout);
+        LogValidationIssues(layout, validation, "current layout was applied for manual tuning", true);
+    }
+
+    private LayoutValidation EvaluateLayout(T1RayOcclusionLayout layout)
+    {
+        return new LayoutValidation
+        {
+            NearTarget = T1RayOcclusionGeometry.IsNearTargetRayOcclusionRatio(
+                layout.SampledOcclusionRatio,
+                targetRayOcclusionRatio,
+                targetRatioTolerance),
+            VisualOcclusionAccepted = !requireVisualOcclusionClear || layout.VisualOcclusionClear,
+            VerticalGapAccepted = !requireMinimumVisualVerticalGap
+                || layout.VisualVerticalGapMeters >= minVisualVerticalGapMeters,
+            D2CenterAngleAccepted = !requireD2CenterAngleValid || layout.D2CenterAngleValid,
+            D2BelowAccepted = !requireD2BelowD1 || layout.D2BelowD1
+        };
+    }
+
+    private void LogValidationIssues(
+        T1RayOcclusionLayout layout,
+        LayoutValidation validation,
+        string context,
+        bool includeNearTarget)
+    {
+        if (includeNearTarget && !validation.NearTarget)
+        {
+            Debug.LogWarning(
+                $"[T1RayOcclusion] {context}: nearTarget30Percent=False, " +
+                $"target={targetRayOcclusionRatio:0.000}±{targetRatioTolerance:0.000}, " +
+                $"actual={layout.SampledOcclusionRatio:0.000}");
+        }
+
+        if (!validation.VisualOcclusionAccepted)
+        {
+            Debug.LogWarning($"[T1RayOcclusion] {context}: visualOcclusionClear=False.");
+        }
+
+        if (!validation.VerticalGapAccepted)
+        {
+            Debug.LogWarning(
+                $"[T1RayOcclusion] {context}: visualVerticalGapMeters is too small, " +
+                $"required={minVisualVerticalGapMeters:0.000}, actual={layout.VisualVerticalGapMeters:0.000}");
+        }
+
+        if (!validation.D2CenterAngleAccepted)
+        {
+            Debug.LogWarning($"[T1RayOcclusion] {context}: d2CenterAngleValid=False.");
+        }
+
+        if (!validation.D2BelowAccepted)
+        {
+            Debug.LogWarning($"[T1RayOcclusion] {context}: d2BelowD1=False.");
+        }
     }
 
     private void LogSampleRayClassifications(T1RayOcclusionLayout layout)
@@ -694,7 +718,7 @@ public class T1RayOcclusionLayoutProbe : MonoBehaviour
         cell.anchorMax = new Vector2(0.5f, 0.5f);
         cell.pivot = new Vector2(0.5f, 0.5f);
 
-        Vector2 pixelSize = display.CanvasPixelSize;
+        Vector2 pixelSize = display.GetCanvasSize();
         cell.anchoredPosition = new Vector2(
             localMeters.x / Mathf.Max(0.0001f, plane.Width) * pixelSize.x,
             localMeters.y / Mathf.Max(0.0001f, plane.Height) * pixelSize.y);
@@ -737,10 +761,10 @@ public class T1RayOcclusionLayoutProbe : MonoBehaviour
             Mathf.Max(0.01f, baseCanvasPixelSize.x),
             Mathf.Max(0.01f, baseCanvasPixelSize.y));
 
-        // DisplaySurfaceの見た目の物理サイズは canvasPixelSize * canvasScale で決まる。
-        // 既定の800x450pxが0.80x0.45mに対応するため、T1の計算上のplaneサイズに比例させる。
-        float widthPixels = referencePixels.x * plane.Width / 0.80f;
-        float heightPixels = referencePixels.y * plane.Height / 0.45f;
+        // 既定の800x450pxを0.80x0.45mの密度として、サイズ変更後もUIの画素密度を保つ。
+        // DisplaySurfaceがCanvasとHitPlaneをplaneの物理サイズへ揃える。
+        float widthPixels = referencePixels.x * plane.Width / DisplayGeometry.DefaultPhysicalSizeMeters.x;
+        float heightPixels = referencePixels.y * plane.Height / DisplayGeometry.DefaultPhysicalSizeMeters.y;
         return new Vector2(widthPixels, heightPixels);
     }
 
@@ -832,11 +856,6 @@ public class T1RayOcclusionLayoutProbe : MonoBehaviour
         EditorSceneManager.MarkSceneDirty(gameObject.scene);
         Debug.Log($"[T1RayOcclusion] marked applied layout dirty. Save the scene before building. scene={gameObject.scene.path}");
 #endif
-    }
-
-    private static Vector3 NormalizeOrFallback(Vector3 value, Vector3 fallback)
-    {
-        return value.sqrMagnitude > 0.000001f ? value.normalized : fallback.normalized;
     }
 
     private static string Format(Vector3 value)

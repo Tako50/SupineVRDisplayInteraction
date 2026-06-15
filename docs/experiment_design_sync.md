@@ -1,6 +1,6 @@
 # 実験設計とUnity実装の同期状況
 
-更新日: 2026-06-09
+更新日: 2026-06-12
 
 ## 1. この資料の目的
 
@@ -9,12 +9,13 @@ Notion側で実験設計が更新されているため、リポジトリ内の�
 
 現時点では、次の順で参照する。
 
-1. 研究目的・最新の実験構成: Notion「案1」2026-06-09版
+1. 研究目的・最新の実験構成: Notion「案1」2026-06-11版
 2. 入力遮蔽と提案手法の解釈: Notion「研究メモ」2026-06-08版
-3. T1遮蔽条件: Notion「T1 Ray遮蔽の幾何モデル」2026-06-02版
-4. 実装・ログ・運用要件: Notionの2026-06-01版各ページ
-5. 現在動く実装: Unityプロジェクトと `README.md`
-6. `prototype_spec.md` と `implementation_plan.md`: 初期設計として参照
+3. T1試行構成・順序: Notion「Study 1：T1 ポインティングタスク案」2026-06-11版
+4. T1遮蔽条件: Notion「T1 Ray遮蔽の幾何モデル」2026-06-02版
+5. 実装・ログ・運用要件: Notionの2026-06-01版各ページ
+6. 現在動く実装: Unityプロジェクトと `README.md`
+7. `prototype_spec.md` と `implementation_plan.md`: 初期設計として参照
 
 `prototype_spec.md` と `implementation_plan.md` は現在の研究設計を
 完全には反映していないため、未同期の旧仕様を含む。
@@ -104,20 +105,23 @@ T1はFitts' Lawそのものではなく、複数Display環境で次を評価す�
 - Press Drift
 - Down Target Error
 
-2026-06-01版では、次の試行構成が定義されている。
+2026-06-11版で、次の試行構成へ更新された。
 
 ```text
-80 trials / condition
-Front: 40
-BackClear: 20
-BackOccluded: 20
+2 displays x 9 positions x 3 sizes x 2 cycles
+= 108 trials / condition
 ```
 
-現在の `FocusPointingTaskManager` はこの80試行構成を実装している。
+各周は54試行で、Display・位置・サイズの全組合せを1回ずつ含む。
+ターゲット位置は各Displayの正規化座標 `0.1 / 0.5 / 0.9` の3 x 3、
+サイズは視角ベースの `Small 1度 / Medium 2度 / Large 3度` とする。
 
-ただし、2026-06-09版では配置予備実験の結果を踏まえてT1を設計する流れへ
-更新され、80試行構成を明示的に再確認していない。
-したがって試行数とocclusion分類を最終固定する必要がある。
+本番順序はList A / B / C / Dの4種類を事前生成し、条件の実施順に応じて
+割り当てる。各Listは108試行である。
+
+現在の `FocusPointingTaskManager` はCSVからこれらの順序を読み込む。
+開発時の初期設定は両操作条件ともMain List Aである。
+TrainingはList Eの108試行を使用する。
 
 ### 4.3 T2: 実利用マイクロ操作
 
@@ -197,7 +201,8 @@ Ambiguous:
 | Raycast Baseline | `RaycastPointer` ほか | 実装済み |
 | display-local cursor | `VirtualCursorController` | 実装済み |
 | grip中gaze mode | 現コードはgrip中に更新 | 要仕様固定・テスト |
-| T1 80試行 | `FocusPointingTaskManager` | 実装済み |
+| T1 108試行・順序List A-D | `FocusPointingTaskManager` | 実装済み |
+| T1 Training List E 108試行 | `FocusPointingTaskManager` | 実装済み |
 | T1遮蔽幾何モデル | `T1RayOcclusionGeometry` | 実装済み |
 | T1 movement/rotation集計 | なし | 未実装 |
 | pre-click jitter | なし | 未実装 |
@@ -294,13 +299,11 @@ Practiceは最低回数に達しても自動終了せず、実験者が終了す
 1. Proposedのfocus確定タイミング
    - grip downで確定
    - grip中に連続更新しreleaseで確定
-2. 予備実験後もT1で `Front / BackClear / BackOccluded` を使うか
-3. T1の本番試行数を80で固定するか
-4. T2はT2-AとT2-Bの両方を実施するか
-5. T2-A/Bの試行数
-6. T2-BでRaycastとProposedのcursor操作をどう対応させるか
-7. Press DriftとDown Target Errorを主要評価指標に含めるか
-8. 旧T3を正式に廃止し、T2-Aへ統合するか
+2. T2はT2-AとT2-Bの両方を実施するか
+3. T2-A/Bの試行数
+4. T2-BでRaycastとProposedのcursor操作をどう対応させるか
+5. Press DriftとDown Target Errorを主要評価指標に含めるか
+6. 旧T3を正式に廃止し、T2-Aへ統合するか
 
 ## 10. 推奨する次の整理順
 

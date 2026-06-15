@@ -5,6 +5,8 @@
 [Bb]uilds/
 [Ll]ogs/
 [Uu]ser[Ss]ettings/
+*.app/
+*.apk
 
 .vs/
 .vscode/
@@ -19,6 +21,12 @@
 *.svd
 *.pdb
 *.mdb
+*.pyc
+
+Tools/__pycache__/
+docs/.Rhistory
+mono_crash.*
+nested_access.dll
 
 .DS_Store
 Thumbs.db

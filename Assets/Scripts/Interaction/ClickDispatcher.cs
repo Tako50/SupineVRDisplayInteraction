@@ -55,10 +55,9 @@ public class ClickDispatcher : MonoBehaviour
             return;
         }
 
-        if (focusPointingTaskManager != null
-            && raycastPointer != null
+        if (raycastPointer != null
             && displayManager.TryGetForemostHit(raycastPointer.CurrentRay, out DisplayHit taskControlHit)
-            && focusPointingTaskManager.TryHandleTaskControlClick(taskControlHit.DisplayId, taskControlHit.Normalized))
+            && TryHandleTaskControlClick(taskControlHit.DisplayId, taskControlHit.Normalized))
         {
             LastClickResult = $"{taskControlHit.DisplayId} taskControl=True";
             return;
@@ -98,7 +97,7 @@ public class ClickDispatcher : MonoBehaviour
             triggerGestureScrolled = false;
         }
 
-        return inputManager.SubmitPressed || triggerClick;
+        return inputManager.SubmitReleased || triggerClick;
     }
 
     private void DispatchRaycastBaselineClick()
@@ -117,7 +116,7 @@ public class ClickDispatcher : MonoBehaviour
             return;
         }
 
-        if (focusPointingTaskManager != null && focusPointingTaskManager.TryHandleTaskControlClick(hit.DisplayId, hit.Normalized))
+        if (TryHandleTaskControlClick(hit.DisplayId, hit.Normalized))
         {
             LastClickResult = $"{hit.DisplayId} taskControl=True";
             return;
@@ -147,7 +146,7 @@ public class ClickDispatcher : MonoBehaviour
             return;
         }
 
-        if (focusPointingTaskManager != null && focusPointingTaskManager.TryHandleTaskControlClick(focusedDisplay.name, normalized))
+        if (TryHandleTaskControlClick(focusedDisplay.name, normalized))
         {
             LastClickResult = $"{focusedDisplay.name} taskControl=True";
             return;
@@ -257,6 +256,14 @@ public class ClickDispatcher : MonoBehaviour
             normalized,
             inputManager.CurrentCondition,
             Time.time);
+    }
+
+    private bool TryHandleTaskControlClick(string displayId, Vector2 normalizedPosition)
+    {
+        return (focusPointingTaskManager != null
+                && focusPointingTaskManager.TryHandleTaskControlClick(displayId, normalizedPosition))
+            || (referenceListTaskManager != null
+                && referenceListTaskManager.TryHandleTaskControlClick(displayId, normalizedPosition));
     }
 
     private void LogClick(string displayId, Vector2 normalized, Ray ray)

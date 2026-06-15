@@ -6,7 +6,7 @@ public class PrototypeControlPanel : MonoBehaviour
 {
     [Header("Use This Panel")]
     [SerializeField] private InteractionCondition condition = InteractionCondition.RaycastBaseline;
-    [SerializeField] private DisplayLayoutPreset layout = DisplayLayoutPreset.StrongOcclusion;
+    [SerializeField] private DisplayLayoutPreset layout = DisplayLayoutPreset.UpDownDepth;
     [SerializeField] private bool applyLayout = false;
     [SerializeField] private GazeSource gazeSource = GazeSource.EyeTracking;
     [SerializeField] private RayVisualizationMode rayMode = RayVisualizationMode.Hidden;

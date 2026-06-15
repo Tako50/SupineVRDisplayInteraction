@@ -16,14 +16,27 @@ public class FocusPointingTrialConfig
     public int trialIndexInCondition;
     public int trialSetId;
     public int trialIndexInSet;
+    public T1TargetOrderList targetOrderList = T1TargetOrderList.A;
+    public string sourcePhase = "main";
+    public int sourceTrialIndex;
+    public int cycleIndex;
+    public int positionId;
+    public int repetition;
     public string conditionName = "ConditionA";
     public InteractionCondition condition = InteractionCondition.RaycastBaseline;
-    public DisplayLayoutPreset layoutPreset = DisplayLayoutPreset.StrongOcclusion;
+    public DisplayLayoutPreset layoutPreset = DisplayLayoutPreset.UpDownDepth;
     public T1OcclusionType occlusionType = T1OcclusionType.Front;
     public string targetDisplayId = "Display_A_Front";
     public string targetPositionId = "Display_A_Front_C1_R1";
     public Vector2 targetNormalizedPosition = new Vector2(0.5f, 0.5f);
+    public T1TargetSize targetSize = T1TargetSize.Medium;
+    public float targetSizeDegrees = 2f;
     public float targetSizeNormalized = 0.12f;
+    public string previousDisplay = string.Empty;
+    public int previousPositionId = -1;
+    public string transitionDirection = string.Empty;
+    public string transitionType = string.Empty;
+    public string occlusionPrevType = string.Empty;
 }
 
 public struct FocusPointingClickEvent
@@ -79,6 +92,30 @@ public enum T1OcclusionType
     BackOccluded
 }
 
+public enum T1TargetOrderList
+{
+    A,
+    B,
+    C,
+    D,
+    E
+}
+
+public enum T1MainTargetOrderList
+{
+    A,
+    B,
+    C,
+    D
+}
+
+public enum T1TargetSize
+{
+    Small,
+    Medium,
+    Large
+}
+
 [DisallowMultipleComponent]
 /// <summary>
 /// T1 FocusPointingタスクを管理する。
@@ -103,7 +140,7 @@ public class FocusPointingTaskManager : MonoBehaviour
     [SerializeField] private bool loopTrainingTrials = true;
     [SerializeField] private bool returnToConditionSelectionAfterMainTask = true;
     [SerializeField] private InteractionCondition selectedCondition = InteractionCondition.RaycastBaseline;
-    [SerializeField] private DisplayLayoutPreset selectedLayout = DisplayLayoutPreset.StrongOcclusion;
+    [SerializeField] private DisplayLayoutPreset selectedLayout = DisplayLayoutPreset.UpDownDepth;
 
     [Header("Experiment Conditions")]
     [SerializeField] private TargetSelectionConditionOrder conditionOrder = TargetSelectionConditionOrder.AThenB;
@@ -116,42 +153,18 @@ public class FocusPointingTaskManager : MonoBehaviour
     [SerializeField] private Color targetColor = new Color(0.10f, 1f, 0.30f, 0.95f);
     [SerializeField] private Color targetHoverColor = new Color(0.10f, 0.55f, 1f, 0.95f);
     [SerializeField] private Color inactiveTargetColor = new Color(0.10f, 1f, 0.30f, 0.35f);
-    [SerializeField] private float targetSizeNormalized = 0.10f;
-    [SerializeField] private int repetitionsPerTargetPosition = 4;
-    [SerializeField] private bool rebuildTrialsOnStart = true;
-    [SerializeField] private bool randomizeTrialsWithinCondition = false;
-    [SerializeField] private int randomSeed = 20260519;
+    [SerializeField] private Transform angularSizeReference;
+    [SerializeField] private float smallTargetSizeDegrees = 1f;
+    [SerializeField] private float mediumTargetSizeDegrees = 2f;
+    [SerializeField] private float largeTargetSizeDegrees = 3f;
+    [SerializeField] private float fallbackTargetSizeNormalized = 0.05f;
     [SerializeField] private List<FocusPointingTrialConfig> trials = new List<FocusPointingTrialConfig>();
 
-    [Header("T1 Experiment Trial Set")]
-    [SerializeField] private int frontTrialsPerCondition = 40;
-    [SerializeField] private int backClearTrialsPerCondition = 20;
-    [SerializeField] private int backOccludedTrialsPerCondition = 20;
-    [SerializeField] private Vector2[] frontTargetPositions =
-    {
-        new Vector2(0.18f, 0.18f),
-        new Vector2(0.42f, 0.18f),
-        new Vector2(0.66f, 0.18f),
-        new Vector2(0.82f, 0.34f),
-        new Vector2(0.18f, 0.50f),
-        new Vector2(0.42f, 0.66f),
-        new Vector2(0.66f, 0.82f),
-        new Vector2(0.82f, 0.82f)
-    };
-    [SerializeField] private Vector2[] backClearTargetPositions =
-    {
-        new Vector2(0.18f, 0.72f),
-        new Vector2(0.38f, 0.84f),
-        new Vector2(0.62f, 0.84f),
-        new Vector2(0.82f, 0.72f)
-    };
-    [SerializeField] private Vector2[] backOccludedTargetPositions =
-    {
-        new Vector2(0.38f, 0.28f),
-        new Vector2(0.62f, 0.28f),
-        new Vector2(0.38f, 0.46f),
-        new Vector2(0.62f, 0.46f)
-    };
+    [Header("T1 Target Order Lists")]
+    [SerializeField] private TextAsset targetOrderCsv;
+    [SerializeField] private string targetOrderResourcePath = "T1/target_orders_ABCDE";
+    [SerializeField] private T1MainTargetOrderList conditionAMainOrder = T1MainTargetOrderList.A;
+    [SerializeField] private T1MainTargetOrderList conditionBMainOrder = T1MainTargetOrderList.A;
 
     [Header("Task Start Gate")]
     [SerializeField] private bool requireStartButtonBeforeTask = true;
@@ -176,12 +189,8 @@ public class FocusPointingTaskManager : MonoBehaviour
     private string t1ResultsCsvPath;
     private int currentTrialAttemptIndex;
     private InteractionCondition activeTaskCondition;
-    private RectTransform startGateRect;
-    private Image startGateImage;
-    private Text startGateText;
-    private bool waitingForStartButton;
-    private bool startCountdownRunning;
-    private float startCountdownEndTime;
+    private TaskStartGate startGate;
+    private Vector2 currentTargetNormalizedSize;
 
     public bool IsRunning => trialRunning;
     public bool IsTaskRunning => taskRunning;
@@ -198,6 +207,9 @@ public class FocusPointingTaskManager : MonoBehaviour
     public string CurrentConditionName => currentTrial != null ? currentTrial.conditionName : "None";
     public Vector2 CurrentTargetNormalizedPosition => currentTrial != null ? currentTrial.targetNormalizedPosition : Vector2.zero;
     public float CurrentTargetSizeNormalized => currentTrial != null ? currentTrial.targetSizeNormalized : 0f;
+    public T1TargetOrderList CurrentTargetOrderList => currentTrial != null
+        ? currentTrial.targetOrderList
+        : (T1TargetOrderList)GetMainOrderForCondition(selectedCondition);
 
     private void Awake()
     {
@@ -207,7 +219,6 @@ public class FocusPointingTaskManager : MonoBehaviour
     private void Start()
     {
         ResolveReferences();
-        EnsureDefaultTrials();
         EnsureTargets();
 
         if (autoStartOnPlay)
@@ -218,12 +229,12 @@ public class FocusPointingTaskManager : MonoBehaviour
 
     private void Update()
     {
-        UpdateStartGateCountdown();
         UpdateTargetHoverVisual();
     }
 
     private void OnDisable()
     {
+        HideStartGate();
         CloseTargetSelectionCsv();
         CloseT1ResultsCsv();
     }
@@ -250,30 +261,10 @@ public class FocusPointingTaskManager : MonoBehaviour
         selectedLayout = layout;
     }
 
-    public void SetRandomizeTrialsWithinCondition(bool randomize)
+    public string GetTargetOrderSummary(InteractionCondition condition)
     {
-        if (taskRunning)
-        {
-            Debug.Log(
-                $"[FocusPointingTask] trial order change ignored while task is running. "
-                + $"requestedRandom={randomize}, activeRandom={randomizeTrialsWithinCondition}");
-            return;
-        }
-
-        if (randomizeTrialsWithinCondition == randomize)
-        {
-            return;
-        }
-
-        randomizeTrialsWithinCondition = randomize;
-        trialsGenerated = false;
-        Debug.Log(
-            $"[FocusPointingTask] trialOrder="
-            + $"{(randomizeTrialsWithinCondition ? "Random" : "Fixed")}, seed={randomSeed}");
+        return $"Main List {GetMainOrderForCondition(condition)} / Training List E";
     }
-
-    public bool RandomizeTrialsWithinCondition => randomizeTrialsWithinCondition;
-    public int RandomSeed => randomSeed;
 
     public void BeginTrainingTask()
     {
@@ -292,8 +283,6 @@ public class FocusPointingTaskManager : MonoBehaviour
         currentTrial = null;
         currentTrialListIndex = -1;
         currentPhase = FocusPointingTaskPhase.ConditionSelection;
-        waitingForStartButton = false;
-        startCountdownRunning = false;
         activeTaskCondition = selectedCondition;
         HideStartGate();
         HideAllTargets();
@@ -311,12 +300,10 @@ public class FocusPointingTaskManager : MonoBehaviour
 
     private void BeginTask(FocusPointingTaskPhase phase, bool lockCondition)
     {
-        // 本タスクでは開始時の条件をロックし、1条件80試行が終わるまで途中変更させない。
+        // 本タスクでは開始時の条件をロックし、選択した順序リストが終わるまで途中変更させない。
         ResolveReferences();
-        if (rebuildTrialsOnStart)
-        {
-            trialsGenerated = false;
-        }
+        currentPhase = phase;
+        trialsGenerated = false;
 
         EnsureDefaultTrials();
         EnsureTargets();
@@ -325,7 +312,6 @@ public class FocusPointingTaskManager : MonoBehaviour
         OpenTargetSelectionCsv();
         OpenT1ResultsCsv();
 
-        currentPhase = phase;
         taskRunning = true;
         activeTaskCondition = selectedCondition;
         currentTrialListIndex = FindIndexBeforeFirstTrialForCondition(activeTaskCondition);
@@ -360,18 +346,7 @@ public class FocusPointingTaskManager : MonoBehaviour
 
     public bool TryHandleTaskControlClick(string displayId, Vector2 normalizedPosition)
     {
-        if (!waitingForStartButton || startCountdownRunning || string.IsNullOrEmpty(displayId))
-        {
-            return false;
-        }
-
-        if (displayId != startGateDisplayId || !GetStartButtonRect().Contains(normalizedPosition))
-        {
-            return false;
-        }
-
-        BeginStartGateCountdown();
-        return true;
+        return startGate != null && startGate.TryHandleClick(displayId, normalizedPosition);
     }
 
     public void StartNextTrial()
@@ -391,7 +366,9 @@ public class FocusPointingTaskManager : MonoBehaviour
         }
 
         currentTrialListIndex++;
-        if (currentTrialListIndex >= trials.Count)
+        bool outsideActiveCondition = currentTrialListIndex >= trials.Count
+            || trials[currentTrialListIndex].condition != activeTaskCondition;
+        if (outsideActiveCondition)
         {
             bool shouldLoop = currentPhase == FocusPointingTaskPhase.Training && loopTrainingTrials;
             if (!shouldLoop)
@@ -400,14 +377,7 @@ public class FocusPointingTaskManager : MonoBehaviour
                 return;
             }
 
-            currentTrialListIndex = 0;
-        }
-
-        if (trials[currentTrialListIndex].condition != activeTaskCondition)
-        {
-            Debug.Log($"[FocusPointingTask] completed condition block condition={activeTaskCondition}, phase={currentPhase}");
-            CompleteCurrentTask();
-            return;
+            currentTrialListIndex = FindIndexBeforeFirstTrialForCondition(activeTaskCondition) + 1;
         }
 
         currentTrial = trials[currentTrialListIndex];
@@ -427,7 +397,13 @@ public class FocusPointingTaskManager : MonoBehaviour
         currentTrialAttemptIndex = 0;
         trialRunning = true;
         ShowTargetForCurrentTrial();
-        Debug.Log($"[FocusPointingTask] start phase={currentPhase}, conditionName={currentTrial.conditionName}, trialInCondition={currentTrial.trialIndexInCondition}, trialSetId={currentTrial.trialSetId}, global={currentTrial.globalTrialIndex}, condition={selectedCondition}, layout={selectedLayout}, occlusion={currentTrial.occlusionType}, targetDisplay={currentTrial.targetDisplayId}, targetId={currentTrial.targetPositionId}, target={Format(currentTrial.targetNormalizedPosition)}, size={currentTrial.targetSizeNormalized:0.000}");
+        Debug.Log(
+            $"[FocusPointingTask] start phase={currentPhase}, list={currentTrial.targetOrderList}, "
+            + $"conditionName={currentTrial.conditionName}, trialInCondition={currentTrial.trialIndexInCondition}, "
+            + $"cycle={currentTrial.cycleIndex}, condition={selectedCondition}, layout={selectedLayout}, "
+            + $"occlusion={currentTrial.occlusionType}, targetDisplay={currentTrial.targetDisplayId}, "
+            + $"targetId={currentTrial.targetPositionId}, target={Format(currentTrial.targetNormalizedPosition)}, "
+            + $"size={currentTrial.targetSize} ({currentTrial.targetSizeDegrees:0.0}deg)");
     }
 
     public void HandleClick(FocusPointingClickEvent clickEvent)
@@ -508,8 +484,6 @@ public class FocusPointingTaskManager : MonoBehaviour
     {
         trialRunning = false;
         taskRunning = false;
-        waitingForStartButton = false;
-        startCountdownRunning = false;
         HideAllTargets();
         HideStartGate();
         SetDisplayContentMode(DisplayContentMode.ConditionSelection);
@@ -533,34 +507,24 @@ public class FocusPointingTaskManager : MonoBehaviour
 
     private void EnsureDefaultTrials()
     {
-        // 本実験仕様: 1条件あたり Front 40 / BackClear 20 / BackOccluded 20 = 80試行。
-        // まず条件非依存のtrial setを作り、それを各条件へ複製して同一trial setを保証する。
         if (trialsGenerated && trials.Count > 0)
         {
             return;
         }
 
-        if (trials.Count > 0 && !rebuildTrialsOnStart)
-        {
-            trialsGenerated = true;
-            return;
-        }
-
         trials.Clear();
         List<ConditionBlock> conditionBlocks = GetConditionBlocksInOrder();
-        List<FocusPointingTrialConfig> baseTrialSet = BuildT1ExperimentTrialSet();
-        if (randomizeTrialsWithinCondition)
-        {
-            Shuffle(baseTrialSet, randomSeed);
-        }
-
         int globalIndex = 1;
         for (int conditionIndex = 0; conditionIndex < conditionBlocks.Count; conditionIndex++)
         {
             ConditionBlock conditionBlock = conditionBlocks[conditionIndex];
-            for (int i = 0; i < baseTrialSet.Count; i++)
+            T1TargetOrderList orderList = currentPhase == FocusPointingTaskPhase.Training
+                ? T1TargetOrderList.E
+                : (T1TargetOrderList)conditionBlock.MainOrder;
+            List<FocusPointingTrialConfig> sourceTrials = BuildTrialSetFromCsv(orderList, currentPhase);
+            for (int i = 0; i < sourceTrials.Count; i++)
             {
-                FocusPointingTrialConfig trial = CloneTrialForCondition(baseTrialSet[i], conditionBlock);
+                FocusPointingTrialConfig trial = CloneTrialForCondition(sourceTrials[i], conditionBlock);
                 trial.globalTrialIndex = globalIndex;
                 trial.trialIndex = globalIndex;
                 trial.trialIndexInCondition = i + 1;
@@ -571,61 +535,118 @@ public class FocusPointingTaskManager : MonoBehaviour
         }
 
         trialsGenerated = true;
+        Debug.Log(
+            $"[FocusPointingTask] loaded phase={currentPhase}, totalTrials={trials.Count}, "
+            + $"conditionA={conditionAMainOrder}, conditionB={conditionBMainOrder}, training=E");
     }
 
-    private List<FocusPointingTrialConfig> BuildT1ExperimentTrialSet()
+    private List<FocusPointingTrialConfig> BuildTrialSetFromCsv(
+        T1TargetOrderList orderList,
+        FocusPointingTaskPhase phase)
     {
         List<FocusPointingTrialConfig> trialSet = new List<FocusPointingTrialConfig>();
+        TextAsset csv = targetOrderCsv != null
+            ? targetOrderCsv
+            : Resources.Load<TextAsset>(targetOrderResourcePath);
+        if (csv == null)
+        {
+            Debug.LogError(
+                $"[FocusPointingTask] T1 target order CSV was not found. "
+                + $"Assign Target Order Csv or add Resources/{targetOrderResourcePath}.csv.");
+            return trialSet;
+        }
+
+        string expectedPhase = phase == FocusPointingTaskPhase.Training ? "training" : "main";
         string frontDisplayId = GetDisplayName(displayA, "Display_A_Front");
         string backDisplayId = GetDisplayName(displayB, "Display_B_Back");
-
-        AppendTrialsForOcclusionType(trialSet, T1OcclusionType.Front, frontDisplayId, frontTargetPositions, frontTrialsPerCondition);
-        AppendTrialsForOcclusionType(trialSet, T1OcclusionType.BackClear, backDisplayId, backClearTargetPositions, backClearTrialsPerCondition);
-        AppendTrialsForOcclusionType(trialSet, T1OcclusionType.BackOccluded, backDisplayId, backOccludedTargetPositions, backOccludedTrialsPerCondition);
-
-        for (int i = 0; i < trialSet.Count; i++)
+        using (StringReader reader = new StringReader(csv.text))
         {
-            trialSet[i].trialSetId = i + 1;
-            trialSet[i].trialIndexInSet = i + 1;
-            trialSet[i].trialIndexInCondition = i + 1;
+            string headerLine = reader.ReadLine();
+            if (string.IsNullOrWhiteSpace(headerLine))
+            {
+                Debug.LogError("[FocusPointingTask] T1 target order CSV has no header.");
+                return trialSet;
+            }
+
+            Dictionary<string, int> columns = BuildCsvColumnMap(headerLine);
+            string line;
+            int lineNumber = 1;
+            while ((line = reader.ReadLine()) != null)
+            {
+                lineNumber++;
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+
+                string[] values = line.TrimEnd('\r').Split(',');
+                string listName = ReadCsv(values, columns, "listName");
+                string sourcePhase = ReadCsv(values, columns, "phase");
+                if (!string.Equals(listName, orderList.ToString(), StringComparison.Ordinal)
+                    || !string.Equals(sourcePhase, expectedPhase, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    bool isBackDisplay = ParseCsvBool(ReadCsv(values, columns, "isBackDisplay"));
+                    bool inputOccluded = ParseCsvBool(ReadCsv(values, columns, "inputOccluded"));
+                    T1TargetSize targetSize = ParseTargetSize(ReadCsv(values, columns, "size"));
+                    int sourceTrialIndex = ParseCsvInt(values, columns, "trialIndex");
+                    int positionId = ParseCsvInt(values, columns, "positionId");
+                    trialSet.Add(new FocusPointingTrialConfig
+                    {
+                        trialSetId = sourceTrialIndex,
+                        trialIndexInSet = sourceTrialIndex,
+                        targetOrderList = orderList,
+                        sourcePhase = sourcePhase,
+                        sourceTrialIndex = sourceTrialIndex,
+                        cycleIndex = ParseCsvInt(values, columns, "cycleIndex"),
+                        positionId = positionId,
+                        repetition = ParseCsvInt(values, columns, "repetition"),
+                        conditionName = "BaseTrialSet",
+                        condition = InteractionCondition.RaycastBaseline,
+                        layoutPreset = selectedLayout,
+                        occlusionType = !isBackDisplay
+                            ? T1OcclusionType.Front
+                            : inputOccluded
+                                ? T1OcclusionType.BackOccluded
+                                : T1OcclusionType.BackClear,
+                        targetDisplayId = isBackDisplay ? backDisplayId : frontDisplayId,
+                        targetPositionId = ReadCsv(values, columns, "targetId"),
+                        targetNormalizedPosition = new Vector2(
+                            ParseCsvFloat(values, columns, "x"),
+                            ParseCsvFloat(values, columns, "y")),
+                        targetSize = targetSize,
+                        targetSizeDegrees = GetTargetSizeDegrees(targetSize),
+                        previousDisplay = ReadCsv(values, columns, "previousDisplay"),
+                        previousPositionId = ParseOptionalCsvInt(values, columns, "previousPositionId", -1),
+                        transitionDirection = ReadCsv(values, columns, "transitionDirection"),
+                        transitionType = ReadCsv(values, columns, "transitionType"),
+                        occlusionPrevType = ReadCsv(values, columns, "occlusionPrevType")
+                    });
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError(
+                        $"[FocusPointingTask] Failed to parse T1 target order CSV line {lineNumber}: "
+                        + exception.Message);
+                    return new List<FocusPointingTrialConfig>();
+                }
+            }
+        }
+
+        const int expectedCount = 108;
+        if (trialSet.Count != expectedCount)
+        {
+            Debug.LogError(
+                $"[FocusPointingTask] List {orderList} phase={expectedPhase} contains "
+                + $"{trialSet.Count} trials; expected {expectedCount}.");
+            trialSet.Clear();
         }
 
         return trialSet;
-    }
-
-    private void AppendTrialsForOcclusionType(
-        List<FocusPointingTrialConfig> destination,
-        T1OcclusionType occlusionType,
-        string displayId,
-        Vector2[] configuredPositions,
-        int requestedCount)
-    {
-        int count = Mathf.Max(0, requestedCount);
-        if (count == 0)
-        {
-            return;
-        }
-
-        Vector2[] positions = configuredPositions != null && configuredPositions.Length > 0
-            ? configuredPositions
-            : new[] { new Vector2(0.5f, 0.5f) };
-
-        for (int i = 0; i < count; i++)
-        {
-            int positionIndex = i % positions.Length;
-            int repetition = i / positions.Length + 1;
-            destination.Add(new FocusPointingTrialConfig
-            {
-                conditionName = "BaseTrialSet",
-                condition = InteractionCondition.RaycastBaseline,
-                layoutPreset = selectedLayout,
-                occlusionType = occlusionType,
-                targetDisplayId = displayId,
-                targetPositionId = BuildTargetPositionId(displayId, occlusionType, positionIndex, repetition),
-                targetNormalizedPosition = positions[positionIndex],
-                targetSizeNormalized = this.targetSizeNormalized
-            });
-        }
     }
 
     private FocusPointingTrialConfig CloneTrialForCondition(FocusPointingTrialConfig source, ConditionBlock conditionBlock)
@@ -634,6 +655,12 @@ public class FocusPointingTaskManager : MonoBehaviour
         {
             trialSetId = source.trialSetId,
             trialIndexInSet = source.trialIndexInSet,
+            targetOrderList = source.targetOrderList,
+            sourcePhase = source.sourcePhase,
+            sourceTrialIndex = source.sourceTrialIndex,
+            cycleIndex = source.cycleIndex,
+            positionId = source.positionId,
+            repetition = source.repetition,
             conditionName = conditionBlock.Name,
             condition = conditionBlock.InteractionCondition,
             layoutPreset = selectedLayout,
@@ -641,29 +668,24 @@ public class FocusPointingTaskManager : MonoBehaviour
             targetDisplayId = source.targetDisplayId,
             targetPositionId = source.targetPositionId,
             targetNormalizedPosition = source.targetNormalizedPosition,
-            targetSizeNormalized = source.targetSizeNormalized
+            targetSize = source.targetSize,
+            targetSizeDegrees = source.targetSizeDegrees,
+            targetSizeNormalized = source.targetSizeNormalized,
+            previousDisplay = source.previousDisplay,
+            previousPositionId = source.previousPositionId,
+            transitionDirection = source.transitionDirection,
+            transitionType = source.transitionType,
+            occlusionPrevType = source.occlusionPrevType
         };
     }
 
     private List<ConditionBlock> GetConditionBlocksInOrder()
     {
-        ConditionBlock conditionA = new ConditionBlock(conditionAName, conditionAInteraction);
-        ConditionBlock conditionB = new ConditionBlock(conditionBName, conditionBInteraction);
+        ConditionBlock conditionA = new ConditionBlock(conditionAName, conditionAInteraction, conditionAMainOrder);
+        ConditionBlock conditionB = new ConditionBlock(conditionBName, conditionBInteraction, conditionBMainOrder);
         return conditionOrder == TargetSelectionConditionOrder.AThenB
             ? new List<ConditionBlock> { conditionA, conditionB }
             : new List<ConditionBlock> { conditionB, conditionA };
-    }
-
-    private static void Shuffle(List<FocusPointingTrialConfig> list, int seed)
-    {
-        System.Random random = new System.Random(seed);
-        for (int i = list.Count - 1; i > 0; i--)
-        {
-            int swapIndex = random.Next(i + 1);
-            FocusPointingTrialConfig temp = list[i];
-            list[i] = list[swapIndex];
-            list[swapIndex] = temp;
-        }
     }
 
     private int FindIndexBeforeFirstTrialForCondition(InteractionCondition condition)
@@ -740,15 +762,18 @@ public class FocusPointingTaskManager : MonoBehaviour
             targetRects[display] = targetRect;
         }
 
-        RectTransform canvasRect = display.WorldSpaceCanvas.GetComponent<RectTransform>();
-        Vector2 canvasSize = canvasRect != null ? canvasRect.sizeDelta : display.CanvasPixelSize;
+        Vector2 canvasSize = display.GetCanvasSize();
         Vector2 targetPosition = currentTrial.targetNormalizedPosition;
-        float targetPixelSize = Mathf.Max(8f, currentTrial.targetSizeNormalized * Mathf.Min(canvasSize.x, canvasSize.y));
+        Vector2 targetCanvasSize = CalculateTargetCanvasSize(display, currentTrial.targetSizeDegrees);
+        currentTargetNormalizedSize = new Vector2(
+            targetCanvasSize.x / Mathf.Max(1f, canvasSize.x),
+            targetCanvasSize.y / Mathf.Max(1f, canvasSize.y));
+        currentTrial.targetSizeNormalized = Mathf.Min(
+            currentTargetNormalizedSize.x,
+            currentTargetNormalizedSize.y);
 
-        targetRect.anchoredPosition = new Vector2(
-            (Mathf.Clamp01(targetPosition.x) - 0.5f) * canvasSize.x,
-            (Mathf.Clamp01(targetPosition.y) - 0.5f) * canvasSize.y);
-        targetRect.sizeDelta = Vector2.one * targetPixelSize;
+        targetRect.anchoredPosition = display.NormalizedToCanvasPosition(targetPosition);
+        targetRect.sizeDelta = targetCanvasSize;
         targetRect.gameObject.SetActive(true);
         targetRect.SetAsLastSibling();
 
@@ -779,25 +804,49 @@ public class FocusPointingTaskManager : MonoBehaviour
             return Vector2.zero;
         }
 
+        if (currentTargetNormalizedSize.x > 0f && currentTargetNormalizedSize.y > 0f)
+        {
+            return currentTargetNormalizedSize;
+        }
+
         DisplaySurface display = FindDisplay(currentTrial.targetDisplayId);
         if (display == null)
         {
-            return Vector2.one * Mathf.Max(0f, currentTrial.targetSizeNormalized);
+            return Vector2.one * Mathf.Max(0f, fallbackTargetSizeNormalized);
         }
 
-        RectTransform canvasRect = display.WorldSpaceCanvas != null
-            ? display.WorldSpaceCanvas.GetComponent<RectTransform>()
-            : null;
-        Vector2 canvasSize = canvasRect != null ? canvasRect.sizeDelta : display.CanvasPixelSize;
+        Vector2 canvasSize = display.GetCanvasSize();
         if (canvasSize.x <= 0f || canvasSize.y <= 0f)
         {
-            return Vector2.one * Mathf.Max(0f, currentTrial.targetSizeNormalized);
+            return Vector2.one * Mathf.Max(0f, fallbackTargetSizeNormalized);
         }
 
-        float targetPixelSize = Mathf.Max(
-            8f,
-            currentTrial.targetSizeNormalized * Mathf.Min(canvasSize.x, canvasSize.y));
-        return new Vector2(targetPixelSize / canvasSize.x, targetPixelSize / canvasSize.y);
+        Vector2 targetCanvasSize = CalculateTargetCanvasSize(display, currentTrial.targetSizeDegrees);
+        return new Vector2(targetCanvasSize.x / canvasSize.x, targetCanvasSize.y / canvasSize.y);
+    }
+
+    private Vector2 CalculateTargetCanvasSize(DisplaySurface display, float targetDegrees)
+    {
+        Vector2 canvasSize = display.GetCanvasSize();
+        Vector2 physicalSize = display.PhysicalSizeMeters;
+        if (angularSizeReference == null
+            || physicalSize.x <= 0f
+            || physicalSize.y <= 0f
+            || targetDegrees <= 0f)
+        {
+            float fallbackPixels = Mathf.Max(
+                8f,
+                fallbackTargetSizeNormalized * Mathf.Min(canvasSize.x, canvasSize.y));
+            return Vector2.one * fallbackPixels;
+        }
+
+        float distanceMeters = Vector3.Distance(angularSizeReference.position, display.transform.position);
+        float targetMeters = 2f
+            * Mathf.Max(0.01f, distanceMeters)
+            * Mathf.Tan(targetDegrees * 0.5f * Mathf.Deg2Rad);
+        return new Vector2(
+            Mathf.Max(8f, targetMeters / physicalSize.x * canvasSize.x),
+            Mathf.Max(8f, targetMeters / physicalSize.y * canvasSize.y));
     }
 
     private void UpdateTargetHoverVisual()
@@ -881,6 +930,7 @@ public class FocusPointingTaskManager : MonoBehaviour
 
     private void HideAllTargets()
     {
+        currentTargetNormalizedSize = Vector2.zero;
         foreach (KeyValuePair<DisplaySurface, RectTransform> pair in targetRects)
         {
             if (pair.Value != null)
@@ -898,178 +948,32 @@ public class FocusPointingTaskManager : MonoBehaviour
 
     private void ShowStartGate()
     {
-        EnsureStartGate();
         HideAllTargets();
-        waitingForStartButton = true;
-        startCountdownRunning = false;
-
-        if (startGateRect == null)
+        DisplaySurface display = FindDisplay(startGateDisplayId);
+        startGate = TaskStartGate.GetOrCreate(display);
+        if (startGate == null)
         {
             Debug.LogWarning("[FocusPointingTask] Start gate display was not found. Starting task without start gate.");
-            waitingForStartButton = false;
             StartNextTrial();
             return;
         }
 
-        ApplyStartGateRect();
-        startGateRect.gameObject.SetActive(true);
-        startGateRect.SetAsLastSibling();
-
-        if (startGateImage != null)
-        {
-            startGateImage.color = startGateButtonColor;
-        }
-
-        if (startGateText != null)
-        {
-            startGateText.text = "START";
-        }
+        startGate.Show(
+            display,
+            startButtonNormalizedPosition,
+            startButtonNormalizedSize,
+            startCountdownSeconds,
+            startGateButtonColor,
+            startGateCountdownColor,
+            StartNextTrial,
+            "[FocusPointingTask]");
 
         Debug.Log($"[FocusPointingTask] waiting for start button phase={currentPhase}, display={startGateDisplayId}");
     }
 
-    private void BeginStartGateCountdown()
-    {
-        if (!waitingForStartButton)
-        {
-            return;
-        }
-
-        startCountdownRunning = true;
-        startCountdownEndTime = Time.time + Mathf.Max(0f, startCountdownSeconds);
-        if (startGateImage != null)
-        {
-            startGateImage.color = startGateCountdownColor;
-        }
-
-        UpdateStartGateCountdownText();
-        Debug.Log($"[FocusPointingTask] start button pressed. countdown={startCountdownSeconds:0.0}s");
-    }
-
-    private void UpdateStartGateCountdown()
-    {
-        if (!startCountdownRunning)
-        {
-            return;
-        }
-
-        UpdateStartGateCountdownText();
-        if (Time.time < startCountdownEndTime)
-        {
-            return;
-        }
-
-        waitingForStartButton = false;
-        startCountdownRunning = false;
-        HideStartGate();
-        StartNextTrial();
-    }
-
-    private void UpdateStartGateCountdownText()
-    {
-        if (startGateText == null)
-        {
-            return;
-        }
-
-        float remaining = Mathf.Max(0f, startCountdownEndTime - Time.time);
-        int count = Mathf.Max(1, Mathf.CeilToInt(remaining));
-        startGateText.text = count.ToString(CultureInfo.InvariantCulture);
-    }
-
     private void HideStartGate()
     {
-        if (startGateRect != null)
-        {
-            startGateRect.gameObject.SetActive(false);
-        }
-    }
-
-    private void EnsureStartGate()
-    {
-        if (startGateRect != null)
-        {
-            return;
-        }
-
-        DisplaySurface display = FindDisplay(startGateDisplayId);
-        if (display == null || display.WorldSpaceCanvas == null)
-        {
-            return;
-        }
-
-        Transform canvasTransform = display.WorldSpaceCanvas.transform;
-        Transform existing = canvasTransform.Find("TaskStartGate");
-        GameObject gateObject = existing != null ? existing.gameObject : new GameObject("TaskStartGate", typeof(RectTransform));
-        gateObject.transform.SetParent(canvasTransform, false);
-
-        startGateRect = gateObject.GetComponent<RectTransform>();
-        startGateRect.anchorMin = new Vector2(0.5f, 0.5f);
-        startGateRect.anchorMax = new Vector2(0.5f, 0.5f);
-        startGateRect.pivot = new Vector2(0.5f, 0.5f);
-        ApplyStartGateRect();
-
-        startGateImage = gateObject.GetComponent<Image>();
-        if (startGateImage == null)
-        {
-            startGateImage = gateObject.AddComponent<Image>();
-        }
-
-        startGateImage.color = startGateButtonColor;
-
-        Transform textTransform = gateObject.transform.Find("Label");
-        GameObject textObject = textTransform != null ? textTransform.gameObject : new GameObject("Label", typeof(RectTransform));
-        textObject.transform.SetParent(gateObject.transform, false);
-
-        RectTransform textRect = textObject.GetComponent<RectTransform>();
-        textRect.anchorMin = Vector2.zero;
-        textRect.anchorMax = Vector2.one;
-        textRect.offsetMin = Vector2.zero;
-        textRect.offsetMax = Vector2.zero;
-
-        startGateText = textObject.GetComponent<Text>();
-        if (startGateText == null)
-        {
-            startGateText = textObject.AddComponent<Text>();
-        }
-
-        startGateText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        startGateText.fontSize = 42;
-        startGateText.fontStyle = FontStyle.Bold;
-        startGateText.alignment = TextAnchor.MiddleCenter;
-        startGateText.color = Color.white;
-        startGateText.text = "START";
-        gateObject.SetActive(false);
-    }
-
-    private void ApplyStartGateRect()
-    {
-        if (startGateRect == null)
-        {
-            return;
-        }
-
-        DisplaySurface display = FindDisplay(startGateDisplayId);
-        if (display == null || display.WorldSpaceCanvas == null)
-        {
-            return;
-        }
-
-        RectTransform canvasRect = display.WorldSpaceCanvas.GetComponent<RectTransform>();
-        Vector2 canvasSize = canvasRect != null ? canvasRect.sizeDelta : display.CanvasPixelSize;
-        startGateRect.anchoredPosition = new Vector2(
-            (Mathf.Clamp01(startButtonNormalizedPosition.x) - 0.5f) * canvasSize.x,
-            (Mathf.Clamp01(startButtonNormalizedPosition.y) - 0.5f) * canvasSize.y);
-        startGateRect.sizeDelta = new Vector2(
-            Mathf.Max(32f, startButtonNormalizedSize.x * canvasSize.x),
-            Mathf.Max(32f, startButtonNormalizedSize.y * canvasSize.y));
-    }
-
-    private Rect GetStartButtonRect()
-    {
-        Vector2 size = startButtonNormalizedSize;
-        Vector2 center = startButtonNormalizedPosition;
-        return new Rect(center - size * 0.5f, size);
+        startGate?.Hide();
     }
 
     private void SetDisplayContentMode(DisplayContentMode mode)
@@ -1096,8 +1000,15 @@ public class FocusPointingTaskManager : MonoBehaviour
             targetSelectionWriter.WriteLine(string.Join(",",
                 Escape(participantId),
                 Escape(currentTrial.conditionName),
-                randomizeTrialsWithinCondition ? "Random" : "Fixed",
-                randomSeed.ToString(CultureInfo.InvariantCulture),
+                $"List{currentTrial.targetOrderList}",
+                GetOrderSeed(currentTrial.targetOrderList).ToString(CultureInfo.InvariantCulture),
+                Escape(currentTrial.targetOrderList.ToString()),
+                Escape(currentTrial.sourcePhase),
+                currentTrial.cycleIndex.ToString(CultureInfo.InvariantCulture),
+                currentTrial.positionId.ToString(CultureInfo.InvariantCulture),
+                Escape(currentTrial.targetSize.ToString()),
+                currentTrial.targetSizeDegrees.ToString("0.0", CultureInfo.InvariantCulture),
+                currentTrial.repetition.ToString(CultureInfo.InvariantCulture),
                 currentTrial.trialIndexInCondition.ToString(CultureInfo.InvariantCulture),
                 currentTrial.globalTrialIndex.ToString(CultureInfo.InvariantCulture),
                 currentTrial.trialSetId.ToString(CultureInfo.InvariantCulture),
@@ -1133,8 +1044,22 @@ public class FocusPointingTaskManager : MonoBehaviour
             Escape(currentTrial.conditionName),
             Escape(result.Condition.ToString()),
             Escape(result.LayoutPreset.ToString()),
-            randomizeTrialsWithinCondition ? "Random" : "Fixed",
-            randomSeed.ToString(CultureInfo.InvariantCulture),
+            $"List{currentTrial.targetOrderList}",
+            GetOrderSeed(currentTrial.targetOrderList).ToString(CultureInfo.InvariantCulture),
+            Escape(currentTrial.targetOrderList.ToString()),
+            Escape(currentTrial.sourcePhase),
+            currentTrial.cycleIndex.ToString(CultureInfo.InvariantCulture),
+            currentTrial.positionId.ToString(CultureInfo.InvariantCulture),
+            Escape(currentTrial.targetSize.ToString()),
+            currentTrial.targetSizeDegrees.ToString("0.0", CultureInfo.InvariantCulture),
+            currentTrial.repetition.ToString(CultureInfo.InvariantCulture),
+            Escape(currentTrial.previousDisplay),
+            currentTrial.previousPositionId >= 0
+                ? currentTrial.previousPositionId.ToString(CultureInfo.InvariantCulture)
+                : string.Empty,
+            Escape(currentTrial.transitionDirection),
+            Escape(currentTrial.transitionType),
+            Escape(currentTrial.occlusionPrevType),
             currentTrial.trialIndexInCondition.ToString(CultureInfo.InvariantCulture),
             currentTrial.globalTrialIndex.ToString(CultureInfo.InvariantCulture),
             currentTrial.trialSetId.ToString(CultureInfo.InvariantCulture),
@@ -1174,7 +1099,7 @@ public class FocusPointingTaskManager : MonoBehaviour
         string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
         targetSelectionCsvPath = Path.Combine(directory, $"target_selection_{participantId}_{timestamp}.csv");
         targetSelectionWriter = new StreamWriter(targetSelectionCsvPath);
-        targetSelectionWriter.WriteLine("participantId,conditionName,trialOrder,randomSeed,trialIndexInCondition,globalTrialIndex,trialSetId,trialIndexInSet,occlusion_type,displayName,targetPositionId,targetLocalX,targetLocalY,responseTime,timestamp");
+        targetSelectionWriter.WriteLine("participantId,conditionName,trialOrder,randomSeed,targetOrderList,sourcePhase,cycleIndex,positionId,targetSizeName,targetSizeDegrees,repetition,trialIndexInCondition,globalTrialIndex,trialSetId,trialIndexInSet,occlusion_type,displayName,targetPositionId,targetLocalX,targetLocalY,responseTime,timestamp");
         Debug.Log($"[FocusPointingTask] target selection CSV logging to {targetSelectionCsvPath}");
     }
 
@@ -1190,7 +1115,7 @@ public class FocusPointingTaskManager : MonoBehaviour
         string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
         t1ResultsCsvPath = Path.Combine(directory, $"t1_results_{participantId}_{sessionId}_{timestamp}.csv");
         t1ResultsWriter = new StreamWriter(t1ResultsCsvPath);
-        t1ResultsWriter.WriteLine("participantId,sessionId,taskPhase,conditionName,interactionCondition,layoutPreset,trialOrder,randomSeed,trialIndexInCondition,globalTrialIndex,trialSetId,trialIndexInSet,occlusion_type,targetDisplayId,targetPositionId,targetLocalX,targetLocalY,targetSize,attemptIndex,clickedDisplayId,clickedLocalX,clickedLocalY,resultType,isCorrect,displayError,targetError,miss,advancesTrial,trialStartTime,clickTime,responseTime,timestamp");
+        t1ResultsWriter.WriteLine("participantId,sessionId,taskPhase,conditionName,interactionCondition,layoutPreset,trialOrder,randomSeed,targetOrderList,sourcePhase,cycleIndex,positionId,targetSizeName,targetSizeDegrees,repetition,previousDisplay,previousPositionId,transitionDirection,transitionType,occlusionPrevType,trialIndexInCondition,globalTrialIndex,trialSetId,trialIndexInSet,occlusion_type,targetDisplayId,targetPositionId,targetLocalX,targetLocalY,targetSize,attemptIndex,clickedDisplayId,clickedLocalX,clickedLocalY,resultType,isCorrect,displayError,targetError,miss,advancesTrial,trialStartTime,clickTime,responseTime,timestamp");
         Debug.Log($"[FocusPointingTask] T1 result CSV logging to {t1ResultsCsvPath}");
     }
 
@@ -1238,16 +1163,139 @@ public class FocusPointingTaskManager : MonoBehaviour
         return value;
     }
 
-    private static string BuildTargetPositionId(string displayId, int positionIndex)
+    private static Dictionary<string, int> BuildCsvColumnMap(string headerLine)
     {
-        int column = positionIndex % 2 + 1;
-        int row = positionIndex / 2 + 1;
-        return $"{displayId}_C{column}_R{row}";
+        string[] headers = headerLine.TrimEnd('\r').Split(',');
+        Dictionary<string, int> columns = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (int i = 0; i < headers.Length; i++)
+        {
+            columns[headers[i]] = i;
+        }
+
+        return columns;
     }
 
-    private static string BuildTargetPositionId(string displayId, T1OcclusionType occlusionType, int positionIndex, int repetition)
+    private static string ReadCsv(
+        string[] values,
+        Dictionary<string, int> columns,
+        string columnName)
     {
-        return $"{displayId}_{occlusionType}_P{positionIndex + 1}_Rep{repetition}";
+        if (!columns.TryGetValue(columnName, out int index))
+        {
+            throw new InvalidDataException($"Missing column '{columnName}'.");
+        }
+
+        return index >= 0 && index < values.Length ? values[index] : string.Empty;
+    }
+
+    private static int ParseCsvInt(
+        string[] values,
+        Dictionary<string, int> columns,
+        string columnName)
+    {
+        string value = ReadCsv(values, columns, columnName);
+        if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed))
+        {
+            throw new InvalidDataException($"Invalid integer in '{columnName}': '{value}'.");
+        }
+
+        return parsed;
+    }
+
+    private static int ParseOptionalCsvInt(
+        string[] values,
+        Dictionary<string, int> columns,
+        string columnName,
+        int fallback)
+    {
+        string value = ReadCsv(values, columns, columnName);
+        return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed)
+            ? parsed
+            : fallback;
+    }
+
+    private static float ParseCsvFloat(
+        string[] values,
+        Dictionary<string, int> columns,
+        string columnName)
+    {
+        string value = ReadCsv(values, columns, columnName);
+        if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsed))
+        {
+            throw new InvalidDataException($"Invalid number in '{columnName}': '{value}'.");
+        }
+
+        return parsed;
+    }
+
+    private static bool ParseCsvBool(string value)
+    {
+        if (bool.TryParse(value, out bool parsed))
+        {
+            return parsed;
+        }
+
+        if (value == "1")
+        {
+            return true;
+        }
+
+        if (value == "0")
+        {
+            return false;
+        }
+
+        throw new InvalidDataException($"Invalid boolean: '{value}'.");
+    }
+
+    private static T1TargetSize ParseTargetSize(string value)
+    {
+        if (Enum.TryParse(value, true, out T1TargetSize parsed))
+        {
+            return parsed;
+        }
+
+        throw new InvalidDataException($"Unknown target size: '{value}'.");
+    }
+
+    private float GetTargetSizeDegrees(T1TargetSize targetSize)
+    {
+        switch (targetSize)
+        {
+            case T1TargetSize.Small:
+                return Mathf.Max(0.1f, smallTargetSizeDegrees);
+            case T1TargetSize.Large:
+                return Mathf.Max(0.1f, largeTargetSizeDegrees);
+            default:
+                return Mathf.Max(0.1f, mediumTargetSizeDegrees);
+        }
+    }
+
+    private T1MainTargetOrderList GetMainOrderForCondition(InteractionCondition condition)
+    {
+        if (condition == conditionBInteraction && condition != conditionAInteraction)
+        {
+            return conditionBMainOrder;
+        }
+
+        return conditionAMainOrder;
+    }
+
+    private static int GetOrderSeed(T1TargetOrderList orderList)
+    {
+        switch (orderList)
+        {
+            case T1TargetOrderList.A:
+                return 101;
+            case T1TargetOrderList.B:
+                return 202;
+            case T1TargetOrderList.C:
+                return 303;
+            case T1TargetOrderList.D:
+                return 404;
+            default:
+                return 505;
+        }
     }
 
     private static string GetDisplayName(Transform displayTransform, string fallback)
@@ -1280,6 +1328,11 @@ public class FocusPointingTaskManager : MonoBehaviour
         if (virtualCursorController == null)
         {
             virtualCursorController = FindObjectOfType<VirtualCursorController>();
+        }
+
+        if (angularSizeReference == null && Camera.main != null)
+        {
+            angularSizeReference = Camera.main.transform;
         }
 
         if (logger == null)
@@ -1334,11 +1387,16 @@ public class FocusPointingTaskManager : MonoBehaviour
     {
         public string Name;
         public InteractionCondition InteractionCondition;
+        public T1MainTargetOrderList MainOrder;
 
-        public ConditionBlock(string name, InteractionCondition interactionCondition)
+        public ConditionBlock(
+            string name,
+            InteractionCondition interactionCondition,
+            T1MainTargetOrderList mainOrder)
         {
             Name = name;
             InteractionCondition = interactionCondition;
+            MainOrder = mainOrder;
         }
     }
 }

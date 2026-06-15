@@ -1,0 +1,5 @@
+participantId,sessionId,taskPhase,conditionName,interactionCondition,targetDisplayId,nAttempts,nCompletedTrials,nCorrectAttempts,accuracyPerAttempt,displayErrorRate,targetErrorRate,missRate,attemptsPerCompletedTrial,meanResponseTime,medianResponseTime,sdResponseTime,minResponseTime,maxResponseTime
+P000,S000,MainTask,ConditionA,RaycastBaseline,Display_A_Front,57,54,54,0.9474,0.0,0.0526,0.0,1.0556,0.8657,0.835,0.1933,0.515,1.559
+P000,S000,MainTask,ConditionA,RaycastBaseline,Display_B_Back,62,52,52,0.8387,0.0161,0.1452,0.0,1.1923,0.9309,0.793,0.4717,0.612,3.341
+P000,S000,MainTask,ConditionB,ExplicitDisplayFocus,Display_A_Front,73,72,72,0.9863,0.0137,0.0,0.0,1.0139,1.1129,1.016,0.3118,0.668,2.283
+P000,S000,MainTask,ConditionB,ExplicitDisplayFocus,Display_B_Back,75,72,72,0.96,0.0,0.04,0.0,1.0417,1.0867,0.981,0.3438,0.711,2.631

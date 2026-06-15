@@ -56,7 +56,7 @@ public class RaycastPointer : MonoBehaviour
             displayManager.SetCursorNormalized(hit.Display, hit.Normalized, true);
             lineEnd = hit.Hit.point;
 
-            if (inputManager.SubmitPressed)
+            if (inputManager.SubmitReleased)
             {
                 Debug.Log($"[RaycastPointer] condition={inputManager.CurrentCondition}, displayId={hit.DisplayId}, normalized={Format(hit.Normalized)}");
             }

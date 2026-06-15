@@ -24,8 +24,9 @@ public class DisplaySurface : MonoBehaviour
     [SerializeField] private RectTransform scrollContent;
 
     [Header("Sizing")]
-    [SerializeField] private Vector2 physicalSizeMeters = new Vector2(0.8f, 0.45f);
-    [SerializeField] private Vector2 canvasPixelSize = new Vector2(800f, 450f);
+    [SerializeField] private Vector2 physicalSizeMeters = DisplayGeometry.DefaultPhysicalSizeMeters;
+    [SerializeField] private Vector2 canvasPixelSize = DisplayGeometry.DefaultCanvasPixelSize;
+    [Tooltip("Fallback meters-per-pixel scale used only when the physical or pixel size is invalid.")]
     [SerializeField] private float canvasScale = 0.001f;
     [SerializeField] private float hitPlaneDepthMeters = 0.02f;
     [SerializeField] private Vector2 cursorPixelSize = new Vector2(10f, 10f);
@@ -35,10 +36,16 @@ public class DisplaySurface : MonoBehaviour
     [SerializeField] private float scrollPixelsPerUnit = 160f;
     [SerializeField] private float maxScrollPixels = 420f;
 
+    [Header("Gaze Highlight")]
+    [SerializeField] private Color gazeHighlightColor = new Color(0.25f, 0.78f, 1f, 1f);
+    [Range(0f, 1f)]
+    [SerializeField] private float gazeHighlightStrength = 0.55f;
+
     private float scrollOffsetPixels;
     private Image visiblePanelImage;
     private Color basePanelColor = Color.white;
     private bool hasCachedBasePanelColor;
+    private bool gazeHighlighted;
 
     public Canvas WorldSpaceCanvas => worldSpaceCanvas;
     public RectTransform VisiblePanel => visiblePanel;
@@ -49,6 +56,7 @@ public class DisplaySurface : MonoBehaviour
     public Vector2 CanvasPixelSize => canvasPixelSize;
     public DisplayContentMode ContentMode => contentMode;
     public float ScrollOffsetPixels => scrollOffsetPixels;
+    public bool IsGazeHighlighted => gazeHighlighted;
 
     private void Awake()
     {
@@ -88,24 +96,43 @@ public class DisplaySurface : MonoBehaviour
 
     public void SetFocusVisual(bool focused)
     {
-        CachePanelImage();
-        if (visiblePanelImage == null)
+        // 入力フォーカスの状態と視線ハイライトは独立させる。
+        if (!gazeHighlighted)
         {
-            return;
+            RestoreBasePanelColor();
         }
-
-        visiblePanelImage.color = WithAlpha(basePanelColor, basePanelColor.a);
     }
 
     public void SetCandidateVisual(bool candidate, bool overlapPreview)
     {
+        // 候補管理から視線ハイライトの見た目を上書きしない。
+        if (!gazeHighlighted)
+        {
+            RestoreBasePanelColor();
+        }
+    }
+
+    public void SetFocused(bool focused)
+    {
         CachePanelImage();
+        gazeHighlighted = focused;
         if (visiblePanelImage == null)
         {
             return;
         }
 
-        visiblePanelImage.color = WithAlpha(basePanelColor, basePanelColor.a);
+        if (!focused)
+        {
+            RestoreBasePanelColor();
+            return;
+        }
+
+        Color highlightedColor = Color.Lerp(
+            basePanelColor,
+            gazeHighlightColor,
+            Mathf.Clamp01(gazeHighlightStrength));
+        highlightedColor.a = basePanelColor.a;
+        visiblePanelImage.color = highlightedColor;
     }
 
     public void SetSize(Vector2 sizeMeters, Vector2 pixelSize)
@@ -115,6 +142,36 @@ public class DisplaySurface : MonoBehaviour
         ApplyConfiguration();
     }
 
+    public Vector2 GetCanvasSize()
+    {
+        if (worldSpaceCanvas != null)
+        {
+            RectTransform canvasRect = worldSpaceCanvas.GetComponent<RectTransform>();
+            if (canvasRect != null && canvasRect.rect.width > 0f && canvasRect.rect.height > 0f)
+            {
+                return canvasRect.rect.size;
+            }
+        }
+
+        return DisplayGeometry.ValidPixelSize(canvasPixelSize);
+    }
+
+    public Vector2 NormalizedToCanvasPosition(Vector2 normalized)
+    {
+        Vector2 canvasSize = GetCanvasSize();
+        return new Vector2(
+            (Mathf.Clamp01(normalized.x) - 0.5f) * canvasSize.x,
+            (Mathf.Clamp01(normalized.y) - 0.5f) * canvasSize.y);
+    }
+
+    public Vector2 NormalizedToCanvasSize(Vector2 normalizedSize)
+    {
+        Vector2 canvasSize = GetCanvasSize();
+        return new Vector2(
+            Mathf.Max(0f, normalizedSize.x) * canvasSize.x,
+            Mathf.Max(0f, normalizedSize.y) * canvasSize.y);
+    }
+
     public void ApplyConfiguration()
     {
         if (worldSpaceCanvas != null)
@@ -122,7 +179,7 @@ public class DisplaySurface : MonoBehaviour
             worldSpaceCanvas.renderMode = RenderMode.WorldSpace;
             worldSpaceCanvas.transform.localPosition = Vector3.zero;
             worldSpaceCanvas.transform.localRotation = Quaternion.identity;
-            worldSpaceCanvas.transform.localScale = Vector3.one * canvasScale;
+            worldSpaceCanvas.transform.localScale = ComputeCanvasScale();
 
             RectTransform canvasRect = worldSpaceCanvas.GetComponent<RectTransform>();
             if (canvasRect != null)
@@ -167,6 +224,22 @@ public class DisplaySurface : MonoBehaviour
         }
 
         ApplyScrollOffset();
+    }
+
+    private Vector3 ComputeCanvasScale()
+    {
+        if (physicalSizeMeters.x <= 0f
+            || physicalSizeMeters.y <= 0f
+            || canvasPixelSize.x <= 0f
+            || canvasPixelSize.y <= 0f)
+        {
+            float fallbackScale = Mathf.Max(0.000001f, canvasScale);
+            return Vector3.one * fallbackScale;
+        }
+
+        float scaleX = physicalSizeMeters.x / canvasPixelSize.x;
+        float scaleY = physicalSizeMeters.y / canvasPixelSize.y;
+        return new Vector3(scaleX, scaleY, Mathf.Min(scaleX, scaleY));
     }
 
     public Vector2 WorldToNormalized(Vector3 worldPoint)
@@ -266,6 +339,15 @@ public class DisplaySurface : MonoBehaviour
         {
             basePanelColor = visiblePanelImage.color;
             hasCachedBasePanelColor = true;
+        }
+    }
+
+    private void RestoreBasePanelColor()
+    {
+        CachePanelImage();
+        if (visiblePanelImage != null)
+        {
+            visiblePanelImage.color = WithAlpha(basePanelColor, basePanelColor.a);
         }
     }
 

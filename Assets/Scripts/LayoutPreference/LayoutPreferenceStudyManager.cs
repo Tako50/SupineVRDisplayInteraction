@@ -29,11 +29,11 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
     [SerializeField] private LayoutPreferenceLogger logger;
 
     [Header("Display Size")]
-    [SerializeField] private float apparentWidthDegrees = 40f;
-    [SerializeField] private float apparentHeightDegrees = 22.5f;
+    [SerializeField] private float apparentWidthDegrees = DisplayGeometry.DefaultApparentWidthDegrees;
+    [SerializeField] private float apparentHeightDegrees = DisplayGeometry.DefaultApparentHeightDegrees;
     [SerializeField] private bool preserveDisplayAspectRatio = true;
-    [SerializeField] private Vector2 displayAspectRatio = new Vector2(16f, 9f);
-    [SerializeField] private Vector2 canvasPixelSize = new Vector2(800f, 450f);
+    [SerializeField] private Vector2 displayAspectRatio = DisplayGeometry.DefaultAspectRatio;
+    [SerializeField] private Vector2 canvasPixelSize = DisplayGeometry.DefaultCanvasPixelSize;
 
     [Header("Placement")]
     [SerializeField] private Vector3 layoutCenterOffsetMeters = Vector3.zero;
@@ -70,7 +70,7 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
     private bool menuHoldTriggered;
     private float conditionEnterTime;
     private bool currentConditionEntered;
-    private HmdAnchor lastAnchor;
+    private DisplayAnchorFrame lastAnchor;
     private OvrInputReader ovrInputReader;
 
 #if ENABLE_INPUT_SYSTEM
@@ -236,7 +236,7 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
     private void ApplyDisplay(
         DisplaySurface surface,
         LayoutPreferenceDisplayPlacement placement,
-        HmdAnchor anchor,
+        DisplayAnchorFrame anchor,
         Vector3 conditionCenterOffset)
     {
         if (surface == null || placement == null)
@@ -244,24 +244,27 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
             return;
         }
 
-        Vector3 anchorPosition =
-            anchor.Position +
-            anchor.Right * conditionCenterOffset.x +
-            anchor.Up * conditionCenterOffset.y +
-            anchor.Forward * conditionCenterOffset.z;
-        Vector3 viewDirection = ComputeAngularDirection(anchor, placement);
-        Vector3 position = anchorPosition + viewDirection * placement.DistanceMeters;
-
-        Quaternion rotation = Quaternion.LookRotation(viewDirection, anchor.Up);
-        rotation *= Quaternion.Euler(placement.RotationOffsetDegrees);
+        DisplayGeometry.ComputeDisplayPose(
+            anchor,
+            placement.DistanceMeters,
+            placement.HorizontalAngleDegrees,
+            placement.VerticalAngleDegrees,
+            placement.RotationOffsetDegrees,
+            conditionCenterOffset,
+            out Vector3 position,
+            out Quaternion rotation);
 
         surface.transform.SetParent(displaysRoot, true);
         surface.transform.SetPositionAndRotation(position, rotation);
         surface.transform.localScale = Vector3.one;
 
-        Vector2 sizeMeters = ComputeDisplaySize(placement.DistanceMeters);
-        surface.SetSize(sizeMeters, canvasPixelSize);
-        ApplyVisibleCanvasSize(surface, sizeMeters);
+        Vector2 sizeMeters = DisplayGeometry.ComputePhysicalSize(
+            placement.DistanceMeters,
+            apparentWidthDegrees,
+            apparentHeightDegrees,
+            preserveDisplayAspectRatio,
+            displayAspectRatio);
+        surface.SetSize(sizeMeters, DisplayGeometry.ValidPixelSize(canvasPixelSize));
         surface.SetContentMode(DisplayContentMode.ConditionSelection);
         if (surface.Cursor != null)
         {
@@ -274,58 +277,14 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
         }
     }
 
-    private Vector2 ComputeDisplaySize(float distanceMeters)
-    {
-        float horizontalAngle = apparentWidthDegrees * Mathf.Deg2Rad;
-        float verticalAngle = apparentHeightDegrees * Mathf.Deg2Rad;
-        float width = 2f * distanceMeters * Mathf.Tan(horizontalAngle * 0.5f);
-        float height = 2f * distanceMeters * Mathf.Tan(verticalAngle * 0.5f);
-
-        if (preserveDisplayAspectRatio && displayAspectRatio.x > 0f && displayAspectRatio.y > 0f)
-        {
-            height = width * displayAspectRatio.y / displayAspectRatio.x;
-        }
-
-        return new Vector2(width, height);
-    }
-
-    private void ApplyVisibleCanvasSize(DisplaySurface surface, Vector2 sizeMeters)
-    {
-        if (surface == null || surface.WorldSpaceCanvas == null)
-        {
-            return;
-        }
-
-        RectTransform canvasRect = surface.WorldSpaceCanvas.GetComponent<RectTransform>();
-        if (canvasRect != null)
-        {
-            canvasRect.sizeDelta = canvasPixelSize;
-        }
-
-        float scaleX = canvasPixelSize.x > 0f ? sizeMeters.x / canvasPixelSize.x : 0.001f;
-        float scaleY = canvasPixelSize.y > 0f ? sizeMeters.y / canvasPixelSize.y : 0.001f;
-        surface.WorldSpaceCanvas.transform.localScale = new Vector3(scaleX, scaleY, Mathf.Min(scaleX, scaleY));
-    }
-
-    private static Vector3 ComputeAngularDirection(HmdAnchor anchor, LayoutPreferenceDisplayPlacement placement)
-    {
-        float horizontal = Mathf.Tan(placement.HorizontalAngleDegrees * Mathf.Deg2Rad);
-        float vertical = Mathf.Tan(placement.VerticalAngleDegrees * Mathf.Deg2Rad);
-        return (anchor.Forward + anchor.Right * horizontal + anchor.Up * vertical).normalized;
-    }
-
-    private void PositionInstructionCanvas(HmdAnchor anchor)
+    private void PositionInstructionCanvas(DisplayAnchorFrame anchor)
     {
         if (instructionCanvasRoot == null)
         {
             return;
         }
 
-        Vector3 position =
-            anchor.Position +
-            anchor.Right * instructionLocalOffset.x +
-            anchor.Up * instructionLocalOffset.y +
-            anchor.Forward * instructionLocalOffset.z;
+        Vector3 position = anchor.TransformOffset(instructionLocalOffset);
 
         instructionCanvasRoot.SetPositionAndRotation(
             position,
@@ -416,34 +375,17 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
         });
     }
 
-    private HmdAnchor CaptureHmdAnchor()
+    private DisplayAnchorFrame CaptureHmdAnchor()
     {
         ResolveReferences();
         Transform anchorTransform = hmdCamera != null ? hmdCamera.transform : transform;
-        Vector3 forward = anchorTransform.forward.sqrMagnitude > 0.0001f
-            ? anchorTransform.forward.normalized
-            : Vector3.forward;
-        Vector3 up = anchorTransform.up.sqrMagnitude > 0.0001f ? anchorTransform.up.normalized : Vector3.up;
-        Vector3 right = Vector3.Cross(up, forward).normalized;
-        if (right.sqrMagnitude < 0.0001f)
-        {
-            right = anchorTransform.right.sqrMagnitude > 0.0001f ? anchorTransform.right.normalized : Vector3.right;
-        }
-
-        up = Vector3.Cross(forward, right).normalized;
-
-        return new HmdAnchor
-        {
-            Position = anchorTransform.position,
-            Forward = forward,
-            Right = right,
-            Up = up
-        };
+        return DisplayAnchorFrame.FromTransform(anchorTransform);
     }
 
     private void ReadButtons(out bool nextPressed, out bool previousPressed, out bool recenterPressed)
     {
         bool primary = false;
+        bool primaryReleased = false;
         bool secondary = false;
         bool menu = false;
         bool recenterButton = false;
@@ -477,19 +419,19 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
                 ovrInputReader = new OvrInputReader();
             }
 
-            primary |= ovrInputReader.GetDown("One");
+            primaryReleased |= ovrInputReader.GetUp("One");
             secondary |= ovrInputReader.GetDown("Two");
             recenterButton |= ovrInputReader.GetDown("PrimaryThumbstick");
         }
 
-        nextPressed = primary && !previousPrimaryButton;
+        nextPressed = primaryReleased || (!primary && previousPrimaryButton);
         previousPressed = secondary && !previousSecondaryButton;
         recenterPressed = recenterButton && !previousRecenterButton;
 
         if (useInputSystemActions)
         {
 #if ENABLE_INPUT_SYSTEM
-            nextPressed |= WasInputActionPressed(nextAction);
+            nextPressed |= WasInputActionReleased(nextAction);
             previousPressed |= WasInputActionPressed(previousAction);
             recenterPressed |= WasInputActionPressed(recenterAction);
 #endif
@@ -515,9 +457,9 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
 
         if (allowKeyboardInput)
         {
-            nextPressed |= GetKeyDown(KeyCode.Space)
-                || GetKeyDown(KeyCode.RightArrow)
-                || GetKeyDown(KeyCode.JoystickButton0);
+            nextPressed |= GetKeyUp(KeyCode.Space)
+                || GetKeyUp(KeyCode.RightArrow)
+                || GetKeyUp(KeyCode.JoystickButton0);
             previousPressed |= GetKeyDown(KeyCode.Backspace)
                 || GetKeyDown(KeyCode.LeftArrow)
                 || GetKeyDown(KeyCode.JoystickButton1);
@@ -605,12 +547,22 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
         return action != null && action.WasPressedThisFrame();
     }
 
+    private static bool WasInputActionReleased(InputAction action)
+    {
+        return action != null && action.WasReleasedThisFrame();
+    }
+
     private static bool IsInputActionPressed(InputAction action)
     {
         return action != null && action.IsPressed();
     }
 #else
     private static bool WasInputActionPressed(object action)
+    {
+        return false;
+    }
+
+    private static bool WasInputActionReleased(object action)
     {
         return false;
     }
@@ -647,6 +599,29 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
         }
 #else
         return UnityEngine.Input.GetKeyDown(keyCode);
+#endif
+    }
+
+    private static bool GetKeyUp(KeyCode keyCode)
+    {
+#if ENABLE_INPUT_SYSTEM
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard == null)
+        {
+            return false;
+        }
+
+        switch (keyCode)
+        {
+            case KeyCode.Space:
+                return keyboard.spaceKey.wasReleasedThisFrame;
+            case KeyCode.RightArrow:
+                return keyboard.rightArrowKey.wasReleasedThisFrame;
+            default:
+                return false;
+        }
+#else
+        return UnityEngine.Input.GetKeyUp(keyCode);
 #endif
     }
 
@@ -737,20 +712,13 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
         }
     }
 
-    private struct HmdAnchor
-    {
-        public Vector3 Position;
-        public Vector3 Forward;
-        public Vector3 Right;
-        public Vector3 Up;
-    }
-
     private sealed class OvrInputReader
     {
         private readonly Type ovrInputType;
         private readonly Type buttonType;
         private readonly Type controllerType;
         private readonly MethodInfo getDownMethod;
+        private readonly MethodInfo getUpMethod;
         private readonly MethodInfo getMethod;
         private readonly object controller;
 
@@ -771,12 +739,18 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
 
             controller = ParseEnum(controllerType, "RTouch") ?? ParseEnum(controllerType, "Touch");
             getDownMethod = FindButtonMethod("GetDown");
+            getUpMethod = FindButtonMethod("GetUp");
             getMethod = FindButtonMethod("Get");
         }
 
         public bool GetDown(string buttonName)
         {
             return InvokeButtonMethod(getDownMethod, buttonName);
+        }
+
+        public bool GetUp(string buttonName)
+        {
+            return InvokeButtonMethod(getUpMethod, buttonName);
         }
 
         public bool Get(string buttonName)

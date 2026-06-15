@@ -14,12 +14,14 @@ public class ExperimentManager : MonoBehaviour
     [SerializeField] private DisplayLayoutManager layoutManager;
     [SerializeField] private RaycastPointer raycastPointer;
     [SerializeField] private FocusManager focusManager;
+    [SerializeField] private GazeDisplayFocusManager gazeDisplayFocusManager;
     [SerializeField] private EditorDebugInputProvider debugInputProvider;
     [SerializeField] private Logger logger;
 
     [Header("Experiment State")]
     [SerializeField] private InteractionCondition startingCondition = InteractionCondition.RaycastBaseline;
-    [SerializeField] private DisplayLayoutPreset startingLayout = DisplayLayoutPreset.StrongOcclusion;
+    [SerializeField] private bool startingHighlightEnabled = true;
+    [SerializeField] private DisplayLayoutPreset startingLayout = DisplayLayoutPreset.UpDownDepth;
     [SerializeField] private bool applyStartingLayoutOnStart = true;
     [SerializeField] private bool allowLayoutSwitching = false;
     [SerializeField] private bool lockDisplaysAfterStart = true;
@@ -29,6 +31,9 @@ public class ExperimentManager : MonoBehaviour
     private float nextDebugLogTime;
 
     public InteractionCondition CurrentCondition => inputManager != null ? inputManager.CurrentCondition : startingCondition;
+    public bool HighlightEnabled => gazeDisplayFocusManager != null
+        ? gazeDisplayFocusManager.HighlightEnabled
+        : startingHighlightEnabled;
     public DisplayLayoutPreset CurrentLayout => currentLayout;
 
     private void Awake()
@@ -40,6 +45,8 @@ public class ExperimentManager : MonoBehaviour
         {
             inputManager.SetCondition(startingCondition);
         }
+
+        SetHighlightEnabled(startingHighlightEnabled);
     }
 
     private void Start()
@@ -92,6 +99,25 @@ public class ExperimentManager : MonoBehaviour
         allowLayoutSwitching = enabled;
     }
 
+    public void SetHighlightEnabled(bool enabled)
+    {
+        startingHighlightEnabled = enabled;
+        if (gazeDisplayFocusManager != null)
+        {
+            gazeDisplayFocusManager.SetHighlightEnabled(enabled);
+        }
+    }
+
+    public void SetInteractionAndHighlight(InteractionCondition interactionMethod, bool enabled)
+    {
+        if (inputManager != null)
+        {
+            inputManager.SetCondition(interactionMethod);
+        }
+
+        SetHighlightEnabled(enabled);
+    }
+
     private void HandleKeyboardShortcuts()
     {
         if (!allowLayoutSwitching || debugInputProvider == null || !debugInputProvider.IsEnabled)
@@ -99,17 +125,17 @@ public class ExperimentManager : MonoBehaviour
             return;
         }
 
-        if (debugInputProvider.NoOcclusionPressed)
+        if (debugInputProvider.UpDownDepthPressed)
         {
-            ApplyLayout(DisplayLayoutPreset.NoOcclusion);
+            ApplyLayout(DisplayLayoutPreset.UpDownDepth);
         }
-        else if (debugInputProvider.PartialOcclusionPressed)
+        else if (debugInputProvider.LeftRightPressed)
         {
-            ApplyLayout(DisplayLayoutPreset.PartialOcclusion);
+            ApplyLayout(DisplayLayoutPreset.LeftRight);
         }
-        else if (debugInputProvider.StrongOcclusionPressed)
+        else if (debugInputProvider.UpDownPressed)
         {
-            ApplyLayout(DisplayLayoutPreset.StrongOcclusion);
+            ApplyLayout(DisplayLayoutPreset.UpDown);
         }
     }
 
@@ -173,6 +199,11 @@ public class ExperimentManager : MonoBehaviour
         if (focusManager == null)
         {
             focusManager = FindObjectOfType<FocusManager>();
+        }
+
+        if (gazeDisplayFocusManager == null)
+        {
+            gazeDisplayFocusManager = FindObjectOfType<GazeDisplayFocusManager>();
         }
 
         if (debugInputProvider == null)

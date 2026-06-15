@@ -142,7 +142,7 @@ public static class LayoutPreferenceStudySceneBuilder
 
         surface.AssignParts(canvas, panel, hitPlane, cursor);
         surface.SetContentMode(DisplayContentMode.ConditionSelection);
-        surface.SetSize(new Vector2(0.8f, 0.45f), new Vector2(800f, 450f));
+        surface.SetSize(DisplayGeometry.DefaultPhysicalSizeMeters, DisplayGeometry.DefaultCanvasPixelSize);
         return surface;
     }
 

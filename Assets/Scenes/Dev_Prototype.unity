@@ -424,6 +424,18 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 359398848}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!134 &442784937
+PhysicMaterial:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  dynamicFriction: 0.6
+  staticFriction: 0.6
+  bounciness: 0
+  frictionCombine: 0
+  bounceCombine: 0
 --- !u!1 &528464812
 GameObject:
   m_ObjectHideFlags: 0
@@ -458,14 +470,16 @@ MonoBehaviour:
   transparentHitPlane: {fileID: 1034436738}
   cursor: {fileID: 1401940731}
   scrollContent: {fileID: 1619621304}
-  physicalSizeMeters: {x: 0.6, y: 0.33749998}
-  canvasPixelSize: {x: 600, y: 337.5}
+  physicalSizeMeters: {x: 0.72794044, y: 0.39782473}
+  canvasPixelSize: {x: 800, y: 450}
   canvasScale: 0.001
   hitPlaneDepthMeters: 0.02
   cursorPixelSize: {x: 10, y: 10}
   contentMode: 1
   scrollPixelsPerUnit: 160
   maxScrollPixels: 420
+  gazeHighlightColor: {r: 0.25, g: 0.78, b: 1, a: 1}
+  gazeHighlightStrength: 0.55
 --- !u!4 &528464814
 Transform:
   m_ObjectHideFlags: 0
@@ -474,8 +488,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 528464812}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.24547064, y: 0.00000394952, z: -0.0009032538, w: 0.96940356}
-  m_LocalPosition: {x: -0.00009854135, y: 1.1116447, z: 0.75006825}
+  m_LocalRotation: {x: 0.2163063, y: 0.000031019234, z: -0.0009027297, w: 0.97632515}
+  m_LocalPosition: {x: -0.00032989518, y: 0.9390694, z: 0.90642315}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -500,7 +514,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &534414695
 RectTransform:
   m_ObjectHideFlags: 0
@@ -553,7 +567,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: A Front
+  m_Text: 
 --- !u!222 &534414697
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -1061,7 +1075,7 @@ BoxCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1034436736}
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 1616146576}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -1073,7 +1087,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.6, y: 0.33749998, z: 0.02}
+  m_Size: {x: 0.72794044, y: 0.39782473, z: 0.02}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1035063436
 GameObject:
@@ -1109,14 +1123,16 @@ MonoBehaviour:
   transparentHitPlane: {fileID: 1302094133}
   cursor: {fileID: 2109210849}
   scrollContent: {fileID: 1172880933}
-  physicalSizeMeters: {x: 1, y: 0.5625}
-  canvasPixelSize: {x: 1000, y: 562.5}
+  physicalSizeMeters: {x: 1.4558809, y: 0.79564947}
+  canvasPixelSize: {x: 800, y: 450}
   canvasScale: 0.001
   hitPlaneDepthMeters: 0.02
   cursorPixelSize: {x: 10, y: 10}
   contentMode: 1
   scrollPixelsPerUnit: 160
   maxScrollPixels: 420
+  gazeHighlightColor: {r: 0.25, g: 0.78, b: 1, a: 1}
+  gazeHighlightStrength: 0.55
 --- !u!4 &1035063438
 Transform:
   m_ObjectHideFlags: 0
@@ -1125,8 +1141,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1035063436}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.00013649339, y: 0.00022567045, z: -0.0008746176, w: 0.9999996}
-  m_LocalPosition: {x: 0.0005419626, y: 1.361767, z: 1.1999999}
+  m_LocalRotation: {x: -0.00013648826, y: 0.00022567045, z: -0.0008746176, w: 0.9999996}
+  m_LocalPosition: {x: 0.00090322614, y: 1.3619851, z: 1.9999998}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1163,6 +1179,7 @@ GameObject:
   - component: {fileID: 1045802458}
   - component: {fileID: 1045802459}
   - component: {fileID: 1045802460}
+  - component: {fileID: 1045802461}
   m_Layer: 0
   m_Name: Prototype_Managers
   m_TagString: Untagged
@@ -1351,62 +1368,49 @@ MonoBehaviour:
   displaysRoot: {fileID: 888164666}
   displayAFront: {fileID: 528464813}
   displayBBack: {fileID: 1035063437}
-  initialPreset: 2
+  initialPreset: 0
   useFixedSceneLayout: 0
-  applyOnStart: 0
+  applyOnStart: 1
   resetLayoutOnXrRecenter: 1
   logLayoutResetEvents: 1
-  noOcclusion:
-    displayAFront:
-      distanceFromHmd: 1.25
-      verticalOffset: -0.45
-      horizontalOffset: 0
-      scale: 0.75
-      pitchDegrees: 0
-      yawDegrees: 0
-      rollDegrees: 0
-    displayBBack:
-      distanceFromHmd: 1.25
-      verticalOffset: 0.45
-      horizontalOffset: 0
-      scale: 1.25
-      pitchDegrees: 0
-      yawDegrees: 0
-      rollDegrees: 0
-  partialOcclusion:
-    displayAFront:
-      distanceFromHmd: 1.15
-      verticalOffset: -0.3
-      horizontalOffset: 0
-      scale: 0.75
-      pitchDegrees: 0
-      yawDegrees: 0
-      rollDegrees: 0
-    displayBBack:
-      distanceFromHmd: 1.45
-      verticalOffset: 0.2
-      horizontalOffset: 0
-      scale: 1.25
-      pitchDegrees: 0
-      yawDegrees: 0
-      rollDegrees: 0
-  strongOcclusion:
-    displayAFront:
-      distanceFromHmd: 0.75
-      verticalOffset: -0.25
-      horizontalOffset: 0
-      scale: 0.75
-      pitchDegrees: 10
-      yawDegrees: 0
-      rollDegrees: 0
-    displayBBack:
-      distanceFromHmd: 1.2
-      verticalOffset: 0
-      horizontalOffset: 0
-      scale: 1.25
-      pitchDegrees: 0
-      yawDegrees: 0
-      rollDegrees: 0
+  apparentWidthDegrees: 40
+  apparentHeightDegrees: 22.5
+  preserveDisplayAspectRatio: 0
+  displayAspectRatio: {x: 16, y: 9}
+  canvasPixelSize: {x: 800, y: 450}
+  upDownDepth:
+    displayA:
+      distanceMeters: 1
+      horizontalAngleDegrees: 0
+      verticalAngleDegrees: -25
+      rotationOffsetDegrees: {x: 0, y: 0, z: 0}
+    displayB:
+      distanceMeters: 2
+      horizontalAngleDegrees: 0
+      verticalAngleDegrees: 0
+      rotationOffsetDegrees: {x: 0, y: 0, z: 0}
+  leftRight:
+    displayA:
+      distanceMeters: 1.25
+      horizontalAngleDegrees: -21
+      verticalAngleDegrees: 0
+      rotationOffsetDegrees: {x: 0, y: 0, z: 0}
+    displayB:
+      distanceMeters: 1.25
+      horizontalAngleDegrees: 21
+      verticalAngleDegrees: 0
+      rotationOffsetDegrees: {x: 0, y: 0, z: 0}
+  upDown:
+    displayA:
+      distanceMeters: 1.25
+      horizontalAngleDegrees: 0
+      verticalAngleDegrees: -12.25
+      rotationOffsetDegrees: {x: 0, y: 0, z: 0}
+    displayB:
+      distanceMeters: 1.25
+      horizontalAngleDegrees: 0
+      verticalAngleDegrees: 12.25
+      rotationOffsetDegrees: {x: 0, y: 0, z: 0}
 --- !u!114 &1045802448
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1479,12 +1483,14 @@ MonoBehaviour:
   layoutManager: {fileID: 1045802447}
   raycastPointer: {fileID: 1045802445}
   focusManager: {fileID: 1045802446}
+  gazeDisplayFocusManager: {fileID: 1045802461}
   debugInputProvider: {fileID: 1045802454}
   logger: {fileID: 1045802441}
   startingCondition: 0
-  startingLayout: 2
-  applyStartingLayoutOnStart: 0
-  allowLayoutSwitching: 0
+  startingHighlightEnabled: 1
+  startingLayout: 0
+  applyStartingLayoutOnStart: 1
+  allowLayoutSwitching: 1
   lockDisplaysAfterStart: 1
   debugLogIntervalSeconds: 0.5
 --- !u!4 &1045802452
@@ -1543,9 +1549,10 @@ MonoBehaviour:
   submitKey: 32
   triggerKey: 304
   resetFocusKey: 114
-  noOcclusionKey: 49
-  partialOcclusionKey: 50
-  strongOcclusionKey: 51
+  highlightToggleKey: 104
+  upDownDepthKey: 49
+  leftRightKey: 50
+  upDownKey: 51
   stickLeftKey: 97
   stickRightKey: 100
   stickUpKey: 119
@@ -1590,7 +1597,7 @@ MonoBehaviour:
   loopTrainingTrials: 1
   returnToConditionSelectionAfterMainTask: 1
   selectedCondition: 0
-  selectedLayout: 2
+  selectedLayout: 0
   conditionOrder: 0
   conditionAName: ConditionA
   conditionBName: ConditionB
@@ -1599,36 +1606,16 @@ MonoBehaviour:
   targetColor: {r: 0.1, g: 1, b: 0.3, a: 0.95}
   targetHoverColor: {r: 0.1, g: 0.55, b: 1, a: 0.95}
   inactiveTargetColor: {r: 0.1, g: 1, b: 0.3, a: 0.35}
-  targetSizeNormalized: 0.05
-  repetitionsPerTargetPosition: 4
-  rebuildTrialsOnStart: 1
-  randomizeTrialsWithinCondition: 0
-  randomSeed: 20260519
+  angularSizeReference: {fileID: 0}
+  smallTargetSizeDegrees: 1
+  mediumTargetSizeDegrees: 2
+  largeTargetSizeDegrees: 3
+  fallbackTargetSizeNormalized: 0.05
   trials: []
-  frontTrialsPerCondition: 40
-  backClearTrialsPerCondition: 20
-  backOccludedTrialsPerCondition: 20
-  frontTargetPositions:
-  - {x: 0.1, y: 0.1}
-  - {x: 0.5, y: 0.1}
-  - {x: 0.9, y: 0.1}
-  - {x: 0.1, y: 0.5}
-  - {x: 0.5, y: 0.5}
-  - {x: 0.9, y: 0.5}
-  - {x: 0.1, y: 0.9}
-  - {x: 0.5, y: 0.9}
-  - {x: 0.9, y: 0.9}
-  backClearTargetPositions:
-  - {x: 0.1, y: 0.5}
-  - {x: 0.5, y: 0.5}
-  - {x: 0.9, y: 0.5}
-  - {x: 0.1, y: 0.9}
-  - {x: 0.5, y: 0.9}
-  - {x: 0.9, y: 0.9}
-  backOccludedTargetPositions:
-  - {x: 0.1, y: 0.1}
-  - {x: 0.5, y: 0.1}
-  - {x: 0.9, y: 0.1}
+  targetOrderCsv: {fileID: 0}
+  targetOrderResourcePath: T1/target_orders_ABCDE
+  conditionAMainOrder: 0
+  conditionBMainOrder: 0
   requireStartButtonBeforeTask: 1
   startGateDisplayId: Display_B_Back
   startButtonNormalizedPosition: {x: 0.5, y: 0.5}
@@ -1649,7 +1636,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   condition: 0
-  layout: 2
+  layout: 0
   applyLayout: 0
   gazeSource: 1
   rayMode: 4
@@ -1682,16 +1669,21 @@ MonoBehaviour:
   referenceListTaskManager: {fileID: 0}
   raycastPointer: {fileID: 0}
   gazeProvider: {fileID: 0}
+  gazeDisplayFocusManager: {fileID: 1045802461}
   menuDisplayId: Display_B_Back
   showMenuInConditionSelection: 1
-  showLayoutButtons: 0
-  applySelectedLayout: 0
-  panelColor: {r: 0.04, g: 0.05, b: 0.06, a: 0.82}
-  buttonColor: {r: 0.16, g: 0.18, b: 0.2, a: 0.92}
-  selectedButtonColor: {r: 0.15, g: 0.48, b: 0.85, a: 0.95}
-  startButtonColor: {r: 0.1, g: 0.7, b: 0.32, a: 0.95}
-  hoveredButtonColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  showLayoutButtons: 1
+  applySelectedLayout: 1
+  panelColor: {r: 0.025, g: 0.035, b: 0.055, a: 0.96}
+  statusCardColor: {r: 0.06, g: 0.09, b: 0.14, a: 0.98}
+  buttonColor: {r: 0.1, g: 0.14, b: 0.2, a: 0.98}
+  selectedButtonColor: {r: 0.08, g: 0.46, b: 0.78, a: 1}
+  startButtonColor: {r: 0.08, g: 0.62, b: 0.4, a: 1}
+  stopButtonColor: {r: 0.78, g: 0.24, b: 0.22, a: 1}
+  hoveredButtonColor: {r: 0.24, g: 0.66, b: 0.95, a: 1}
   textColor: {r: 1, g: 1, b: 1, a: 1}
+  secondaryTextColor: {r: 0.66, g: 0.76, b: 0.86, a: 1}
+  outlineColor: {r: 0.28, g: 0.42, b: 0.56, a: 0.72}
 --- !u!114 &1045802459
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1732,11 +1724,11 @@ MonoBehaviour:
   applyDisplaySize: 1
   applyDisplayPose: 1
   baseCanvasPixelSize: {x: 800, y: 450}
-  applyCurrentLayoutOnStart: 1
+  applyCurrentLayoutOnStart: 0
   logOnStart: 0
   logHandSamples: 1
   targetRayOcclusionRatio: 0.3
-  targetRatioTolerance: 0.05
+  targetRatioTolerance: 0.3
   showDebugOcclusionOverlay: 0
   showVisualOcclusionOverlay: 0
   showRayOcclusionOverlay: 1
@@ -1776,6 +1768,34 @@ MonoBehaviour:
   listRowColor: {r: 0.12, g: 0.16, b: 0.24, a: 0.98}
   alternatingRowColor: {r: 0.16, g: 0.21, b: 0.3, a: 0.98}
   rowTextColor: {r: 1, g: 1, b: 1, a: 1}
+  requireStartButtonBeforeTask: 1
+  startGateDisplayId: Display_B_Back
+  startButtonNormalizedPosition: {x: 0.5, y: 0.5}
+  startButtonNormalizedSize: {x: 0.28, y: 0.14}
+  startCountdownSeconds: 3
+  startGateButtonColor: {r: 0.1, g: 0.7, b: 0.32, a: 0.95}
+  startGateCountdownColor: {r: 0.15, g: 0.48, b: 0.85, a: 0.95}
+--- !u!114 &1045802461
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1045802439}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9952ff45a4bed4330a8a9271078bb85d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  inputManager: {fileID: 1045802450}
+  gazeProvider: {fileID: 1045802449}
+  displayManager: {fileID: 1045802448}
+  debugInputProvider: {fileID: 1045802454}
+  highlightEnabled: 1
+  debugToggleWithKeyboard: 1
+  logStateChanges: 1
+  currentFocusedTarget: {fileID: 0}
+  currentInteractionMethod: 0
 --- !u!1 &1172880932
 GameObject:
   m_ObjectHideFlags: 0
@@ -1809,7 +1829,7 @@ RectTransform:
   m_Father: {fileID: 11759483}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.08, y: 0.04}
-  m_AnchorMax: {x: 0.92, y: 0.86}
+  m_AnchorMax: {x: 0.92, y: 0.94}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 520}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -1909,7 +1929,7 @@ RectTransform:
   m_GameObject: {fileID: 1222415396}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.001, y: 0.001, z: 0.001}
+  m_LocalScale: {x: 0.00090992555, y: 0.000884055, z: 0.000884055}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 856379150}
@@ -1921,7 +1941,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 600, y: 337.5}
+  m_SizeDelta: {x: 800, y: 450}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1222415398
 MonoBehaviour:
@@ -2025,7 +2045,7 @@ BoxCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1302094131}
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 442784937}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -2037,7 +2057,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1, y: 0.5625, z: 0.02}
+  m_Size: {x: 1.4558809, y: 0.79564947, z: 0.02}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1391092718
 GameObject:
@@ -2234,7 +2254,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1470608245
 Transform:
   m_ObjectHideFlags: 0
@@ -2255,6 +2275,18 @@ Transform:
   - {fileID: 541844330}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!134 &1616146576
+PhysicMaterial:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  dynamicFriction: 0.6
+  staticFriction: 0.6
+  bounciness: 0
+  frictionCombine: 0
+  bounceCombine: 0
 --- !u!1 &1619621303
 GameObject:
   m_ObjectHideFlags: 0
@@ -2288,7 +2320,7 @@ RectTransform:
   m_Father: {fileID: 856379150}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.08, y: 0.04}
-  m_AnchorMax: {x: 0.92, y: 0.86}
+  m_AnchorMax: {x: 0.92, y: 0.94}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 520}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -2443,7 +2475,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1800657492
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2496,7 +2528,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: B Back
+  m_Text: 
 --- !u!222 &1800657494
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -2533,7 +2565,7 @@ RectTransform:
   m_GameObject: {fileID: 1846588272}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.001, y: 0.001, z: 0.001}
+  m_LocalScale: {x: 0.0018198511, y: 0.00176811, z: 0.00176811}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 11759483}
@@ -2545,7 +2577,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 1000, y: 562.5}
+  m_SizeDelta: {x: 800, y: 450}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1846588274
 MonoBehaviour:

@@ -31,8 +31,8 @@ public static class DevPrototypeSceneBuilder
         Transform displaysRoot = EnsureChild(prototypeRoot.transform, "Displays");
 
         Color sharedDisplayColor = new Color(0.18f, 0.32f, 0.46f, 0.86f);
-        DisplaySurface displayA = CreateOrUpdateDisplay(displaysRoot, "Display_A_Front", sharedDisplayColor, "A Front");
-        DisplaySurface displayB = CreateOrUpdateDisplay(displaysRoot, "Display_B_Back", sharedDisplayColor, "B Back");
+        DisplaySurface displayA = CreateOrUpdateDisplay(displaysRoot, "Display_A_Front", sharedDisplayColor, string.Empty);
+        DisplaySurface displayB = CreateOrUpdateDisplay(displaysRoot, "Display_B_Back", sharedDisplayColor, string.Empty);
 
         GameObject managers = GameObject.Find("Prototype_Managers") ?? new GameObject("Prototype_Managers");
         Component controlPanel = GetOrAddByTypeName(managers, "PrototypeControlPanel");
@@ -44,6 +44,7 @@ public static class DevPrototypeSceneBuilder
         DisplayManager displayManager = GetOrAdd<DisplayManager>(managers);
         DisplayLayoutManager layoutManager = GetOrAdd<DisplayLayoutManager>(managers);
         FocusManager focusManager = GetOrAdd<FocusManager>(managers);
+        GazeDisplayFocusManager gazeDisplayFocusManager = GetOrAdd<GazeDisplayFocusManager>(managers);
         RaycastPointer raycastPointer = GetOrAdd<RaycastPointer>(managers);
         VirtualCursorController cursorController = GetOrAdd<VirtualCursorController>(managers);
         ScrollController scrollController = GetOrAdd<ScrollController>(managers);
@@ -60,9 +61,9 @@ public static class DevPrototypeSceneBuilder
         SetObject(layoutManager, "displaysRoot", displaysRoot);
         SetObject(layoutManager, "displayAFront", displayA);
         SetObject(layoutManager, "displayBBack", displayB);
-        SetEnum(layoutManager, "initialPreset", DisplayLayoutPreset.StrongOcclusion);
+        SetEnum(layoutManager, "initialPreset", DisplayLayoutPreset.UpDownDepth);
         SetBool(layoutManager, "useFixedSceneLayout", false);
-        SetBool(layoutManager, "applyOnStart", false);
+        SetBool(layoutManager, "applyOnStart", true);
 
         SetObject(gazeProvider, "hmdCamera", hmdCamera);
         Transform eyeTrackingRaySource = EnsureChild(managers.transform, "EyeTracking_RaySource");
@@ -80,17 +81,27 @@ public static class DevPrototypeSceneBuilder
         SetObject(experimentManager, "layoutManager", layoutManager);
         SetObject(experimentManager, "raycastPointer", raycastPointer);
         SetObject(experimentManager, "focusManager", focusManager);
+        SetObject(experimentManager, "gazeDisplayFocusManager", gazeDisplayFocusManager);
         SetObject(experimentManager, "debugInputProvider", debugInputProvider);
         SetObject(experimentManager, "logger", logger);
         SetEnum(experimentManager, "startingCondition", InteractionCondition.RaycastBaseline);
-        SetBool(experimentManager, "applyStartingLayoutOnStart", false);
-        SetBool(experimentManager, "allowLayoutSwitching", false);
+        SetBool(experimentManager, "startingHighlightEnabled", true);
+        SetBool(experimentManager, "applyStartingLayoutOnStart", true);
+        SetBool(experimentManager, "allowLayoutSwitching", true);
 
         SetObject(focusManager, "inputManager", inputManager);
         SetObject(focusManager, "gazeProvider", gazeProvider);
         SetObject(focusManager, "displayManager", displayManager);
         SetObject(focusManager, "virtualCursorController", cursorController);
         SetObject(focusManager, "logger", logger);
+
+        SetObject(gazeDisplayFocusManager, "inputManager", inputManager);
+        SetObject(gazeDisplayFocusManager, "gazeProvider", gazeProvider);
+        SetObject(gazeDisplayFocusManager, "displayManager", displayManager);
+        SetObject(gazeDisplayFocusManager, "debugInputProvider", debugInputProvider);
+        SetBool(gazeDisplayFocusManager, "highlightEnabled", true);
+        SetBool(gazeDisplayFocusManager, "debugToggleWithKeyboard", true);
+        SetBool(gazeDisplayFocusManager, "logStateChanges", true);
 
         SetObject(raycastPointer, "inputManager", inputManager);
         SetObject(raycastPointer, "displayManager", displayManager);
@@ -137,6 +148,8 @@ public static class DevPrototypeSceneBuilder
         SetObject(referenceListTaskManager, "logger", logger);
         SetObject(referenceListTaskManager, "displayA", displayA);
         SetObject(referenceListTaskManager, "displayB", displayB);
+        SetBool(referenceListTaskManager, "requireStartButtonBeforeTask", true);
+        SetFloat(referenceListTaskManager, "startCountdownSeconds", 3f);
 
         SetObject(rayOcclusionLayoutProbe, "hmdCamera", hmdCamera);
         SetObject(rayOcclusionLayoutProbe, "d1BackDisplay", displayB);
@@ -154,7 +167,7 @@ public static class DevPrototypeSceneBuilder
         SetFloat(rayOcclusionLayoutProbe, "eta2MinDegrees", 22.5f);
         SetFloat(rayOcclusionLayoutProbe, "eta2MaxDegrees", 45f);
         SetFloat(rayOcclusionLayoutProbe, "eta2StepDegrees", 2.5f);
-        SetBool(rayOcclusionLayoutProbe, "applyCurrentLayoutOnStart", true);
+        SetBool(rayOcclusionLayoutProbe, "applyCurrentLayoutOnStart", false);
         SetBool(rayOcclusionLayoutProbe, "logOnStart", false);
         SetBool(rayOcclusionLayoutProbe, "logHandSamples", true);
         SetBool(rayOcclusionLayoutProbe, "requireMinimumVisualVerticalGap", true);
@@ -175,8 +188,9 @@ public static class DevPrototypeSceneBuilder
         SetObject(vrTaskMenuManager, "displayManager", displayManager);
         SetObject(vrTaskMenuManager, "focusPointingTaskManager", focusPointingTaskManager);
         SetObject(vrTaskMenuManager, "referenceListTaskManager", referenceListTaskManager);
-        SetBool(vrTaskMenuManager, "showLayoutButtons", false);
-        SetBool(vrTaskMenuManager, "applySelectedLayout", false);
+        SetObject(vrTaskMenuManager, "gazeDisplayFocusManager", gazeDisplayFocusManager);
+        SetBool(vrTaskMenuManager, "showLayoutButtons", true);
+        SetBool(vrTaskMenuManager, "applySelectedLayout", true);
 
         SetObject(debugVisualizer, "inputManager", inputManager);
         SetObject(debugVisualizer, "gazeProvider", gazeProvider);
@@ -206,7 +220,7 @@ public static class DevPrototypeSceneBuilder
         SetObject(controlPanel, "virtualCursorController", cursorController);
         SetObject(controlPanel, "focusPointingTaskManager", focusPointingTaskManager);
         SetEnum(controlPanel, "condition", InteractionCondition.RaycastBaseline);
-        SetEnum(controlPanel, "layout", DisplayLayoutPreset.StrongOcclusion);
+        SetEnum(controlPanel, "layout", DisplayLayoutPreset.UpDownDepth);
         SetBool(controlPanel, "applyLayout", false);
         SetEnum(controlPanel, "gazeSource", GazeSource.EyeTracking);
         SetEnum(controlPanel, "rayMode", RayVisualizationMode.Hidden);
@@ -219,7 +233,7 @@ public static class DevPrototypeSceneBuilder
         SetBool(focusPointingTaskManager, "loopTrainingTrials", true);
         SetBool(focusPointingTaskManager, "returnToConditionSelectionAfterMainTask", true);
 
-        layoutManager.ApplyLayout(DisplayLayoutPreset.StrongOcclusion);
+        layoutManager.ApplyLayout(DisplayLayoutPreset.UpDownDepth);
         displayManager.RefreshDisplays();
 
         EditorSceneManager.MarkSceneDirty(scene);
@@ -352,11 +366,14 @@ public static class DevPrototypeSceneBuilder
 
         RectTransform title = EnsureRectChild(panel, "Label");
         Text titleText = GetOrAdd<Text>(title.gameObject);
-        titleText.text = label;
+        bool showLabel = !string.IsNullOrWhiteSpace(label);
+        title.gameObject.SetActive(showLabel);
+        titleText.text = showLabel ? label : string.Empty;
         titleText.alignment = TextAnchor.UpperLeft;
         titleText.color = Color.white;
         titleText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         titleText.fontSize = 42;
+        titleText.raycastTarget = false;
         title.anchorMin = new Vector2(0f, 1f);
         title.anchorMax = new Vector2(1f, 1f);
         title.pivot = new Vector2(0.5f, 1f);
@@ -365,7 +382,7 @@ public static class DevPrototypeSceneBuilder
 
         RectTransform content = EnsureRectChild(panel, "Pseudo2DContent");
         content.anchorMin = new Vector2(0.08f, 0.04f);
-        content.anchorMax = new Vector2(0.92f, 0.86f);
+        content.anchorMax = new Vector2(0.92f, 0.94f);
         content.pivot = new Vector2(0.5f, 0.5f);
         content.offsetMin = new Vector2(0f, -260f);
         content.offsetMax = new Vector2(0f, 260f);
