@@ -26,14 +26,13 @@ public class PrototypeInputManager : MonoBehaviour
 
     public InteractionCondition CurrentCondition => currentCondition;
     public Vector2 Stick { get; private set; }
-    public bool SubmitPressed { get; private set; }
+    public bool SubmitReleased { get; private set; }
     public bool GripPressed { get; private set; }
     public bool GripHeld { get; private set; }
     public bool TriggerPressed { get; private set; }
     public bool TriggerHeld { get; private set; }
     public bool TriggerReleased { get; private set; }
     public bool ConditionTogglePressed { get; private set; }
-    public bool RayVisualizationTogglePressed { get; private set; }
     public bool ResetFocusPressed => debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.ResetFocusPressed;
     public bool DebugInputEnabled => debugInputProvider != null && debugInputProvider.IsEnabled;
     public bool IsConditionLocked { get; private set; }
@@ -135,7 +134,7 @@ public class PrototypeInputManager : MonoBehaviour
             Stick = Vector2.zero;
         }
 
-        bool debugSubmit = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.SubmitPressed;
+        bool debugSubmit = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.SubmitReleased;
         bool debugGrip = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.GripPressed;
         bool debugGripHeld = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.GripHeld;
         bool debugTriggerHeld = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.TriggerHeld;
@@ -145,14 +144,13 @@ public class PrototypeInputManager : MonoBehaviour
         bool xrTriggerHeld = xrTriggerButton || xrTriggerValue > 0.5f;
 
         // Pressed/Released はこのフレームだけtrueになるイベントとして扱う。
-        SubmitPressed = debugSubmit || (xrPrimary && !previousPrimaryButton);
+        SubmitReleased = debugSubmit || (!xrPrimary && previousPrimaryButton);
         GripPressed = debugGrip || (xrGrip && !previousGripButton);
         GripHeld = debugGripHeld || xrGrip;
         TriggerHeld = debugTriggerHeld || xrTriggerHeld;
         TriggerPressed = debugTriggerPressed || (xrTriggerHeld && !previousTriggerButton);
         TriggerReleased = debugTriggerReleased || (!xrTriggerHeld && previousTriggerButton);
         ConditionTogglePressed = debugConditionToggle || (xrSecondary && !previousSecondaryButton);
-        RayVisualizationTogglePressed = false;
 
         previousPrimaryButton = xrPrimary;
         previousSecondaryButton = xrSecondary;

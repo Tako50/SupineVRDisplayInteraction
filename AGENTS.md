@@ -12,8 +12,16 @@ The prototype compares conventional controller raycasting with a proposed method
 ## Source of truth
 Read and follow these files before making changes:
 
-1. `Docs/prototype_spec.md`
-2. `Docs/implementation_plan.md`
+1. `Docs/experiment_design_sync.md`
+2. `Docs/prototype_spec.md`
+3. `Docs/implementation_plan.md`
+
+`Docs/prototype_spec.md` and `Docs/implementation_plan.md` contain the initial
+prototype design and may lag behind the current Notion experiment design.
+When they conflict with `Docs/experiment_design_sync.md`, do not silently
+implement the older behavior. Treat items marked as unresolved in the sync
+document as design decisions that must be fixed before large implementation
+changes.
 
 Do not reinterpret the project as a generic gaze-pointing prototype. The central research concept is **explicit input focus management across multiple 2D virtual displays**.
 
@@ -42,13 +50,14 @@ Standard VR controller raycasting.
 Proposed method.
 
 - Gaze ray obtains candidate displays.
-- Grip button confirms the focused display.
-- Focus confirmation also warps the virtual cursor to the gaze hit position.
-- Gaze alone must not change focus.
+- Gaze is used only during an explicit grip focus gesture.
+- The focus gesture updates the focused display and warps the virtual cursor to the gaze hit position.
+- Gaze alone, outside the focus gesture, must not change focus or cursor position.
 - Stick moves the virtual cursor inside the focused display.
 - A button clicks at the virtual cursor.
 - Trigger + stick scrolls the focused display.
-- The focused display remains the input target until grip is pressed again.
+- The focused display remains the input target until the next explicit focus gesture.
+- The exact focus commit timing (`grip down`, continuous `grip held`, or `grip release`) is currently unresolved. Follow `Docs/experiment_design_sync.md` and do not change it implicitly.
 
 ## Eye tracking policy
 Use Meta Quest Pro Eye Tracking for experiment use.
@@ -79,12 +88,15 @@ public enum GazeSource
 Implement in this order:
 
 1. `Dev_Prototype`
-2. `Calibration_Debug`
-3. `Exp_FocusPointing`
-4. `Exp_FocusScroll`
-5. `Exp_AttentionFocus`
+2. `LayoutPreferenceStudy`
+3. `Calibration_Debug`
+4. T1 multiple-display target selection
+5. T2-A reference-while-list-selection
+6. T2-B seek-bar adjustment, if retained after design review
 
 `Dev_Prototype` is the first priority and should be kept usable throughout development.
+Do not create a standalone `Exp_AttentionFocus` scene unless the experiment
+design explicitly restores it; the current design folds that question into T2-A.
 
 ## Required core scripts
 Create or maintain these modules:

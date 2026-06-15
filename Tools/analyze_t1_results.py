@@ -9,6 +9,7 @@ Output:
   Analysis/T1/cleaned_completed_trials.csv
   Analysis/T1/summary_by_condition.csv
   Analysis/T1/summary_by_condition_display.csv
+  Analysis/T1/summary_by_condition_occlusion.csv
 """
 
 from __future__ import annotations
@@ -30,6 +31,9 @@ EXPECTED_COLUMNS = [
     "layoutPreset",
     "trialIndexInCondition",
     "globalTrialIndex",
+    "trialSetId",
+    "trialIndexInSet",
+    "occlusion_type",
     "targetDisplayId",
     "targetPositionId",
     "targetLocalX",
@@ -45,7 +49,6 @@ EXPECTED_COLUMNS = [
     "targetError",
     "miss",
     "advancesTrial",
-    "directSelect",
     "trialStartTime",
     "clickTime",
     "responseTime",
@@ -104,6 +107,8 @@ def read_rows(files: list[Path], phase: str) -> list[dict[str, str]]:
 
 def normalize_row(row: dict[str, str]) -> dict[str, str]:
     normalized = {column: row.get(column, "") for column in EXPECTED_COLUMNS}
+    if not normalized.get("occlusion_type"):
+        normalized["occlusion_type"] = row.get("occlusionType", "")
     return normalized
 
 
@@ -141,6 +146,8 @@ def clean_attempt_rows(rows: list[dict[str, str]]) -> list[dict[str, object]]:
                 **row,
                 "trialIndexInCondition": to_int(row["trialIndexInCondition"]),
                 "globalTrialIndex": to_int(row["globalTrialIndex"]),
+                "trialSetId": to_int(row["trialSetId"]),
+                "trialIndexInSet": to_int(row["trialIndexInSet"]),
                 "targetLocalX": to_float(row["targetLocalX"]),
                 "targetLocalY": to_float(row["targetLocalY"]),
                 "targetSize": to_float(row["targetSize"]),
@@ -152,7 +159,6 @@ def clean_attempt_rows(rows: list[dict[str, str]]) -> list[dict[str, object]]:
                 "targetError": int(flag(row, "targetError")),
                 "miss": int(flag(row, "miss")),
                 "advancesTrial": int(flag(row, "advancesTrial")),
-                "directSelect": int(flag(row, "directSelect")),
                 "trialStartTime": to_float(row["trialStartTime"]),
                 "clickTime": to_float(row["clickTime"]),
                 "responseTime": to_float(row["responseTime"]),
@@ -243,6 +249,7 @@ def main() -> int:
 
     condition_keys = ["participantId", "sessionId", "taskPhase", "conditionName", "interactionCondition"]
     display_keys = condition_keys + ["targetDisplayId"]
+    occlusion_keys = condition_keys + ["occlusion_type"]
     summary_fields = condition_keys + [
         "nAttempts",
         "nCompletedTrials",
@@ -259,9 +266,15 @@ def main() -> int:
         "maxResponseTime",
     ]
     display_summary_fields = display_keys + summary_fields[len(condition_keys) :]
+    occlusion_summary_fields = occlusion_keys + summary_fields[len(condition_keys) :]
 
     write_csv(out_dir / "summary_by_condition.csv", summarize(cleaned, condition_keys), summary_fields)
     write_csv(out_dir / "summary_by_condition_display.csv", summarize(cleaned, display_keys), display_summary_fields)
+    write_csv(
+        out_dir / "summary_by_condition_occlusion.csv",
+        summarize(cleaned, occlusion_keys),
+        occlusion_summary_fields,
+    )
 
     print(f"[analyze_t1_results] Input files: {len(files)}")
     print(f"[analyze_t1_results] Attempts: {len(cleaned)}")

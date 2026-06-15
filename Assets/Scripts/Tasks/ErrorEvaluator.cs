@@ -31,6 +31,23 @@ public class ErrorEvaluator : MonoBehaviour
         Vector2 clickedNormalizedPosition,
         bool hasValidDisplay)
     {
+        return EvaluateFocusPointingClick(
+            targetDisplayId,
+            targetNormalizedPosition,
+            Vector2.one * targetSizeNormalized,
+            clickedDisplayId,
+            clickedNormalizedPosition,
+            hasValidDisplay);
+    }
+
+    public FocusPointingEvaluation EvaluateFocusPointingClick(
+        string targetDisplayId,
+        Vector2 targetNormalizedPosition,
+        Vector2 targetNormalizedSize,
+        string clickedDisplayId,
+        Vector2 clickedNormalizedPosition,
+        bool hasValidDisplay)
+    {
         FocusPointingEvaluation evaluation = new FocusPointingEvaluation();
 
         if (!hasValidDisplay || string.IsNullOrEmpty(clickedDisplayId) || clickedDisplayId == "None")
@@ -46,9 +63,11 @@ public class ErrorEvaluator : MonoBehaviour
             return evaluation;
         }
 
-        float halfSize = Mathf.Max(0f, targetSizeNormalized) * 0.5f;
+        Vector2 halfSize = new Vector2(
+            Mathf.Max(0f, targetNormalizedSize.x) * 0.5f,
+            Mathf.Max(0f, targetNormalizedSize.y) * 0.5f);
         Vector2 delta = clickedNormalizedPosition - targetNormalizedPosition;
-        bool insideTarget = Mathf.Abs(delta.x) <= halfSize && Mathf.Abs(delta.y) <= halfSize;
+        bool insideTarget = Mathf.Abs(delta.x) <= halfSize.x && Mathf.Abs(delta.y) <= halfSize.y;
         if (!insideTarget)
         {
             evaluation.ResultType = FocusPointingResultType.TargetError;

@@ -14,6 +14,7 @@ public class ClickDispatcher : MonoBehaviour
     [SerializeField] private VirtualCursorController virtualCursorController;
     [SerializeField] private GazeProvider gazeProvider;
     [SerializeField] private FocusPointingTaskManager focusPointingTaskManager;
+    [SerializeField] private ReferenceListTaskManager referenceListTaskManager;
     [SerializeField] private VRTaskMenuManager vrTaskMenuManager;
     [SerializeField] private Logger logger;
     [SerializeField] private float triggerScrollDeadzone = 0.05f;
@@ -49,10 +50,14 @@ public class ClickDispatcher : MonoBehaviour
             return;
         }
 
-        if (focusPointingTaskManager != null
-            && raycastPointer != null
+        if (TryHandleDisplayMenuClick())
+        {
+            return;
+        }
+
+        if (raycastPointer != null
             && displayManager.TryGetForemostHit(raycastPointer.CurrentRay, out DisplayHit taskControlHit)
-            && focusPointingTaskManager.TryHandleTaskControlClick(taskControlHit.DisplayId, taskControlHit.Normalized))
+            && TryHandleTaskControlClick(taskControlHit.DisplayId, taskControlHit.Normalized))
         {
             LastClickResult = $"{taskControlHit.DisplayId} taskControl=True";
             return;
@@ -92,7 +97,7 @@ public class ClickDispatcher : MonoBehaviour
             triggerGestureScrolled = false;
         }
 
-        return inputManager.SubmitPressed || triggerClick;
+        return inputManager.SubmitReleased || triggerClick;
     }
 
     private void DispatchRaycastBaselineClick()
@@ -111,18 +116,16 @@ public class ClickDispatcher : MonoBehaviour
             return;
         }
 
-        if (focusPointingTaskManager != null && focusPointingTaskManager.TryHandleTaskControlClick(hit.DisplayId, hit.Normalized))
+        if (TryHandleTaskControlClick(hit.DisplayId, hit.Normalized))
         {
             LastClickResult = $"{hit.DisplayId} taskControl=True";
             return;
         }
 
-        string targetId = string.Empty;
-        bool validTarget = hit.Display != null && hit.Display.TryClickDebugTarget(hit.Normalized, out targetId);
-        LastClickResult = $"{hit.DisplayId} valid={validTarget} target={targetId}";
+        LastClickResult = hit.DisplayId;
         NotifyTaskLayer(hit.DisplayId, hit.Normalized, hit.Display != null);
         Ray ray = raycastPointer != null ? raycastPointer.CurrentRay : default;
-        LogClick(hit.DisplayId, hit.Normalized, validTarget, targetId, ray);
+        LogClick(hit.DisplayId, hit.Normalized, ray);
     }
 
     private void DispatchExplicitFocusClick()
@@ -143,15 +146,13 @@ public class ClickDispatcher : MonoBehaviour
             return;
         }
 
-        if (focusPointingTaskManager != null && focusPointingTaskManager.TryHandleTaskControlClick(focusedDisplay.name, normalized))
+        if (TryHandleTaskControlClick(focusedDisplay.name, normalized))
         {
             LastClickResult = $"{focusedDisplay.name} taskControl=True";
             return;
         }
 
-        string targetId = string.Empty;
-        bool validTarget = focusedDisplay.TryClickDebugTarget(normalized, out targetId);
-        LastClickResult = $"{focusedDisplay.name} valid={validTarget} target={targetId}";
+        LastClickResult = focusedDisplay.name;
         NotifyTaskLayer(focusedDisplay.name, normalized, true);
         Ray gazeRay = gazeProvider != null ? gazeProvider.GetGazeRay() : default;
         bool gazeOnDifferentDisplay = focusManager != null && focusManager.IsGazeOnDifferentDisplay(focusedDisplay);
@@ -164,15 +165,13 @@ public class ClickDispatcher : MonoBehaviour
                 focusManager != null ? focusManager.CurrentCandidateIds : "None",
                 focusedDisplay.name,
                 normalized,
-                validTarget,
-                targetId,
                 gazeOnDifferentDisplay,
                 gazeRay.origin,
                 gazeRay.direction);
         }
         else
         {
-            Debug.Log($"[ClickDispatcher] condition={inputManager.CurrentCondition}, focusedDisplay={focusedDisplay.name}, normalized={Format(normalized)}, validTarget={validTarget}, targetId={targetId}, gazeOnDifferentDisplay={gazeOnDifferentDisplay}");
+            Debug.Log($"[ClickDispatcher] condition={inputManager.CurrentCondition}, focusedDisplay={focusedDisplay.name}, normalized={Format(normalized)}, gazeOnDifferentDisplay={gazeOnDifferentDisplay}");
         }
     }
 
@@ -217,6 +216,11 @@ public class ClickDispatcher : MonoBehaviour
             focusPointingTaskManager = FindObjectOfType<FocusPointingTaskManager>();
         }
 
+        if (referenceListTaskManager == null)
+        {
+            referenceListTaskManager = FindObjectOfType<ReferenceListTaskManager>();
+        }
+
         if (vrTaskMenuManager == null)
         {
             vrTaskMenuManager = FindObjectOfType<VRTaskMenuManager>();
@@ -230,30 +234,47 @@ public class ClickDispatcher : MonoBehaviour
 
     private void NotifyTaskLayer(string clickedDisplayId, Vector2 normalized, bool hasValidDisplay)
     {
-        if (focusPointingTaskManager == null || inputManager == null)
+        if (inputManager == null)
         {
             return;
         }
 
-        focusPointingTaskManager.HandleClick(new FocusPointingClickEvent
+        if (focusPointingTaskManager != null)
         {
-            Condition = inputManager.CurrentCondition,
-            ClickedDisplayId = clickedDisplayId,
-            ClickedNormalizedPosition = normalized,
-            Timestamp = Time.time,
-            HasValidDisplay = hasValidDisplay
-        });
+            focusPointingTaskManager.HandleClick(new FocusPointingClickEvent
+            {
+                Condition = inputManager.CurrentCondition,
+                ClickedDisplayId = clickedDisplayId,
+                ClickedNormalizedPosition = normalized,
+                Timestamp = Time.time,
+                HasValidDisplay = hasValidDisplay
+            });
+        }
+
+        referenceListTaskManager?.HandleClick(
+            clickedDisplayId,
+            normalized,
+            inputManager.CurrentCondition,
+            Time.time);
     }
 
-    private void LogClick(string displayId, Vector2 normalized, bool validTarget, string targetId, Ray ray)
+    private bool TryHandleTaskControlClick(string displayId, Vector2 normalizedPosition)
+    {
+        return (focusPointingTaskManager != null
+                && focusPointingTaskManager.TryHandleTaskControlClick(displayId, normalizedPosition))
+            || (referenceListTaskManager != null
+                && referenceListTaskManager.TryHandleTaskControlClick(displayId, normalizedPosition));
+    }
+
+    private void LogClick(string displayId, Vector2 normalized, Ray ray)
     {
         if (logger != null)
         {
-            logger.LogRaycastClick(inputManager.CurrentCondition, displayId, normalized, validTarget, targetId, ray.origin, ray.direction);
+            logger.LogRaycastClick(inputManager.CurrentCondition, displayId, normalized, ray.origin, ray.direction);
         }
         else
         {
-            Debug.Log($"[ClickDispatcher] condition={inputManager.CurrentCondition}, displayId={displayId}, normalized={Format(normalized)}, validTarget={validTarget}, targetId={targetId}");
+            Debug.Log($"[ClickDispatcher] condition={inputManager.CurrentCondition}, displayId={displayId}, normalized={Format(normalized)}");
         }
     }
 
@@ -276,6 +297,27 @@ public class ClickDispatcher : MonoBehaviour
 
         ray = default;
         return false;
+    }
+
+    private bool TryHandleDisplayMenuClick()
+    {
+        if (vrTaskMenuManager == null || raycastPointer == null || displayManager == null)
+        {
+            return false;
+        }
+
+        if (!displayManager.TryGetForemostHit(raycastPointer.CurrentRay, out DisplayHit menuHit))
+        {
+            return false;
+        }
+
+        if (!vrTaskMenuManager.TryHandleClick(menuHit.DisplayId, menuHit.Normalized))
+        {
+            return false;
+        }
+
+        LastClickResult = $"{menuHit.DisplayId} menu=True";
+        return true;
     }
 
     private static string Format(Vector2 value)

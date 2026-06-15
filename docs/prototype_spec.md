@@ -281,7 +281,7 @@ center = HMD position + HMD forward * distance
 責務：
 
 - 右スティック値の取得
-- Aボタン押下の取得
+- Aボタン解放の取得
 - 右グリップ押下の取得
 - 右トリガー押下量の取得
 - 現在の操作条件を返す
@@ -290,7 +290,7 @@ center = HMD position + HMD forward * distance
 
 ```csharp
 Vector2 RightStick;
-bool AButtonDown;
+bool AButtonReleased;
 bool GripDown;
 float TriggerValue;
 bool IsTriggerPressed;

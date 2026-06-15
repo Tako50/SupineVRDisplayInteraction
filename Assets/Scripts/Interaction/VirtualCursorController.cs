@@ -88,7 +88,7 @@ public class VirtualCursorController : MonoBehaviour
 
         displayManager.SetCursorNormalized(focusedDisplay, NormalizedPosition, true);
 
-        if (inputManager.SubmitPressed)
+        if (inputManager.SubmitReleased)
         {
             Debug.Log($"[VirtualCursor] condition={inputManager.CurrentCondition}, displayId={focusedDisplay.name}, normalized={Format(NormalizedPosition)}");
         }

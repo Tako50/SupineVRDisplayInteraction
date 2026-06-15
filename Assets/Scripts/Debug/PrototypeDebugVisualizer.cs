@@ -33,7 +33,6 @@ public class PrototypeDebugVisualizer : MonoBehaviour
     [SerializeField] private float rayLength = 4f;
     [SerializeField] private float hitPointRadius = 0.01f;
     [SerializeField] private RayVisualizationMode rayVisualizationMode = RayVisualizationMode.Hidden;
-    [SerializeField] private bool allowRuntimeRayVisualizationToggle = false;
     [SerializeField] private bool showGazeRayInGame = true;
     [SerializeField] private bool showGazeRayOnlyWhileGripHeld = true;
     [SerializeField] private float gazeRayStartOffset = 0.35f;
@@ -66,7 +65,6 @@ public class PrototypeDebugVisualizer : MonoBehaviour
     private void Update()
     {
         ResolveReferences();
-        HandleRayVisualizationToggle();
         UpdateRaycastPointerVisibility();
         UpdateGazeRayVisuals();
         UpdateUnityUiOverlay();
@@ -383,37 +381,6 @@ public class PrototypeDebugVisualizer : MonoBehaviour
         }
 
         return true;
-    }
-
-    private void HandleRayVisualizationToggle()
-    {
-        if (!allowRuntimeRayVisualizationToggle
-            || inputManager == null
-            || !inputManager.RayVisualizationTogglePressed)
-        {
-            return;
-        }
-
-        rayVisualizationMode = NextRayVisualizationMode(rayVisualizationMode);
-        UpdateRaycastPointerVisibility();
-        Debug.Log($"[PrototypeDebugVisualizer] rayVisualizationMode={rayVisualizationMode}");
-    }
-
-    private static RayVisualizationMode NextRayVisualizationMode(RayVisualizationMode current)
-    {
-        switch (current)
-        {
-            case RayVisualizationMode.ConditionBased:
-                return RayVisualizationMode.ControllerOnly;
-            case RayVisualizationMode.ControllerOnly:
-                return RayVisualizationMode.GazeOnly;
-            case RayVisualizationMode.GazeOnly:
-                return RayVisualizationMode.Both;
-            case RayVisualizationMode.Both:
-                return RayVisualizationMode.Hidden;
-            default:
-                return RayVisualizationMode.ConditionBased;
-        }
     }
 
     public void SetRayVisualizationMode(RayVisualizationMode mode)

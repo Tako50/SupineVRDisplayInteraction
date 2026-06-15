@@ -14,6 +14,7 @@ public class ScrollController : MonoBehaviour
     [SerializeField] private VirtualCursorController virtualCursorController;
     [SerializeField] private GazeProvider gazeProvider;
     [SerializeField] private Logger logger;
+    [SerializeField] private ReferenceListTaskManager referenceListTaskManager;
     [SerializeField] private float scrollLogInterval = 0.12f;
     [SerializeField] private float stickScrollDeadzone = 0.05f;
 
@@ -75,6 +76,7 @@ public class ScrollController : MonoBehaviour
 
         LastScrollAmount = appliedScroll;
         LastScrollDisplayId = hit.DisplayId;
+        referenceListTaskManager?.HandleScroll(hit.DisplayId, appliedScroll, Time.time);
 
         if (Time.time - lastScrollLogTime >= scrollLogInterval)
         {
@@ -119,6 +121,7 @@ public class ScrollController : MonoBehaviour
 
         LastScrollAmount = appliedScroll;
         LastScrollDisplayId = focusedDisplay.name;
+        referenceListTaskManager?.HandleScroll(focusedDisplay.name, appliedScroll, Time.time);
 
         if (Time.time - lastScrollLogTime >= scrollLogInterval)
         {
@@ -187,6 +190,11 @@ public class ScrollController : MonoBehaviour
         if (logger == null)
         {
             logger = FindObjectOfType<Logger>();
+        }
+
+        if (referenceListTaskManager == null)
+        {
+            referenceListTaskManager = FindObjectOfType<ReferenceListTaskManager>();
         }
     }
 
