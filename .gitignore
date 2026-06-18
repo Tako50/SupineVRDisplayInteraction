@@ -28,6 +28,10 @@ docs/.Rhistory
 mono_crash.*
 nested_access.dll
 
+# Paid/trial local assets. Import locally; do not commit plugin binaries.
+Assets/Vuplex/
+Assets/Vuplex.meta
+
 .DS_Store
 Thumbs.db
 

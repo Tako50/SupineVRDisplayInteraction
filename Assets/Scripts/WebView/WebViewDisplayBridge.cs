@@ -11,6 +11,7 @@ using UnityEngine;
 /// </summary>
 public class WebViewDisplayBridge : MonoBehaviour
 {
+    private const string VuplexCanvasWebViewPrefabTypeName = "Vuplex.WebView.CanvasWebViewPrefab";
     private const string VuplexWebViewPrefabTypeName = "Vuplex.WebView.WebViewPrefab";
 
     [Header("References")]
@@ -30,7 +31,12 @@ public class WebViewDisplayBridge : MonoBehaviour
     [SerializeField] private bool disableVuplexBuiltInPointerInput = true;
     [SerializeField] private bool nativeOnScreenKeyboardEnabled = true;
     [SerializeField] private bool remoteDebuggingEnabled = true;
+    [Tooltip("CanvasWebViewPrefab resolution in pixels per Canvas unit. 1 maps this project's 800x450 display canvas to an 800x450 web texture.")]
+    [Min(0.1f)]
+    [SerializeField] private float canvasResolutionPixelsPerUnit = 1f;
     [SerializeField] private float resolutionPixelsPerUnit = 1300f;
+    [Min(1f)]
+    [SerializeField] private float initializationTimeoutSeconds = 12f;
 
     [Header("Input Mapping")]
     [SerializeField] private float scrollPixelsPerSecond = 900f;
@@ -40,6 +46,7 @@ public class WebViewDisplayBridge : MonoBehaviour
     private Component webViewPrefabComponent;
     private object webView;
     private Coroutine initializationCoroutine;
+    private bool usingCanvasWebViewPrefab;
 
     public bool IsEnabled => enableOnStart;
     public bool IsReady => webView != null;
@@ -56,6 +63,7 @@ public class WebViewDisplayBridge : MonoBehaviour
     {
         if (enableOnStart)
         {
+            Debug.Log($"[WebViewDisplayBridge] Enable On Start is true on {name}");
             EnableWebView();
         }
     }
@@ -64,6 +72,7 @@ public class WebViewDisplayBridge : MonoBehaviour
     {
         enableOnStart = true;
         ResolveReferences();
+        Debug.Log($"[WebViewDisplayBridge] Enable requested on {name}");
 
         if (initializationCoroutine != null)
         {
@@ -86,7 +95,7 @@ public class WebViewDisplayBridge : MonoBehaviour
 
         if (webViewPrefabComponent != null)
         {
-            SetPropertyIfAvailable(webViewPrefabComponent, "Visible", false);
+            SetMemberIfAvailable(webViewPrefabComponent, "Visible", false);
         }
 
         Status = "Disabled";
@@ -181,7 +190,14 @@ public class WebViewDisplayBridge : MonoBehaviour
 
     private IEnumerator InitializeVuplexWebView()
     {
-        Type prefabType = FindType(VuplexWebViewPrefabTypeName);
+        Type prefabType = FindType(VuplexCanvasWebViewPrefabTypeName);
+        usingCanvasWebViewPrefab = prefabType != null;
+        if (prefabType == null)
+        {
+            prefabType = FindType(VuplexWebViewPrefabTypeName);
+            usingCanvasWebViewPrefab = false;
+        }
+
         if (prefabType == null)
         {
             Status = "Vuplex 3D WebView not found. Import the Android trial/package first.";
@@ -193,7 +209,9 @@ public class WebViewDisplayBridge : MonoBehaviour
         webViewPrefabComponent = FindExistingVuplexPrefab(prefabType);
         if (webViewPrefabComponent == null && autoCreateVuplexPrefab)
         {
-            webViewPrefabComponent = CreateVuplexPrefab(prefabType);
+            string prefabKind = usingCanvasWebViewPrefab ? "CanvasWebViewPrefab" : "WebViewPrefab";
+            Debug.Log($"[WebViewDisplayBridge] Creating Vuplex {prefabKind} on {name}");
+            webViewPrefabComponent = CreateVuplexPrefab(prefabType, usingCanvasWebViewPrefab);
         }
 
         if (webViewPrefabComponent == null)
@@ -206,12 +224,23 @@ public class WebViewDisplayBridge : MonoBehaviour
 
         ConfigureVuplexPrefab();
         Status = "Initializing WebView...";
+        Debug.Log($"[WebViewDisplayBridge] Initializing Vuplex WebView on {name}");
+        yield return null;
 
         object taskObject = InvokeAndReturn(webViewPrefabComponent, "WaitUntilInitialized");
         if (taskObject is Task initializationTask)
         {
+            float timeoutAt = Time.realtimeSinceStartup + initializationTimeoutSeconds;
             while (!initializationTask.IsCompleted)
             {
+                if (Time.realtimeSinceStartup >= timeoutAt)
+                {
+                    Status = $"WebView initialization timed out after {initializationTimeoutSeconds:0.0}s.";
+                    Debug.LogWarning($"[WebViewDisplayBridge] {Status}");
+                    initializationCoroutine = null;
+                    yield break;
+                }
+
                 yield return null;
             }
 
@@ -224,13 +253,23 @@ public class WebViewDisplayBridge : MonoBehaviour
                 initializationCoroutine = null;
                 yield break;
             }
+
+            if (initializationTask.IsCanceled)
+            {
+                Status = "WebView initialization was canceled.";
+                Debug.LogWarning($"[WebViewDisplayBridge] {Status}");
+                initializationCoroutine = null;
+                yield break;
+            }
         }
         else
         {
+            Status = "WaitUntilInitialized did not return a Task.";
+            Debug.LogWarning($"[WebViewDisplayBridge] {Status}");
             yield return null;
         }
 
-        webView = GetPropertyValue(webViewPrefabComponent, "WebView");
+        webView = GetMemberValue(webViewPrefabComponent, "WebView");
         if (webView == null)
         {
             Status = "WebView property is null after initialization.";
@@ -249,28 +288,45 @@ public class WebViewDisplayBridge : MonoBehaviour
         initializationCoroutine = null;
     }
 
-    private Component CreateVuplexPrefab(Type prefabType)
+    private Component CreateVuplexPrefab(Type prefabType, bool createCanvasPrefab)
     {
-        Vector2 size = displaySurface != null
-            ? displaySurface.PhysicalSizeMeters
-            : DisplayGeometry.DefaultPhysicalSizeMeters;
-
-        object instance = InvokeStaticAndReturn(
-            prefabType,
-            "Instantiate",
-            Mathf.Max(0.01f, size.x),
-            Mathf.Max(0.01f, size.y));
+        object instance = createCanvasPrefab
+            ? InvokeStaticAndReturn(prefabType, "Instantiate")
+            : CreateWorldSpaceVuplexPrefab(prefabType);
 
         if (!(instance is Component component))
         {
             return null;
         }
 
-        component.transform.SetParent(transform, false);
-        component.transform.localPosition = localOffsetMeters;
-        component.transform.localRotation = Quaternion.Euler(localEulerAngles);
-        component.gameObject.name = "Vuplex_WebViewPrefab";
+        if (createCanvasPrefab)
+        {
+            component.transform.SetParent(ResolveCanvasParent(), false);
+            component.gameObject.name = "Vuplex_CanvasWebViewPrefab";
+            StretchRectTransform(component.transform as RectTransform);
+        }
+        else
+        {
+            component.transform.SetParent(transform, false);
+            component.transform.localPosition = localOffsetMeters;
+            component.transform.localRotation = Quaternion.Euler(localEulerAngles);
+            component.gameObject.name = "Vuplex_WebViewPrefab";
+        }
+
         return component;
+    }
+
+    private object CreateWorldSpaceVuplexPrefab(Type prefabType)
+    {
+        Vector2 size = displaySurface != null
+            ? displaySurface.PhysicalSizeMeters
+            : DisplayGeometry.DefaultPhysicalSizeMeters;
+
+        return InvokeStaticAndReturn(
+            prefabType,
+            "Instantiate",
+            Mathf.Max(0.01f, size.x),
+            Mathf.Max(0.01f, size.y));
     }
 
     private void ConfigureVuplexPrefab()
@@ -280,24 +336,35 @@ public class WebViewDisplayBridge : MonoBehaviour
             return;
         }
 
-        webViewPrefabComponent.transform.localPosition = localOffsetMeters;
-        webViewPrefabComponent.transform.localRotation = Quaternion.Euler(localEulerAngles);
-        SetPropertyIfAvailable(webViewPrefabComponent, "Visible", true);
-        SetPropertyIfAvailable(webViewPrefabComponent, "InitialUrl", initialUrl);
-        SetPropertyIfAvailable(webViewPrefabComponent, "NativeOnScreenKeyboardEnabled", nativeOnScreenKeyboardEnabled);
-        SetPropertyIfAvailable(webViewPrefabComponent, "RemoteDebuggingEnabled", remoteDebuggingEnabled);
-        SetPropertyIfAvailable(webViewPrefabComponent, "Resolution", resolutionPixelsPerUnit);
+        if (usingCanvasWebViewPrefab)
+        {
+            StretchRectTransform(webViewPrefabComponent.transform as RectTransform);
+        }
+        else
+        {
+            webViewPrefabComponent.transform.localPosition = localOffsetMeters;
+            webViewPrefabComponent.transform.localRotation = Quaternion.Euler(localEulerAngles);
+        }
+
+        SetMemberIfAvailable(webViewPrefabComponent, "Visible", true);
+        SetMemberIfAvailable(webViewPrefabComponent, "InitialUrl", initialUrl);
+        SetMemberIfAvailable(webViewPrefabComponent, "NativeOnScreenKeyboardEnabled", nativeOnScreenKeyboardEnabled);
+        SetMemberIfAvailable(webViewPrefabComponent, "RemoteDebuggingEnabled", remoteDebuggingEnabled);
+        SetMemberIfAvailable(
+            webViewPrefabComponent,
+            "Resolution",
+            usingCanvasWebViewPrefab ? canvasResolutionPixelsPerUnit : resolutionPixelsPerUnit);
 
         if (disableVuplexBuiltInPointerInput)
         {
-            SetPropertyIfAvailable(webViewPrefabComponent, "ClickingEnabled", false);
-            SetPropertyIfAvailable(webViewPrefabComponent, "ScrollingEnabled", false);
-            SetPropertyIfAvailable(webViewPrefabComponent, "HoveringEnabled", false);
+            SetMemberIfAvailable(webViewPrefabComponent, "ClickingEnabled", false);
+            SetMemberIfAvailable(webViewPrefabComponent, "ScrollingEnabled", false);
+            SetMemberIfAvailable(webViewPrefabComponent, "HoveringEnabled", false);
         }
 
         if (disableVuplexCollider)
         {
-            object colliderObject = GetPropertyValue(webViewPrefabComponent, "Collider");
+            object colliderObject = GetMemberValue(webViewPrefabComponent, "Collider");
             if (colliderObject is Collider collider)
             {
                 collider.enabled = false;
@@ -323,6 +390,22 @@ public class WebViewDisplayBridge : MonoBehaviour
         }
     }
 
+    private Transform ResolveCanvasParent()
+    {
+        ResolveReferences();
+        if (displaySurface != null && displaySurface.VisiblePanel != null)
+        {
+            return displaySurface.VisiblePanel;
+        }
+
+        if (displaySurface != null && displaySurface.WorldSpaceCanvas != null)
+        {
+            return displaySurface.WorldSpaceCanvas.transform;
+        }
+
+        return transform;
+    }
+
     private Component FindExistingVuplexPrefab(Type prefabType)
     {
         Component[] childComponents = GetComponentsInChildren<Component>(true);
@@ -336,6 +419,23 @@ public class WebViewDisplayBridge : MonoBehaviour
         }
 
         return null;
+    }
+
+    private static void StretchRectTransform(RectTransform rectTransform)
+    {
+        if (rectTransform == null)
+        {
+            return;
+        }
+
+        rectTransform.anchorMin = Vector2.zero;
+        rectTransform.anchorMax = Vector2.one;
+        rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        rectTransform.offsetMin = Vector2.zero;
+        rectTransform.offsetMax = Vector2.zero;
+        rectTransform.localScale = Vector3.one;
+        rectTransform.localRotation = Quaternion.identity;
+        rectTransform.SetAsFirstSibling();
     }
 
     private static Vector2 ToVuplexNormalizedPoint(Vector2 displayNormalized)
@@ -361,40 +461,54 @@ public class WebViewDisplayBridge : MonoBehaviour
         return null;
     }
 
-    private static bool SetPropertyIfAvailable(object target, string propertyName, object value)
+    private static bool SetMemberIfAvailable(object target, string memberName, object value)
     {
         if (target == null)
-        {
-            return false;
-        }
-
-        PropertyInfo property = target.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public);
-        if (property == null || !property.CanWrite)
         {
             return false;
         }
 
         try
         {
-            property.SetValue(target, value);
-            return true;
+            Type targetType = target.GetType();
+            PropertyInfo property = targetType.GetProperty(memberName, BindingFlags.Instance | BindingFlags.Public);
+            if (property != null && property.CanWrite)
+            {
+                property.SetValue(target, value);
+                return true;
+            }
+
+            FieldInfo field = targetType.GetField(memberName, BindingFlags.Instance | BindingFlags.Public);
+            if (field != null)
+            {
+                field.SetValue(target, value);
+                return true;
+            }
         }
         catch (Exception exception)
         {
-            Debug.LogWarning($"[WebViewDisplayBridge] Could not set {propertyName}: {exception.Message}");
-            return false;
+            Debug.LogWarning($"[WebViewDisplayBridge] Could not set {memberName}: {exception.Message}");
         }
+
+        return false;
     }
 
-    private static object GetPropertyValue(object target, string propertyName)
+    private static object GetMemberValue(object target, string memberName)
     {
         if (target == null)
         {
             return null;
         }
 
-        PropertyInfo property = target.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public);
-        return property != null && property.CanRead ? property.GetValue(target) : null;
+        Type targetType = target.GetType();
+        PropertyInfo property = targetType.GetProperty(memberName, BindingFlags.Instance | BindingFlags.Public);
+        if (property != null && property.CanRead)
+        {
+            return property.GetValue(target);
+        }
+
+        FieldInfo field = targetType.GetField(memberName, BindingFlags.Instance | BindingFlags.Public);
+        return field != null ? field.GetValue(target) : null;
     }
 
     private static bool TryInvoke(object target, string methodName, params object[] args)
