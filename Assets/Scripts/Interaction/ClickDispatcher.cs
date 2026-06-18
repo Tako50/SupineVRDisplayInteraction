@@ -122,6 +122,12 @@ public class ClickDispatcher : MonoBehaviour
             return;
         }
 
+        if (TryHandleWebViewClick(hit.Display, hit.Normalized))
+        {
+            LastClickResult = $"{hit.DisplayId} webView=True";
+            return;
+        }
+
         LastClickResult = hit.DisplayId;
         NotifyTaskLayer(hit.DisplayId, hit.Normalized, hit.Display != null);
         Ray ray = raycastPointer != null ? raycastPointer.CurrentRay : default;
@@ -149,6 +155,12 @@ public class ClickDispatcher : MonoBehaviour
         if (TryHandleTaskControlClick(focusedDisplay.name, normalized))
         {
             LastClickResult = $"{focusedDisplay.name} taskControl=True";
+            return;
+        }
+
+        if (TryHandleWebViewClick(focusedDisplay, normalized))
+        {
+            LastClickResult = $"{focusedDisplay.name} webView=True";
             return;
         }
 
@@ -264,6 +276,17 @@ public class ClickDispatcher : MonoBehaviour
                 && focusPointingTaskManager.TryHandleTaskControlClick(displayId, normalizedPosition))
             || (referenceListTaskManager != null
                 && referenceListTaskManager.TryHandleTaskControlClick(displayId, normalizedPosition));
+    }
+
+    private static bool TryHandleWebViewClick(DisplaySurface display, Vector2 normalizedPosition)
+    {
+        if (display == null)
+        {
+            return false;
+        }
+
+        WebViewDisplayBridge webViewBridge = display.GetComponent<WebViewDisplayBridge>();
+        return webViewBridge != null && webViewBridge.TryClick(normalizedPosition);
     }
 
     private void LogClick(string displayId, Vector2 normalized, Ray ray)

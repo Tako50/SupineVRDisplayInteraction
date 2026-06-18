@@ -68,6 +68,13 @@ public class ScrollController : MonoBehaviour
             return;
         }
 
+        if (TryHandleWebViewScroll(hit.Display, stickVertical, Time.deltaTime, hit.Normalized, out float webViewScrollPixels))
+        {
+            LastScrollAmount = webViewScrollPixels;
+            LastScrollDisplayId = hit.DisplayId;
+            return;
+        }
+
         float appliedScroll = hit.Display.Scroll(stickVertical, Time.deltaTime);
         if (Mathf.Approximately(appliedScroll, 0f))
         {
@@ -113,6 +120,17 @@ public class ScrollController : MonoBehaviour
             return;
         }
 
+        Vector2 normalized = virtualCursorController != null
+            ? virtualCursorController.NormalizedPosition
+            : new Vector2(0.5f, 0.5f);
+
+        if (TryHandleWebViewScroll(focusedDisplay, stickVertical, Time.deltaTime, normalized, out float webViewScrollPixels))
+        {
+            LastScrollAmount = webViewScrollPixels;
+            LastScrollDisplayId = focusedDisplay.name;
+            return;
+        }
+
         float appliedScroll = focusedDisplay.Scroll(stickVertical, Time.deltaTime);
         if (Mathf.Approximately(appliedScroll, 0f))
         {
@@ -126,9 +144,6 @@ public class ScrollController : MonoBehaviour
         if (Time.time - lastScrollLogTime >= scrollLogInterval)
         {
             lastScrollLogTime = Time.time;
-            Vector2 normalized = virtualCursorController != null
-                ? virtualCursorController.NormalizedPosition
-                : new Vector2(0.5f, 0.5f);
             Ray gazeRay = gazeProvider != null ? gazeProvider.GetGazeRay() : default;
             bool gazeOnDifferentDisplay = focusManager != null && focusManager.IsGazeOnDifferentDisplay(focusedDisplay);
             if (logger != null)
@@ -149,6 +164,24 @@ public class ScrollController : MonoBehaviour
                 Debug.Log($"[ScrollController] condition={inputManager.CurrentCondition}, focusedDisplay={focusedDisplay.name}, normalized={Format(normalized)}, scrollAmount={appliedScroll:0.000}, gazeOnDifferentDisplay={gazeOnDifferentDisplay}");
             }
         }
+    }
+
+    private static bool TryHandleWebViewScroll(
+        DisplaySurface display,
+        float stickVertical,
+        float deltaTime,
+        Vector2 normalizedPosition,
+        out float appliedScrollPixels)
+    {
+        appliedScrollPixels = 0f;
+        if (display == null)
+        {
+            return false;
+        }
+
+        WebViewDisplayBridge webViewBridge = display.GetComponent<WebViewDisplayBridge>();
+        return webViewBridge != null
+            && webViewBridge.TryScroll(stickVertical, deltaTime, normalizedPosition, out appliedScrollPixels);
     }
 
     private void ResolveReferences()

@@ -277,8 +277,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Material: {fileID: 0}
   m_Color: {r: 0.18, g: 0.32, b: 0.46, a: 0.86}
   m_RaycastTarget: 1
@@ -315,8 +315,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3312d7739989d2b4e91e6319e9a96d76, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Padding: {x: 0, y: 0, z: 0, w: 0}
   m_Softness: {x: 0, y: 0}
 --- !u!1 &359398848
@@ -446,6 +446,7 @@ GameObject:
   m_Component:
   - component: {fileID: 528464814}
   - component: {fileID: 528464813}
+  - component: {fileID: 528464815}
   m_Layer: 0
   m_Name: Display_A_Front
   m_TagString: Untagged
@@ -497,6 +498,33 @@ Transform:
   - {fileID: 1034436737}
   m_Father: {fileID: 888164666}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &528464815
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 528464812}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1bdcbd55c44374c4fb344c6a972feaf8, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  displaySurface: {fileID: 0}
+  enableOnStart: 0
+  initialUrl: https://www.youtube.com
+  autoCreateVuplexPrefab: 1
+  consumeExperimentInput: 1
+  localOffsetMeters: {x: 0, y: 0, z: -0.002}
+  localEulerAngles: {x: 0, y: 0, z: 0}
+  disableVuplexCollider: 1
+  disableVuplexBuiltInPointerInput: 1
+  nativeOnScreenKeyboardEnabled: 1
+  remoteDebuggingEnabled: 1
+  resolutionPixelsPerUnit: 1300
+  scrollPixelsPerSecond: 900
+  invertScrollDirection: 1
+  logInputEvents: 0
 --- !u!1 &534414694
 GameObject:
   m_ObjectHideFlags: 0
@@ -1099,6 +1127,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1035063438}
   - component: {fileID: 1035063437}
+  - component: {fileID: 1035063439}
   m_Layer: 0
   m_Name: Display_B_Back
   m_TagString: Untagged
@@ -1150,6 +1179,33 @@ Transform:
   - {fileID: 1302094132}
   m_Father: {fileID: 888164666}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1035063439
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1035063436}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1bdcbd55c44374c4fb344c6a972feaf8, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  displaySurface: {fileID: 0}
+  enableOnStart: 0
+  initialUrl: https://www.youtube.com
+  autoCreateVuplexPrefab: 1
+  consumeExperimentInput: 1
+  localOffsetMeters: {x: 0, y: 0, z: -0.002}
+  localEulerAngles: {x: 0, y: 0, z: 0}
+  disableVuplexCollider: 1
+  disableVuplexBuiltInPointerInput: 1
+  nativeOnScreenKeyboardEnabled: 1
+  remoteDebuggingEnabled: 1
+  resolutionPixelsPerUnit: 1300
+  scrollPixelsPerSecond: 900
+  invertScrollDirection: 1
+  logInputEvents: 0
 --- !u!1 &1045802439
 GameObject:
   m_ObjectHideFlags: 0
@@ -1330,11 +1386,15 @@ MonoBehaviour:
   displayManager: {fileID: 1045802448}
   rightControllerTransform: {fileID: 2098682404}
   rayLine: {fileID: 0}
-  visibleRayLength: 4
+  showRayLine: 1
+  rayLengthLevel: 1
+  shortRayLength: 0.5
+  mediumRayLength: 1
+  longRayLength: 2
   rayStartWidth: 0.007
   rayEndWidth: 0.002
   rayColor: {r: 0, g: 1, b: 1, a: 1}
-  showRayLine: 1
+  logRayVisualSettingChanges: 1
 --- !u!114 &1045802446
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1493,6 +1553,26 @@ MonoBehaviour:
   allowLayoutSwitching: 1
   lockDisplaysAfterStart: 1
   debugLogIntervalSeconds: 0.5
+  raycastHighlightOffRay:
+    interactionMethod: 0
+    highlightEnabled: 0
+    rayVisualEnabled: 0
+    rayLengthLevel: 1
+  raycastHighlightOnRay:
+    interactionMethod: 0
+    highlightEnabled: 1
+    rayVisualEnabled: 0
+    rayLengthLevel: 1
+  proposedHighlightOffRay:
+    interactionMethod: 1
+    highlightEnabled: 0
+    rayVisualEnabled: 0
+    rayLengthLevel: 1
+  proposedHighlightOnRay:
+    interactionMethod: 1
+    highlightEnabled: 1
+    rayVisualEnabled: 0
+    rayLengthLevel: 1
 --- !u!4 &1045802452
 Transform:
   m_ObjectHideFlags: 0

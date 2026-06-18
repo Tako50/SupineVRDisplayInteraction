@@ -118,6 +118,53 @@ In `Dev_Prototype`, attach `GazeDisplayFocusManager` to `Prototype_Managers` and
 
 Turning highlight OFF immediately calls `SetFocused(false)` for every `DisplaySurface`. The display is a uGUI `Image`, so the highlight uses `Image.color` rather than changing a shared material; `MaterialPropertyBlock` is not applicable to this UI component.
 
+## Per-Condition Controller Ray Display Settings
+
+The visible controller Ray is configured per experiment condition, independently from the cursor:
+
+- `Ray OFF` / `Ray ON`: hide or show the controller Ray visual.
+- `Short` / `Medium` / `Long`: choose the visible Ray length for the currently selected method + highlight condition.
+
+This is a visual setting only. `RaycastBaseline` still uses the existing controller-ray hit test for cursor position, clicking, scrolling, and occlusion reproduction. When the interaction method is `ExplicitDisplayFocus`, the controller Ray is not used for display selection.
+
+`ExperimentManager` has four Inspector settings:
+
+- `Raycast Highlight Off Ray`
+- `Raycast Highlight On Ray`
+- `Proposed Highlight Off Ray`
+- `Proposed Highlight On Ray`
+
+Each setting has its own `Ray Visual Enabled` and `Ray Length Level`, so the four experiment conditions can use different Ray lengths. In the in-app task menu, the `CONDITION RAY` buttons edit only the currently selected method + highlight condition.
+
+External scripts can apply the same settings through:
+
+```csharp
+experimentManager.SetRayVisualEnabled(true);
+experimentManager.SetRayLengthLevel(RayVisualLengthLevel.Medium);
+experimentManager.SetRayVisualSettings(true, RayVisualLengthLevel.Long);
+```
+
+The default visible lengths are configured on `RaycastPointer`: Short `1.5m`, Medium `2.5m`, and Long `4.0m`.
+
+## Optional WebView Probe
+
+`WebViewDisplayBridge` is an optional probe for T3-style free browsing sessions. It lets the existing `DisplaySurface` click and scroll coordinates drive a Vuplex `WebViewPrefab` when the Vuplex package is imported.
+
+The repository does not include Vuplex or any paid/trial WebView binaries. To test real browsing:
+
+1. Download the Vuplex `3D WebView for Android` trial or package.
+2. Import it into the Unity project locally.
+3. Add `WebViewDisplayBridge` to a `DisplaySurface` GameObject, such as `Display_B_Back`.
+4. Set `Enable On Start` to true and set `Initial Url` to a test page such as `https://www.youtube.com`.
+5. Build to Quest Pro. Android WebView rendering must be verified on device; without the Vuplex package the bridge logs that WebView is not found and the project still compiles.
+
+When `Consume Experiment Input` is enabled, the current experiment input path is reused:
+
+- `RaycastBaseline`: controller-ray hit position clicks or scrolls the WebView.
+- `ExplicitDisplayFocus`: the focused display's virtual cursor clicks or scrolls the WebView.
+
+This keeps WebView browsing independent from the interaction method. Do not commit Vuplex plugin files or trial binaries to the public repository.
+
 ## Phase 3.5 Editor Validation
 
 `Dev_Prototype` includes editor-only validation helpers for testing `ExplicitDisplayFocus` without Quest hardware:

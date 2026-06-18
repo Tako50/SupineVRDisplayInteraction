@@ -33,6 +33,8 @@ public static class DevPrototypeSceneBuilder
         Color sharedDisplayColor = new Color(0.18f, 0.32f, 0.46f, 0.86f);
         DisplaySurface displayA = CreateOrUpdateDisplay(displaysRoot, "Display_A_Front", sharedDisplayColor, string.Empty);
         DisplaySurface displayB = CreateOrUpdateDisplay(displaysRoot, "Display_B_Back", sharedDisplayColor, string.Empty);
+        WebViewDisplayBridge webViewBridgeA = GetOrAdd<WebViewDisplayBridge>(displayA.gameObject);
+        WebViewDisplayBridge webViewBridgeB = GetOrAdd<WebViewDisplayBridge>(displayB.gameObject);
 
         GameObject managers = GameObject.Find("Prototype_Managers") ?? new GameObject("Prototype_Managers");
         Component controlPanel = GetOrAddByTypeName(managers, "PrototypeControlPanel");
@@ -64,6 +66,11 @@ public static class DevPrototypeSceneBuilder
         SetEnum(layoutManager, "initialPreset", DisplayLayoutPreset.UpDownDepth);
         SetBool(layoutManager, "useFixedSceneLayout", false);
         SetBool(layoutManager, "applyOnStart", true);
+
+        SetBool(webViewBridgeA, "enableOnStart", false);
+        SetString(webViewBridgeA, "initialUrl", "https://www.youtube.com");
+        SetBool(webViewBridgeB, "enableOnStart", false);
+        SetString(webViewBridgeB, "initialUrl", "https://www.youtube.com");
 
         SetObject(gazeProvider, "hmdCamera", hmdCamera);
         Transform eyeTrackingRaySource = EnsureChild(managers.transform, "EyeTracking_RaySource");
@@ -106,6 +113,11 @@ public static class DevPrototypeSceneBuilder
         SetObject(raycastPointer, "inputManager", inputManager);
         SetObject(raycastPointer, "displayManager", displayManager);
         SetObject(raycastPointer, "rightControllerTransform", controllerRaySource);
+        SetBool(raycastPointer, "showRayLine", false);
+        SetEnum(raycastPointer, "rayLengthLevel", RayVisualLengthLevel.Medium);
+        SetFloat(raycastPointer, "shortRayLength", 1.5f);
+        SetFloat(raycastPointer, "mediumRayLength", 2.5f);
+        SetFloat(raycastPointer, "longRayLength", 4f);
 
         SetObject(cursorController, "inputManager", inputManager);
         SetObject(cursorController, "displayManager", displayManager);
@@ -188,6 +200,8 @@ public static class DevPrototypeSceneBuilder
         SetObject(vrTaskMenuManager, "displayManager", displayManager);
         SetObject(vrTaskMenuManager, "focusPointingTaskManager", focusPointingTaskManager);
         SetObject(vrTaskMenuManager, "referenceListTaskManager", referenceListTaskManager);
+        SetObject(vrTaskMenuManager, "raycastPointer", raycastPointer);
+        SetObject(vrTaskMenuManager, "gazeProvider", gazeProvider);
         SetObject(vrTaskMenuManager, "gazeDisplayFocusManager", gazeDisplayFocusManager);
         SetBool(vrTaskMenuManager, "showLayoutButtons", true);
         SetBool(vrTaskMenuManager, "applySelectedLayout", true);

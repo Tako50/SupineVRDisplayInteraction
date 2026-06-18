@@ -1,5 +1,37 @@
 using UnityEngine;
 
+[System.Serializable]
+public class RayVisualConditionSettings
+{
+    [HideInInspector]
+    public InteractionCondition interactionMethod = InteractionCondition.RaycastBaseline;
+    [HideInInspector]
+    public bool highlightEnabled = true;
+    public bool rayVisualEnabled = false;
+    public RayVisualLengthLevel rayLengthLevel = RayVisualLengthLevel.Medium;
+
+    public RayVisualConditionSettings()
+    {
+    }
+
+    public RayVisualConditionSettings(
+        InteractionCondition interactionMethod,
+        bool highlightEnabled,
+        bool rayVisualEnabled,
+        RayVisualLengthLevel rayLengthLevel)
+    {
+        this.interactionMethod = interactionMethod;
+        this.highlightEnabled = highlightEnabled;
+        this.rayVisualEnabled = rayVisualEnabled;
+        this.rayLengthLevel = rayLengthLevel;
+    }
+
+    public bool Matches(InteractionCondition method, bool highlight)
+    {
+        return interactionMethod == method && highlightEnabled == highlight;
+    }
+}
+
 [DisallowMultipleComponent]
 /// <summary>
 /// プロトタイプ全体の現在条件・配置プリセット・デバッグ状態を束ねる軽い管理役。
@@ -27,7 +59,22 @@ public class ExperimentManager : MonoBehaviour
     [SerializeField] private bool lockDisplaysAfterStart = true;
     [SerializeField] private float debugLogIntervalSeconds = 0.5f;
 
+    [Header("Ray Visual Per Condition")]
+    [SerializeField] private RayVisualConditionSettings raycastHighlightOffRay =
+        new RayVisualConditionSettings(InteractionCondition.RaycastBaseline, false, false, RayVisualLengthLevel.Medium);
+    [SerializeField] private RayVisualConditionSettings raycastHighlightOnRay =
+        new RayVisualConditionSettings(InteractionCondition.RaycastBaseline, true, false, RayVisualLengthLevel.Medium);
+    [SerializeField] private RayVisualConditionSettings proposedHighlightOffRay =
+        new RayVisualConditionSettings(InteractionCondition.ExplicitDisplayFocus, false, false, RayVisualLengthLevel.Medium);
+    [SerializeField] private RayVisualConditionSettings proposedHighlightOnRay =
+        new RayVisualConditionSettings(InteractionCondition.ExplicitDisplayFocus, true, false, RayVisualLengthLevel.Medium);
+
     private DisplayLayoutPreset currentLayout;
+    private bool currentRayVisualEnabled;
+    private RayVisualLengthLevel currentRayLengthLevel;
+    private InteractionCondition lastRayVisualCondition;
+    private bool lastRayVisualHighlightEnabled;
+    private bool hasAppliedRayVisualCondition;
     private float nextDebugLogTime;
 
     public InteractionCondition CurrentCondition => inputManager != null ? inputManager.CurrentCondition : startingCondition;
@@ -35,10 +82,14 @@ public class ExperimentManager : MonoBehaviour
         ? gazeDisplayFocusManager.HighlightEnabled
         : startingHighlightEnabled;
     public DisplayLayoutPreset CurrentLayout => currentLayout;
+    public bool RayVisualEnabled => currentRayVisualEnabled;
+    public RayVisualLengthLevel RayLengthLevel => currentRayLengthLevel;
+    public float RayVisualLengthMeters => raycastPointer != null ? raycastPointer.VisibleRayLengthMeters : 0f;
 
     private void Awake()
     {
         ResolveReferences();
+        EnsureRayVisualConditionKeys();
         currentLayout = startingLayout;
 
         if (inputManager != null)
@@ -47,6 +98,12 @@ public class ExperimentManager : MonoBehaviour
         }
 
         SetHighlightEnabled(startingHighlightEnabled);
+        ApplyRayVisualForCurrentCondition();
+    }
+
+    private void OnValidate()
+    {
+        EnsureRayVisualConditionKeys();
     }
 
     private void Start()
@@ -60,6 +117,7 @@ public class ExperimentManager : MonoBehaviour
     private void Update()
     {
         ResolveReferences();
+        ApplyRayVisualIfConditionChanged();
         HandleKeyboardShortcuts();
         SampleDebugState();
     }
@@ -106,6 +164,154 @@ public class ExperimentManager : MonoBehaviour
         {
             gazeDisplayFocusManager.SetHighlightEnabled(enabled);
         }
+
+        ApplyRayVisualForCurrentCondition();
+    }
+
+    public void SetRayVisualEnabled(bool enabled)
+    {
+        SetRayVisualSettings(enabled, currentRayLengthLevel);
+    }
+
+    public void SetRayLengthLevel(RayVisualLengthLevel level)
+    {
+        SetRayVisualSettings(currentRayVisualEnabled, level);
+    }
+
+    public void SetRayVisualSettings(bool enabled, RayVisualLengthLevel level)
+    {
+        SetRayVisualSettingsForCondition(CurrentCondition, HighlightEnabled, enabled, level, true);
+    }
+
+    public void SetRayVisualSettingsForCondition(
+        InteractionCondition interactionMethod,
+        bool highlightEnabled,
+        bool rayVisualEnabled,
+        RayVisualLengthLevel rayLengthLevel,
+        bool applyIfCurrent = true)
+    {
+        RayVisualConditionSettings settings = GetRayVisualSettingsForCondition(interactionMethod, highlightEnabled);
+        settings.rayVisualEnabled = rayVisualEnabled;
+        settings.rayLengthLevel = rayLengthLevel;
+
+        if (applyIfCurrent
+            && CurrentCondition == interactionMethod
+            && HighlightEnabled == highlightEnabled)
+        {
+            ApplyRayVisualSettings(rayVisualEnabled, rayLengthLevel);
+        }
+    }
+
+    public RayVisualConditionSettings GetRayVisualSettingsForCondition(
+        InteractionCondition interactionMethod,
+        bool highlightEnabled)
+    {
+        EnsureRayVisualConditionKeys();
+
+        if (raycastHighlightOffRay.Matches(interactionMethod, highlightEnabled))
+        {
+            return raycastHighlightOffRay;
+        }
+
+        if (raycastHighlightOnRay.Matches(interactionMethod, highlightEnabled))
+        {
+            return raycastHighlightOnRay;
+        }
+
+        if (proposedHighlightOffRay.Matches(interactionMethod, highlightEnabled))
+        {
+            return proposedHighlightOffRay;
+        }
+
+        return proposedHighlightOnRay;
+    }
+
+    public void ApplyRayVisualForCurrentCondition()
+    {
+        RayVisualConditionSettings settings = GetRayVisualSettingsForCondition(CurrentCondition, HighlightEnabled);
+        ApplyRayVisualSettings(settings.rayVisualEnabled, settings.rayLengthLevel);
+        lastRayVisualCondition = CurrentCondition;
+        lastRayVisualHighlightEnabled = HighlightEnabled;
+        hasAppliedRayVisualCondition = true;
+    }
+
+    private void ApplyRayVisualSettings(bool enabled, RayVisualLengthLevel level)
+    {
+        bool changed = currentRayVisualEnabled != enabled || currentRayLengthLevel != level;
+        currentRayVisualEnabled = enabled;
+        currentRayLengthLevel = level;
+
+        if (raycastPointer != null)
+        {
+            raycastPointer.SetRayVisualSettings(enabled, level);
+        }
+
+        if (changed)
+        {
+            Debug.Log(
+                $"[ExperimentManager] rayVisualEnabled={enabled}, "
+                + $"rayLengthLevel={level}, rayLengthMeters={RayVisualLengthMeters:0.00}");
+        }
+    }
+
+    private void ApplyRayVisualIfConditionChanged()
+    {
+        if (!hasAppliedRayVisualCondition
+            || lastRayVisualCondition != CurrentCondition
+            || lastRayVisualHighlightEnabled != HighlightEnabled)
+        {
+            ApplyRayVisualForCurrentCondition();
+        }
+    }
+
+    private void EnsureRayVisualConditionKeys()
+    {
+        raycastHighlightOffRay ??= new RayVisualConditionSettings(
+            InteractionCondition.RaycastBaseline,
+            false,
+            false,
+            RayVisualLengthLevel.Medium);
+        raycastHighlightOnRay ??= new RayVisualConditionSettings(
+            InteractionCondition.RaycastBaseline,
+            true,
+            false,
+            RayVisualLengthLevel.Medium);
+        proposedHighlightOffRay ??= new RayVisualConditionSettings(
+            InteractionCondition.ExplicitDisplayFocus,
+            false,
+            false,
+            RayVisualLengthLevel.Medium);
+        proposedHighlightOnRay ??= new RayVisualConditionSettings(
+            InteractionCondition.ExplicitDisplayFocus,
+            true,
+            false,
+            RayVisualLengthLevel.Medium);
+
+        ApplyRayVisualConditionKey(
+            raycastHighlightOffRay,
+            InteractionCondition.RaycastBaseline,
+            false);
+        ApplyRayVisualConditionKey(
+            raycastHighlightOnRay,
+            InteractionCondition.RaycastBaseline,
+            true);
+        ApplyRayVisualConditionKey(
+            proposedHighlightOffRay,
+            InteractionCondition.ExplicitDisplayFocus,
+            false);
+        ApplyRayVisualConditionKey(
+            proposedHighlightOnRay,
+            InteractionCondition.ExplicitDisplayFocus,
+            true);
+    }
+
+    private static void ApplyRayVisualConditionKey(
+        RayVisualConditionSettings settings,
+        InteractionCondition interactionMethod,
+        bool highlightEnabled)
+    {
+        settings.interactionMethod = interactionMethod;
+        settings.highlightEnabled = highlightEnabled;
     }
 
     public void SetInteractionAndHighlight(InteractionCondition interactionMethod, bool enabled)

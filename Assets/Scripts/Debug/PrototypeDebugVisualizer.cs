@@ -81,8 +81,9 @@ public class PrototypeDebugVisualizer : MonoBehaviour
         }
 
         Ray controllerRay = GetControllerRay();
+        float controllerRayLength = raycastPointer != null ? raycastPointer.VisibleRayLengthMeters : rayLength;
         Gizmos.color = Color.cyan;
-        Gizmos.DrawLine(controllerRay.origin, controllerRay.origin + controllerRay.direction * rayLength);
+        Gizmos.DrawLine(controllerRay.origin, controllerRay.origin + controllerRay.direction * controllerRayLength);
         if (displayManager.TryGetForemostHit(controllerRay, out DisplayHit controllerHit))
         {
             Gizmos.DrawSphere(controllerHit.Hit.point, hitPointRadius);
@@ -330,24 +331,24 @@ public class PrototypeDebugVisualizer : MonoBehaviour
             return;
         }
 
-        raycastPointer.SetRayLineVisible(ShouldShowControllerRay());
+        if (rayVisualizationMode == RayVisualizationMode.Hidden)
+        {
+            return;
+        }
+
+        raycastPointer.SetRayVisualEnabled(ShouldEnableControllerRayVisual());
     }
 
-    private bool ShouldShowControllerRay()
+    private bool ShouldEnableControllerRayVisual()
     {
-        if (rayVisualizationMode == RayVisualizationMode.Hidden)
+        if (rayVisualizationMode == RayVisualizationMode.GazeOnly)
         {
             return false;
         }
 
-        if (rayVisualizationMode == RayVisualizationMode.ControllerOnly || rayVisualizationMode == RayVisualizationMode.Both)
-        {
-            return true;
-        }
-
-        return rayVisualizationMode == RayVisualizationMode.ConditionBased
-            && inputManager != null
-            && inputManager.CurrentCondition == InteractionCondition.RaycastBaseline;
+        return rayVisualizationMode == RayVisualizationMode.ControllerOnly
+            || rayVisualizationMode == RayVisualizationMode.Both
+            || rayVisualizationMode == RayVisualizationMode.ConditionBased;
     }
 
     private bool ShouldShowGazeRay()
@@ -590,6 +591,9 @@ public class PrototypeDebugVisualizer : MonoBehaviour
         string lastScroll = scrollController != null
             ? $"{scrollController.LastScrollDisplayId} {scrollController.LastScrollAmount:0.000}"
             : "None";
+        string controllerRayVisual = raycastPointer != null
+            ? $"{(raycastPointer.RayVisualEnabled ? "ON" : "OFF")} {raycastPointer.RayLengthLevel} {raycastPointer.VisibleRayLengthMeters:0.00}m"
+            : "No RaycastPointer";
         string trial = focusPointingTaskManager != null && focusPointingTaskManager.IsRunning
             ? $"{focusPointingTaskManager.CurrentTrialIndex} target={focusPointingTaskManager.CurrentTargetDisplayId} {Format(focusPointingTaskManager.CurrentTargetNormalizedPosition)} size={focusPointingTaskManager.CurrentTargetSizeNormalized:0.000}"
             : "None";
@@ -598,6 +602,7 @@ public class PrototypeDebugVisualizer : MonoBehaviour
             "Explicit Display Focus Debug\n" +
             $"Condition: {condition}\n" +
             $"Ray mode: {rayVisualizationMode}\n" +
+            $"Controller ray visual: {controllerRayVisual}\n" +
             $"Gaze source: configured={configuredGazeSource}, active={activeGazeSource}\n" +
             $"Eye tracking: {eyeTracking}\n" +
             $"Focus state: {focusState}\n" +
