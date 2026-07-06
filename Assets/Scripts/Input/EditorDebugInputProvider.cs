@@ -25,6 +25,8 @@ public class EditorDebugInputProvider : MonoBehaviour
     [SerializeField] private KeyCode gripKey = KeyCode.G;
     [SerializeField] private KeyCode submitKey = KeyCode.Space;
     [SerializeField] private KeyCode triggerKey = KeyCode.LeftShift;
+    [SerializeField] private KeyCode stickClickKey = KeyCode.LeftControl;
+    [SerializeField] private KeyCode exitHoldKey = KeyCode.X;
     [SerializeField] private KeyCode resetFocusKey = KeyCode.R;
     [SerializeField] private KeyCode highlightToggleKey = KeyCode.H;
     [SerializeField] private KeyCode upDownDepthKey = KeyCode.Alpha1;
@@ -44,12 +46,20 @@ public class EditorDebugInputProvider : MonoBehaviour
     public bool IsEnabled => forceEnabled || IsPlatformEnabled();
     public bool LogDebugInputEvents => logDebugInputEvents;
     public Vector2 Stick { get; private set; }
+    public bool SubmitPressed { get; private set; }
+    public bool SubmitHeld { get; private set; }
     public bool SubmitReleased { get; private set; }
     public bool GripPressed { get; private set; }
     public bool GripHeld { get; private set; }
     public bool TriggerPressed { get; private set; }
     public bool TriggerHeld { get; private set; }
     public bool TriggerReleased { get; private set; }
+    public bool StickClickPressed { get; private set; }
+    public bool StickClickHeld { get; private set; }
+    public bool StickClickReleased { get; private set; }
+    public bool ExitPressed { get; private set; }
+    public bool ExitHeld { get; private set; }
+    public bool ExitReleased { get; private set; }
     public bool ToggleConditionPressed { get; private set; }
     public bool ResetFocusPressed { get; private set; }
     public bool HighlightTogglePressed { get; private set; }
@@ -77,12 +87,20 @@ public class EditorDebugInputProvider : MonoBehaviour
         stick.y -= GetKey(stickDownKey) || (useArrowKeys && GetKey(KeyCode.DownArrow)) ? 1f : 0f;
 
         Stick = Vector2.ClampMagnitude(stick, 1f);
+        SubmitPressed = GetKeyDown(submitKey);
+        SubmitHeld = GetKey(submitKey);
         SubmitReleased = GetKeyUp(submitKey);
         GripPressed = GetKeyDown(gripKey);
         GripHeld = GetKey(gripKey);
         TriggerHeld = GetKey(triggerKey);
         TriggerPressed = GetKeyDown(triggerKey);
         TriggerReleased = GetKeyUp(triggerKey);
+        StickClickHeld = GetKey(stickClickKey);
+        StickClickPressed = GetKeyDown(stickClickKey);
+        StickClickReleased = GetKeyUp(stickClickKey);
+        ExitHeld = GetKey(exitHoldKey);
+        ExitPressed = GetKeyDown(exitHoldKey);
+        ExitReleased = GetKeyUp(exitHoldKey);
         ToggleConditionPressed = GetKeyDown(toggleConditionKey);
         ResetFocusPressed = GetKeyDown(resetFocusKey);
         HighlightTogglePressed = GetKeyDown(highlightToggleKey);
@@ -99,12 +117,20 @@ public class EditorDebugInputProvider : MonoBehaviour
     private void Clear()
     {
         Stick = Vector2.zero;
+        SubmitPressed = false;
+        SubmitHeld = false;
         SubmitReleased = false;
         GripPressed = false;
         GripHeld = false;
         TriggerHeld = false;
         TriggerPressed = false;
         TriggerReleased = false;
+        StickClickHeld = false;
+        StickClickPressed = false;
+        StickClickReleased = false;
+        ExitPressed = false;
+        ExitHeld = false;
+        ExitReleased = false;
         ToggleConditionPressed = false;
         ResetFocusPressed = false;
         HighlightTogglePressed = false;
@@ -134,6 +160,11 @@ public class EditorDebugInputProvider : MonoBehaviour
             Debug.Log("[EditorDebugInput] GripDown");
         }
 
+        if (SubmitPressed)
+        {
+            Debug.Log("[EditorDebugInput] AButtonPressed");
+        }
+
         if (SubmitReleased)
         {
             Debug.Log("[EditorDebugInput] AButtonReleased");
@@ -147,6 +178,16 @@ public class EditorDebugInputProvider : MonoBehaviour
         if (TriggerReleased)
         {
             Debug.Log("[EditorDebugInput] TriggerReleased");
+        }
+
+        if (StickClickPressed)
+        {
+            Debug.Log("[EditorDebugInput] StickClickPressed");
+        }
+
+        if (StickClickReleased)
+        {
+            Debug.Log("[EditorDebugInput] StickClickReleased");
         }
 
         if (ResetFocusPressed)

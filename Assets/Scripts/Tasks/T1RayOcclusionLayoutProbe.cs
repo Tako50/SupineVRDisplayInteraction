@@ -87,7 +87,7 @@ public class T1RayOcclusionLayoutProbe : MonoBehaviour
     [SerializeField] private Color rayHitOnD2Color = new Color(1f, 0.55f, 0.05f, 0.42f);
     [SerializeField] private Color ambiguousOverlayColor = new Color(1f, 1f, 0.05f, 0.32f);
 
-    private const bool ShowReferencePointGizmos = true;
+    private static readonly bool ShowReferencePointGizmos = true;
     private const float ReferencePointGizmoRadius = 0.035f;
     private static readonly Color EyeGizmoColor = new Color(0.10f, 0.80f, 1f, 1f);
     private static readonly Color HandCenterGizmoColor = new Color(1f, 0.25f, 0.10f, 1f);

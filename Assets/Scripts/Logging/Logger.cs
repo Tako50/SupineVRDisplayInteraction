@@ -208,7 +208,7 @@ public class Logger : MonoBehaviour
                 result.TrialIndex,
                 result.TrialSetId,
                 result.TrialIndexInSet,
-                result.OcclusionType,
+                result.InputOccluded ? "inputOccluded" : "none",
                 result.TargetDisplayId,
                 FormatVector(result.TargetNormalizedPosition),
                 result.TargetSizeNormalized.ToString("0.000", CultureInfo.InvariantCulture),
@@ -223,7 +223,7 @@ public class Logger : MonoBehaviour
                 result.CompletionTime.ToString("0.000", CultureInfo.InvariantCulture)));
         }
 
-        Debug.Log($"[Logger] trialResult participant={result.ParticipantId}, session={result.SessionId}, trial={result.TrialIndex}, trialSetId={result.TrialSetId}, condition={result.Condition}, layout={result.LayoutPreset}, occlusion={result.OcclusionType}, targetDisplay={result.TargetDisplayId}, target={FormatVector(result.TargetNormalizedPosition)}, size={result.TargetSizeNormalized:0.000}, clickedDisplay={result.ClickedDisplayId}, clicked={FormatVector(result.ClickedNormalizedPosition)}, result={result.ResultType}, correct={result.IsCorrect}, displayError={result.IsDisplayError}, targetError={result.IsTargetError}, completion={result.CompletionTime:0.000}");
+        Debug.Log($"[Logger] trialResult participant={result.ParticipantId}, session={result.SessionId}, trial={result.TrialIndex}, trialSetId={result.TrialSetId}, task={result.Task}, taskOrder={result.TaskOrder}, methodOrder={result.MethodOrder}, condition={result.Condition}, layout={result.LayoutPreset}, occlusion={(result.InputOccluded ? "inputOccluded" : "none")}, targetDisplay={result.TargetDisplayId}, target={FormatVector(result.TargetNormalizedPosition)}, size={result.TargetSizeNormalized:0.000}, clickedDisplay={result.ClickedDisplayId}, clicked={FormatVector(result.ClickedNormalizedPosition)}, result={result.ResultType}, correct={result.IsCorrect}, displayError={result.IsDisplayError}, targetError={result.IsTargetError}, completion={result.CompletionTime:0.000}, controllerMovementMeters={result.ControllerMovementMeters:0.000000}, controllerRotationDegrees={result.ControllerRotationDegrees:0.000}");
     }
 
     private void Open()

@@ -342,6 +342,7 @@ public class DisplayLayoutConfig
             new DisplayPlacementConfig(1.25f, 0f, -18f),
             new DisplayPlacementConfig(1.25f, 0f, 18f));
     }
+
 }
 
 [System.Serializable]

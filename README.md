@@ -55,7 +55,9 @@ Useful development controls:
 - Release `Space`: submit/click fallback
 - `Tab`: switch between `RaycastBaseline` and `ExplicitDisplayFocus`
 - `G`: grip fallback for focus confirmation
-- `Left Shift`: trigger fallback for ExplicitDisplayFocus selection and trigger+stick scrolling
+- `Left Shift`: trigger fallback; in a WebView session, hold it with `W` / `S` for Explicit scroll
+- `Left Control`: right stick click fallback; in a WebView session, tap it once to start Explicit Web UI drag, then use `WASD` / arrow keys
+- `X`: simulate aiming at the left-side exit panel and holding the left trigger
 - `R`: clear the focused display
 - right stick vertical, or `W` / `S`: scroll the currently ray-hit display in `RaycastBaseline`
 
@@ -65,6 +67,7 @@ Useful development controls:
 - only the first `DisplaySurface` hit receives input
 - the cursor follows the ray hit position on the hit display
 - Releasing A / right trigger / `Space` / `Left Shift` clicks at the ray-hit position
+- in the default T2 WebView mode, A is a standalone click, vertical stick scrolls, and trigger hold + Ray movement sends Web UI drag
 - right stick vertical / `W` / `S` scrolls only the currently hit display
 - `UpDownDepth` preserves the existing T1 front/back ray-occlusion geometry
 
@@ -81,8 +84,8 @@ Useful development controls:
 - cursor warps to the gaze hit position when focus is confirmed
 - right stick / `WASD` moves the virtual cursor inside the focused display
 - Releasing A / right trigger / `Space` / `Left Shift` clicks at the virtual cursor on the focused display
-- right trigger + right stick vertical, or `Left Shift` + `W` / `S`, scrolls the focused display
-- if trigger+stick scrolling occurred during a trigger press, releasing the trigger does not also click
+- in the default T2 WebView mode, A is a standalone click; trigger + vertical stick scrolls, and one stick click latches Web UI drag from the virtual cursor until the stick stays neutral briefly
+- outside a running WebView session, right trigger + right stick vertical, or `Left Shift` + `W` / `S`, keeps the existing relative-scroll behavior
 - moving gaze to another display after focus is locked does not redirect click or scroll input
 
 The debug overlay shows the current condition, focus state, focused display, and gaze candidate ids. Gaze highlight is managed separately from interaction focus by `GazeDisplayFocusManager`.
@@ -116,7 +119,7 @@ In the in-app task menu, select `Highlight OFF` or `Highlight ON` before startin
 
 In `Dev_Prototype`, attach `GazeDisplayFocusManager` to `Prototype_Managers` and assign `PrototypeInputManager`, `GazeProvider`, `DisplayManager`, and `EditorDebugInputProvider`. `Highlight Enabled` controls the initial state, `Debug Toggle With Keyboard` enables the Editor-only `H` shortcut, and `Log State Changes` logs only target or enabled-state changes. Each display uses its existing `DisplaySurface`; its `Visible Panel` must reference the panel `Image`.
 
-Turning highlight OFF immediately calls `SetFocused(false)` for every `DisplaySurface`. The display is a uGUI `Image`, so the highlight uses `Image.color` rather than changing a shared material; `MaterialPropertyBlock` is not applicable to this UI component.
+Turning highlight OFF immediately calls `SetFocused(false)` for every `DisplaySurface`. The highlight is rendered as a runtime `GazeHighlightFrame` child with four uGUI `Image` edges, so the display face keeps its base color and only the border glows. `Gaze Highlight Color`, `Gaze Highlight Strength`, and `Gaze Highlight Border Thickness Pixels` control the frame appearance.
 
 ## Per-Condition Controller Ray Display Settings
 
@@ -146,24 +149,62 @@ experimentManager.SetRayVisualSettings(true, RayVisualLengthLevel.Long);
 
 The default visible lengths are configured on `RaycastPointer`: Short `1.5m`, Medium `2.5m`, and Long `4.0m`.
 
-## Optional WebView Probe
+## T2 YouTube + Comparison Web Task
 
-`WebViewDisplayBridge` is an optional probe for T3-style free browsing sessions. It lets the existing `DisplaySurface` click and scroll coordinates drive a Vuplex `WebViewPrefab` when the Vuplex package is imported.
+T2 implements the Notion `T2 指示セット案：YouTube＋自作Web` semi-free task. The back display runs YouTube and the front display runs a fixed experiment comparison page. The participant uses both displays and completes the task by confirming 2–3 purchase candidates on the front page.
 
-The repository does not include Vuplex or any paid/trial WebView binaries. To test real browsing:
+T2 uses `TLabWebViewDisplayBridge`, backed by the free MIT-licensed UPM packages from `TLabAltoh/TLabWebView` and `TLabAltoh/TLabVKeyborad`.
 
-1. Download the Vuplex `3D WebView for Android` trial or package.
-2. Import it into the Unity project locally.
-3. Add `WebViewDisplayBridge` to a `DisplaySurface` GameObject, such as `Display_B_Back`.
-4. Set `Enable On Start` to true and set `Initial Url` to a test page such as `https://www.youtube.com`.
-5. Build to Quest Pro. Android WebView rendering must be verified on device; without the Vuplex package the bridge logs that WebView is not found and the project still compiles.
+1. Let Unity resolve `Packages/manifest.json`. It contains `com.tlabaltoh.webview` and `com.tlabaltoh.vkeyborad` git dependencies.
+2. Open `Assets/Scenes/Dev_Prototype.unity`.
+3. The T2 Web Browsing session uses `TLabWebViewDisplayBridge` on both experiment displays.
+4. Build to Quest Pro / Android. TLabWebView does not render real web pages in the Unity Editor; the bridge shows an Editor placeholder there.
 
 When `Consume Experiment Input` is enabled, the current experiment input path is reused:
 
-- `RaycastBaseline`: controller-ray hit position clicks or scrolls the WebView.
-- `ExplicitDisplayFocus`: the focused display's virtual cursor clicks or scrolls the WebView.
+- `WebViewSessionManager > Input Mode = Direct Scroll And Seek` is the default trial mode.
+- A is a standalone click in both conditions. A is not combined with stick movement, and right trigger alone does not click during the WebView session.
+- `RaycastBaseline`: vertical stick scrolls the WebView under the ray; trigger hold + Ray movement sends Web UI drag.
+- `ExplicitDisplayFocus`: trigger + vertical stick scrolls the focused WebView; one right stick click starts Web UI drag from the virtual cursor, stick movement drags it, and a brief neutral pause or second stick click releases it.
+- Web UI drag sends pointer down / move / up to the WebView, so YouTube's seek bar can be manipulated through the page UI instead of relative video-time seek.
+- Scroll directly updates the WebView page's relative scroll position. Web UI drag depends on the active page element under the pointer.
+- Stick cursor and Web UI drag speeds are pixel-based so horizontal and vertical motion have the same canvas-pixel speed. Tune `Prototype_Managers > VirtualCursorController > Cursor Speed Pixels Per Second` and `Prototype_Managers > ClickDispatcher > Web View Stick Gesture Speed Pixels Per Second`. Current defaults are `220` px/s for cursor movement and `260` px/s for Web UI drag.
+- `Stick Touch Gesture` remains available in the Inspector for comparison, and `Legacy Direct Scroll And Submit Drag` remains available for rollback.
+- To restore the previous direct `ScrollBy` plus A-held drag path, set `WebViewSessionManager > Input Mode = Legacy Direct Scroll And Submit Drag`.
+- During a WebView session, the right controller B button navigates back one page on the display currently under the Baseline ray or focused by `ExplicitDisplayFocus`. In the Editor, the equivalent debug key is `Tab`. Outside a running WebView session, B / `Tab` retains its existing condition-toggle behavior.
 
-This keeps WebView browsing independent from the interaction method. Do not commit Vuplex plugin files or trial binaries to the public repository.
+This keeps WebView browsing independent from the interaction method. TLab is pulled through UPM git dependencies rather than copying package sources into `Assets/`.
+
+In `Dev_Prototype`, the T2 menu launches only the current YouTube + comparison task. To try it:
+
+1. Select `T2 Web Browsing` in the VR task menu.
+2. Select `Set A 2024` or `Set B 2025`.
+3. Select `Raycast Baseline` or `Explicit Display Focus` and the desired highlight/ray settings. T2 always uses `UpDownDepth` regardless of the T1 layout selection.
+4. Press `START T2 TASK`.
+5. Press the in-display `START` gate and wait for the countdown.
+6. `Display_B_Back` opens the fixed 2024/2025 YouTube URL. `Display_A_Front` opens the common 20-product comparison Web.
+
+T2 also shows a passive world-space instruction panel above `Display_B_Back`. It mirrors the current training step, main-task instruction, completion state, and late-task reminder without adding a collider or receiving controller input. The panel uses the back display's transform, so it stays fixed with the experiment displays and does not follow head direction. Panel size, scale, and phase/message font sizes are adjustable on `WebViewSessionManager`. T2 is currently fixed to `UpDownDepth`; the other layout presets remain available only for T1.
+
+T2 runs as one continuous 10-minute session. Practice follows eight checks in order: YouTube play, pause, seek backward, skip forward by 10 seconds, Web scroll, product-detail open, candidate add, and candidate remove. After P08, it automatically changes to Main without closing or reloading either WebView and without returning to condition selection. Practice candidates are cleared at the transition, while the pages remain loaded. The instruction panel shows the interaction condition and a countdown from `10:00` throughout the session.
+
+Main presents the set-specific V2D instruction first, the D2V instruction after 1:30, semi-free comparison after 3:00, and candidate finalization after 6:00. V2D identifies the target by a designated video time range; D2V identifies it by its fixed position within the Web category and completes only when the video is paused within that product's appearance range. The fixed videos are `oCKnZl-XT1Y` for Set A (2024) and `wIHPxl6OPOc` for Set B (2025). Participants confirm 2–3 candidates, and at least one Main-phase YouTube play, pause, or seek is required before confirmation.
+
+T2 writes separate `Logs/T2/t2_events_*.csv` and `t2_results_*.csv` files under `Application.persistentDataPath`. The summary includes participant/session/counterbalance identifiers, method, content set, duration, selected candidates, V2D/D2V completion times, candidate add/remove and detail counts, YouTube operation counts and pause time, Web scroll/click amount, display switches, controller movement/rotation, clutch count, and result.
+
+The T2 completion telemetry is implemented through TLab's `window.tlab.unitySendMessage` bridge.
+
+During the unified T2 session, the normal condition menu is hidden. The exit panel is fixed 90 degrees to the left of the HMD pose captured when the task starts. The left-controller ray is shown only while it is hitting this panel. Aim at it and hold the left trigger for `0.6` seconds to abort and return to condition selection; hover, hold progress, and haptics provide feedback. B is not used for exiting. Returning disables both WebViews.
+
+Keyboard handling uses this project's display-local keyboard overlay because the bundled TLab keyboard is screen-layout oriented and does not line up well inside the VR display.
+
+`TLabWebViewDisplayBridge` keeps both WebView sizes at the display's 16:9 aspect. `View Size` defaults to `960x540`, while `Texture Size` defaults to `1920x1080`. The smaller view size makes web-page text and controls use a larger layout; the higher texture size keeps the captured result sharp when shown in VR. These settings do not change the physical VR display size, which is still controlled by `DisplaySurface` / layout settings. The bridge defaults to `HardwareBuffer`, `24fps`, and `Limit Texture Updates To Fps` so HMD motion stays smoother on Quest. If the headset is still juddering during head movement, lower `Texture Size` to `1600x900` or `1280x720`, or reduce `Fps`. It disables TLab's bundled screen-layout keyboard by default and uses this project's display-local keyboard instead, so RaycastBaseline and ExplicitDisplayFocus can press keys through the same display-normalized click path. `Show Keyboard Only For Text Input` is enabled by default: the keyboard stays hidden while browsing and appears only when the active web element is an `input`, `textarea`, or `contenteditable` field. Key labels are drawn as a high-sorting-order Unity overlay with bold text and outlines, and the display cursor is raised above the keyboard while it is visible. The built-in TLab keyboard can be re-enabled from the Inspector with `Use Built In TLab Keyboard`, but it is not recommended for the current VR display layout.
+
+Running two WebViews doubles the capture workload. If head-motion judder increases on Quest, lower `Texture Size` or `Fps` on both display bridges together so the two conditions keep the same visual settings.
+
+The default `DirectScrollAndSeek` path changes the page's relative scroll position for scroll input and uses pointer down / move / up for Web UI drag. TLab performs page scrolling through JavaScript because its native `ScrollBy` path was unreliable on Quest. The older hidden-touch stick gesture remains available as the Inspector-selectable `StickTouchGesture` mode.
+
+When the WebView session ends, both active bridges load `about:blank` and destroy their generated WebView prefabs. This is intentional: simply hiding a prefab can leave media playback, such as YouTube audio, running in the background.
 
 ## Phase 3.5 Editor Validation
 
@@ -171,7 +212,7 @@ This keeps WebView browsing independent from the interaction method. Do not comm
 
 - `EditorDebugInputProvider` keeps keyboard input separate from the real XR input path.
 - `GazeProvider` has `DebugCameraForward` for driving the same gaze candidate path from the Main Camera in Play Mode.
-- The debug overlay shows condition, gaze source, focus state, focused display, gaze candidates, cursor position, layout, debug input state, last click result, and last scroll amount.
+- The debug overlay shows condition, gaze source, focus state, focused display, gaze candidates, cursor position, layout, debug input state, last click result, and last scroll amount. Its Canvas uses `ScreenSpaceCamera` so it remains visible when VR rendering is enabled.
 - `FocusManager` exposes safe debug utilities: `ClearFocus`, `ForceRefocusFromCurrentGazeCandidate`, `GetFocusedDisplayId`, `GetCurrentCandidateIds`, and `GetFocusState`.
 
 For editor validation:
@@ -182,8 +223,9 @@ For editor validation:
 4. Aim the Game view / Main Camera at a display.
 5. Press `G` to confirm focus and warp the cursor.
 6. Use `WASD` or arrow keys to move the focused cursor.
-7. Press `Space` or tap and release `Left Shift` to click.
-8. Hold `Left Shift` and press `W` / `S` to scroll the focused display.
+7. Press `Space` to click during a WebView session.
+8. Hold `Left Shift` and press `W` / `S` to scroll the focused WebView, or tap `Left Control` once and use `WASD` / arrow keys for Web UI drag.
+9. Hold `X` to validate the left-side exit panel without XR controllers.
 
 ## Phase 4 FocusPointing Task Skeleton
 
@@ -191,55 +233,27 @@ For editor validation:
 
 - `FocusPointingTaskManager` manages the target-selection trial list.
 - `Display A` and `Display B` are assignable from the Inspector.
-- Main-task trials are loaded from `Assets/Resources/T1/target_orders_ABCDE.csv`.
-- Lists `A` through `D` each contain 108 main trials: 2 displays x 9 positions x 3 sizes x 2 cycles.
-- List `E` contains 108 training trials.
-- The current development configuration assigns List `A` to both interaction conditions.
-- `Condition A Main Order` and `Condition B Main Order` are separate Inspector fields so lists `A` through `D` can be assigned per condition without changing task code.
-- Starting a task runs only the currently selected condition block. After its 108-trial main block finishes, the task returns to condition selection instead of automatically continuing to the next condition.
-- Training uses all 108 trials from List `E` and loops after trial 108 until the experimenter ends training.
-- Target positions use the normalized 3 x 3 grid at x/y values `0.1`, `0.5`, and `0.9`.
-- Back-display positions on the lower row (`y = 0.1`) are logged as `BackOccluded`; the other back-display positions are `BackClear`.
-- Target sizes `Small`, `Medium`, and `Large` are rendered at approximately 1, 2, and 3 degrees based on the current head-to-display-center distance.
-- Trial rows include the source list, cycle, position id, size, repetition, and transition metadata from the generated order CSV.
-- Condition order is selectable from the Inspector as `AThenB` or `BThenA`.
-- The VR menu shows the configured main/training list for the selected interaction condition; ad hoc Fixed/Random reshuffling is disabled.
-- T1 result CSVs retain `trialOrder` and `randomSeed` compatibility columns and also record `targetOrderList`.
+- T1 currently maps its three task selections back to the established layouts: Task A = `LeftRight`, Task B = `UpDown`, and Task C = `UpDownDepth`. The temporary `FrontBackClear` / `FrontBackOccluded` layout presets were removed after the supplied specification was identified as an older version.
+- Each main block contains 48 trials: 2 displays x 6 positions x 2 sizes x 2 cycles.
+- Each 24-trial cycle contains every display/position/size combination exactly once.
+- Target positions use `x = 0.10 / 0.50 / 0.90` and `y = 0.20 / 0.80`.
+- Target sizes `Small` and `Large` are rendered at approximately 1.5 and 3 degrees based on the current head-to-display-center distance.
+- `T1TrialSequenceGenerator` uses a logged deterministic seed to choose a constrained random order. D1→D2 and D2→D1 counts are balanced, long same-display/size runs are penalized, and Task C input-occluded trials are spread through the block.
+- Task C marks the three Display 2 positions at `y = 0.80` as `inputOccluded`, giving 12 input-occluded trials and 36 `none` trials per block. Tasks A/B log all 48 trials as `none`.
+- Training is Inspector-configurable from 6 to 12 trials and may loop until the experimenter ends it.
+- Task order is recorded as one of `ABC / BCA / CAB / ACB / CBA / BAC`; method order is recorded as `RayFirst` or `ExplicitFirst`.
+- Starting a task runs only the selected task/method block. After its 48-trial main block finishes, the task returns to condition selection.
+- The old `Assets/Resources/T1/target_orders_ABCDEFG.csv` path remains as an optional compatibility mode when `Use Latest 48 Trial Design` is disabled.
 - `ConditionA` maps to `RaycastBaseline` by default, and `ConditionB` maps to `ExplicitDisplayFocus` by default.
 - A visible `FocusPointingTarget` is generated on the active target display.
 - Starting Training or Main Task first shows a centered `START` button on `Display_B_Back`; pressing it starts a 3-second countdown before the first target appears.
 - `ClickDispatcher` reports click attempts to the task layer for both `RaycastBaseline` and `ExplicitDisplayFocus`.
 - `ErrorEvaluator` classifies clicks as `Correct`, `DisplayError`, `TargetError`, or `Miss`.
-- `Logger` writes `TrialResult` rows with participant/session placeholders, target info, click info, result flags, start time, click time, and completion time.
+- `Logger` writes `TrialResult` rows with participant/session placeholders, task/method assignment, target info, click info, result flags, start time, click time, and completion time.
 - A compatibility target-selection CSV is written to `Application.persistentDataPath/Logs/target_selection_*.csv` with correct target selections.
-- The analysis-oriented T1 CSV is written to `Application.persistentDataPath/Logs/t1_results_*.csv`. It records every click attempt, including `Correct`, `DisplayError`, `TargetError`, and `Miss`, with participant/session ids, task phase, condition, layout, trial-set ids, occlusion type, target position, clicked position, attempt index, response time, and analysis flags.
+- The analysis-oriented T1 CSV is written to `Application.persistentDataPath/Logs/t1_results_*.csv`. It records every click attempt, including `Correct`, `DisplayError`, `TargetError`, and `Miss`, with participant/session ids, T1 task, task/method order, deterministic sequence seed, cycle, position, size, `inputOccluded`/`none`, target/click positions, attempt index, response time, controller movement meters, controller rotation degrees, and analysis flags.
 
-This does not implement T2-B seek-bar adjustment, questionnaires, or full participant-flow screens.
-
-## Phase 5 T2-A Reference List Task MVP
-
-`Dev_Prototype` includes an MVP of the updated T2-A task:
-
-- Select `T2-A Reference List` from the VR task menu, then choose Training or Main Task.
-- As in T1, the task shows a centered `START` button on `Display_B_Back`; pressing it starts a 3-second countdown before the first trial appears.
-- One display shows the requested item id while the other shows a 40-item scrollable list.
-- The list and instruction displays alternate between `Display_A_Front` and `Display_B_Back`.
-- Training uses four looping trials by default.
-- Main Task uses five trials per list display, for ten trials total. These counts are provisional until the experiment design is fixed.
-- `RaycastBaseline` scrolls the display currently hit by the controller ray.
-- `ExplicitDisplayFocus` uses trigger + stick to scroll the focused display and clicks at the display-local virtual cursor.
-- Click attempts are classified as `Correct`, `DisplayError`, `TargetError`, or `Miss`.
-- Scroll gestures on the non-target display are counted as wrong-display scrolls.
-- Correct selection advances the trial; incorrect attempts remain in the current trial.
-
-`ReferenceListTaskManager` writes:
-
-```text
-Application.persistentDataPath/Logs/t2a_results_*.csv
-Application.persistentDataPath/Logs/t2a_events_*.csv
-```
-
-The result CSV records every click attempt and trial-level wrong-display scroll counts. The event CSV records trial starts and aggregated scroll gestures.
+This does not implement questionnaires or full participant-flow screens.
 
 ## T1 Ray Occlusion Layout Probe
 
@@ -334,9 +348,9 @@ The analyzer uses only Python's standard library and writes:
 
 - `Analysis/T1/cleaned_attempts.csv`: all T1 click attempts.
 - `Analysis/T1/cleaned_completed_trials.csv`: attempts that advanced the trial.
-- `Analysis/T1/summary_by_condition.csv`: accuracy, error rates, attempts per completed trial, and response-time summaries per condition.
+- `Analysis/T1/summary_by_condition.csv`: accuracy, error rates, attempts per completed trial, response time, controller movement, and controller rotation summaries per T1 task and interaction method.
 - `Analysis/T1/summary_by_condition_display.csv`: the same metrics split by target display.
-- `Analysis/T1/summary_by_condition_occlusion.csv`: the same metrics split by `occlusion_type` values `Front`, `BackClear`, and `BackOccluded`.
+- `Analysis/T1/summary_by_condition_occlusion.csv`: the same metrics split by `occlusion_type` values `none` and `inputOccluded`.
 
 By default it analyzes `MainTask` rows only. To include training rows too:
 
@@ -386,3 +400,43 @@ Application.persistentDataPath/Logs/layout_preference_*.csv
 ```
 
 Rows are written when a condition is entered, left, or recentered. The CSV records participant/session ids, condition order, display poses, display sizes, and the HMD anchor pose used for the layout.
+
+## T2 キャンプギア比較Web
+
+T2実験で手前ディスプレイに表示する、React + TypeScript + Vite製の静的Webアプリをルート直下に置いています。商品は必ず「カテゴリ一覧 → 商品一覧 → 商品詳細」の順に探し、詳細画面から候補へ追加します。検索機能はありません。
+
+### 起動方法
+
+Node.jsを用意し、リポジトリのルートで次を実行します。
+
+```bash
+npm install
+npm run dev
+```
+
+表示されたローカルURLをブラウザで開きます。本番用の静的ファイルは次で `dist/` に生成できます。
+
+```bash
+npm run build
+npm run preview
+```
+
+Viteの `base` は相対パスに設定しているため、生成物は後からUnity WebView用のローカルコンテンツとして組み込みやすい構成です。
+
+Quest上のUnity WebViewから開発用HTTPサーバーを表示するため、`Assets/Plugins/Android/T2Cleartext.androidlib` がAndroid ManifestへローカルHTTP許可設定をマージします。これは実験・開発用設定です。MacとQuestを同じネットワークへ接続し、`npm run dev -- --host 0.0.0.0` で起動してください。`WebViewSessionManager` の `Secondary Initial Url` には `Network:` を含めず、`http://<MacのIP>:5173/` のみを設定します。外部公開用ビルドではHTTPSへ移行し、この許可設定を見直してください。
+
+### 画面構成
+
+- ホーム: カテゴリ一覧または候補リストへ移動
+- カテゴリ一覧: 5カテゴリから1つを選択
+- 商品一覧: 選択カテゴリの商品カードを表示
+- 商品詳細: 商品情報・動画内の見た目を確認して候補へ追加
+- 候補リスト: 候補の削除と確定。確定後は候補数のみ表示
+
+### `items.json` の編集方法
+
+商品データは `src/data/items.json` のJSON配列です。既存商品と同じフィールドを持つオブジェクトを追加してください。`category` は画面に定義済みの5カテゴリのいずれかを指定し、`item_order` は各動画内での紹介順を保持します。カテゴリ内の固定表示順は `src/App.tsx` の `CATEGORY_DISPLAY_ORDER` で管理します。画像は `public/images/` に置き、`image` には `/images/example.jpg` の形式で記載します。画像が存在しない場合は商品名のみの代替表示へ自動的に切り替わります。`video_set`、`video_year`、`item_id`、動画内時刻は内部データ・ログ用で、Web画面には表示しません。
+
+### ログの保存・書き出し方法
+
+`category_open`、`product_open`、`add_candidate`、`remove_candidate`、`confirm_candidates`、`back` をブラウザの `localStorage` に保存します。保存キーは `t2_web_logs` です。画面右下の「ログを書き出す」を押すと、保存済みログを `logs.json` としてダウンロードします。候補リストは同じブラウザの `t2_web_candidates` に保存されます。

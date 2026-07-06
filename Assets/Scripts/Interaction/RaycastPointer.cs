@@ -37,10 +37,11 @@ public class RaycastPointer : MonoBehaviour
     [SerializeField] private float rayStartWidth = 0.0035f;
     [Min(0.0001f)]
     [SerializeField] private float rayEndWidth = 0.001f;
-    [SerializeField] private Color rayColor = Color.cyan;
+    [SerializeField] private Color rayColor = new Color(0.4f, 0.8f, 1f, 0.55f);
     [SerializeField] private bool logRayVisualSettingChanges = true;
 
     public Ray CurrentRay { get; private set; }
+    public Transform RightControllerTransform => rightControllerTransform;
     public bool RayVisualEnabled => showRayLine;
     public RayVisualLengthLevel RayLengthLevel => rayLengthLevel;
     public float VisibleRayLengthMeters => ResolveVisibleRayLengthMeters(rayLengthLevel);

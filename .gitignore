@@ -35,4 +35,9 @@ Assets/Vuplex.meta
 .DS_Store
 Thumbs.db
 
+# T2 comparison web build artifacts
+node_modules/
+dist/
+*.tsbuildinfo
+
 sysinfo.txt

@@ -1,6 +1,6 @@
 # 実験設計とUnity実装の同期状況
 
-更新日: 2026-06-12
+更新日: 2026-07-02
 
 ## 1. この資料の目的
 
@@ -76,6 +76,38 @@ grip down:
 挙動としては最新案に近い。ただし、focus確定のタイミングを
 grip down、grip中、grip releaseのどこに置くかは明文化とテストが必要である。
 
+### 3.1 WebView入力の試行仕様（2026-06-26更新）
+
+T2 Web Browsingでは、YouTubeのseek bar操作感をRaycastBaselineに近づけるため、
+Web UI dragを本番入力に戻す。ただし長いページスクロールはdragではなく相対scroll
+として扱い、画面端でtouchを持ち直す問題を避ける。
+
+```text
+共通:
+  A単独 = cursor位置のclick
+  Web UI drag = WebViewへpointer down / move / upを送る
+  scroll = WebViewの相対scroll
+
+RaycastBaseline:
+  ray hit中の上下stick = scroll
+  trigger hold + Ray移動 = Web UI drag
+
+ExplicitDisplayFocus:
+  trigger + 上下stick = focused displayをscroll
+  stick押し込み開始 = focused displayのvirtual cursor位置でpointer down
+  stick移動 = Web UI drag
+  stickが短時間neutralを維持、またはstick再押し = pointer up
+  trigger単独 = clickしない
+```
+
+Unity実装では既存Sceneとの互換性のため `WebViewSessionManager.InputMode` の
+`DirectScrollAndSeek` 名称を維持し、その既定挙動を上記のhybrid scroll / dragへ
+更新する。比較・ロールバック用に旧 `StickTouchGesture` と
+`LegacyDirectScrollAndSubmitDrag` も残す。`TLabWebViewDisplayBridge.TrySeekHorizontal`
+は実装上残すが、既定T2操作では直接呼ばない。
+この決定はWebViewセッションに限定し、T1や疑似2Dコンテンツの入力仕様は変更しない。
+Quest Pro実機でWeb UI dragの安定性、scroll速度、TLabのtexture更新fpsを検証する必要がある。
+
 ## 4. 実験構成の更新
 
 ### 4.1 予備実験: Display配置確認
@@ -105,53 +137,86 @@ T1はFitts' Lawそのものではなく、複数Display環境で次を評価す�
 - Press Drift
 - Down Target Error
 
-2026-06-11版で、次の試行構成へ更新された。
+2026-07-03の実装確認で、ディスプレイ配置は従来の3配置へ戻した。
+直前に共有された前後配置中心の仕様は旧版だったため、配置の正本にはしない。
 
 ```text
-2 displays x 9 positions x 3 sizes x 2 cycles
-= 108 trials / condition
+Task A: LeftRight（左右配置）
+Task B: UpDown（上下・同一平面配置）
+Task C: UpDownDepth（上下 + 奥行き配置）
+
+2 displays x 6 positions x 2 sizes x 2 cycles
+= 48 trials / block
+
+48 trials x 3 tasks x 2 methods
+= 288 main trials / participant
 ```
 
-各周は54試行で、Display・位置・サイズの全組合せを1回ずつ含む。
-ターゲット位置は各Displayの正規化座標 `0.1 / 0.5 / 0.9` の3 x 3、
-サイズは視角ベースの `Small 1度 / Medium 2度 / Large 3度` とする。
+各ブロックは24試行の2周で、各周はDisplay・位置・サイズの全組合せを
+1回ずつ含む。位置は `x = 0.10 / 0.50 / 0.90`、
+`y = 0.20 / 0.80` の3 x 2、サイズは視角ベースの
+`Small 1.5度 / Large 3度` とする。
 
-本番順序はList A / B / C / Dの4種類を事前生成し、条件の実施順に応じて
-割り当てる。各Listは108試行である。
+タスク順は `ABC / BCA / CAB / ACB / CBA / BAC` の6種類、手法順は
+`RayFirst / ExplicitFirst` の2種類を組み合わせてカウンターバランスする。
+各ブロックの試行順はseed付き制約ランダム化で生成し、D1→D2とD2→D1、
+同一Display内移動とDisplay間移動、サイズ、Task CのinputOccluded試行が
+偏らない候補を選ぶ。
 
-現在の `FocusPointingTaskManager` はCSVからこれらの順序を読み込む。
-開発時の初期設定は両操作条件ともMain List Aである。
-TrainingはList Eの108試行を使用する。
+Task CではDisplay 2の下段3点 `(0.10, 0.80) / (0.50, 0.80) / (0.90, 0.80)`
+をinputOccludedとし、1ブロック12試行を含む。Task A/BのinputOccludedは0である。
+`FocusPointingTaskManager` はこの48試行設計を既定でコード生成し、旧CSV方式は
+比較・ロールバック用に残す。TrainingはInspectorで6〜12試行に設定する。
 
-### 4.3 T2: 実利用マイクロ操作
+### 4.3 T2: YouTube + 自作比較Webの半自由タスク
 
-旧仕様のT2は、指定Displayを連続スクロールする単一タスクだった。
+2026-07-02更新のNotion「T2 指示セット案：YouTube＋自作Web」を現在の正本とする。
+T2では厳密なポインティング性能ではなく、
+動画を流し見しながら複数Displayを継続利用する場面の使いやすさを評価する。
 
-最新案では、T2を次の2タスクとして整理している。
+```text
+奥 Display_B_Back:
+  実際のYouTubeページ
 
-#### T2-A: 参照しながらリスト選択
+手前 Display_A_Front:
+  実験用の製品比較Webページ
 
-- main displayに選択指示を表示
-- sub displayに縦リストを表示
-- main displayを参照しながらsub displayをscroll
-- 指定項目を選択
-- 視線を参照先へ移しても操作先を維持できるか評価
+完了:
+  手前Webで購入候補2〜3個を追加して確定
 
-#### T2-B: 動画シークバー操作
+制約:
+  候補選択前にYouTubeを最低1回、再生・停止・シークする
+```
 
-- 動画プレイヤー風UIを使用
-- seek barを目標位置へ合わせる
-- 細長いUIでの連続的な位置調整を評価
+コンテンツセットは次の2種類で、Webのセクション順、候補数、ボタン位置を揃える。
 
-旧T2 Continuous Scrollingは、最新T2-Aの一部として再利用できる。
-T2-Bは未実装である。
+- Set A: 2024年版キャンプギア動画
+- Set B: 2025年版キャンプギア動画
+
+2026-07-01更新として、T2のTrainingとMainは1つの連続セッションへ統合する。
+開始後は `P01 YouTube再生 → P02 YouTube停止 → P03 少し戻す → P04 10秒スキップ → P05 Webスクロール → P06 商品詳細 → P07 候補追加 → P08 候補削除`
+の操作確認を行い、P08完了時にWebViewを閉じたり条件選択へ戻ったりせず、そのままMainへ移行する。
+操作確認で追加した候補はMain移行時に消去する。10分カウントダウンは統合セッション開始から表示し、
+Main移行後はV2D、D2V、半自由比較、候補確定の順に指示を切り替える。
+
+WebではA/Bセットを混在させ、カテゴリごとにNotionで指定した固定順で表示する。
+`video_set`、`video_year`、`item_id`、`start_time`、`end_time`、`appearance_duration` は
+内部データとログにのみ保持し、商品カード、詳細、候補、画像代替表示には出さない。
+V2DはSet Aで8分48秒〜9分35秒付近からA06、Set Bで5分55秒〜6分45秒付近からB03を探す。
+D2Vは「収納・ゴミ箱」の上からSet Aで3番目のA05、Set Bで5番目のB02を確認する。
+
+Unityでは `WebViewSessionManager` がA/B、Training進行、完了条件、タイムアウト、
+YouTube/WebのJavaScript telemetry、T2専用CSVを管理する。比較ページは現在、
+React/Viteで起動した共通20商品Webを `secondaryInitialUrl` から読み込む。
+固定YouTube動画はSet Aを `https://www.youtube.com/watch?v=oCKnZl-XT1Y`、
+Set Bを `https://www.youtube.com/watch?v=wIHPxl6OPOc` とする。
 
 ### 4.4 旧T3 AttentionFocus
 
 ローカル仕様書では、視覚的注意と入力フォーカスの分離を
 独立したT3としていた。
 
-最新案では、この研究課題は主にT2-Aへ統合されている。
+最新案では、この研究課題はYouTube視聴と比較Web閲覧を並行する現在のT2へ統合されている。
 
 したがって `Exp_AttentionFocus` を独立Sceneとして作ることは、
 現時点の優先実装ではない。
@@ -190,6 +255,10 @@ Ambiguous:
   手位置によって判定が変わるため実験対象から除外
 ```
 
+上記は配置調整時の幾何分類である。本番T1ログでは分析単位を単純化し、
+Task Cの指定された奥側下段3点だけを `inputOccluded`、それ以外を `none`
+として記録する。旧分類は `legacyOcclusionType` 列に互換情報として残す。
+
 現在の `T1RayOcclusionGeometry` と `T1RayOcclusionLayoutProbe` は
 この幾何モデルを実装するためのコードである。
 
@@ -201,25 +270,21 @@ Ambiguous:
 | Raycast Baseline | `RaycastPointer` ほか | 実装済み |
 | display-local cursor | `VirtualCursorController` | 実装済み |
 | grip中gaze mode | 現コードはgrip中に更新 | 要仕様固定・テスト |
-| T1 108試行・順序List A-D | `FocusPointingTaskManager` | 実装済み |
-| T1 Training List E 108試行 | `FocusPointingTaskManager` | 実装済み |
+| T1 3タスク・48試行/ブロック | `FocusPointingTaskManager`、`T1TrialSequenceGenerator` | 実装済み |
+| T1 Training 6〜12試行 | `FocusPointingTaskManager` | 実装済み |
 | T1遮蔽幾何モデル | `T1RayOcclusionGeometry` | 実装済み |
-| T1 movement/rotation集計 | なし | 未実装 |
+| T1 movement/rotation集計 | `FocusPointingTaskManager` | 実装済み |
 | pre-click jitter | なし | 未実装 |
 | Press Drift | なし | 未実装 |
 | Down Target Error | なし | 未実装 |
-| T2-A list task | `ReferenceListTaskManager` | MVP実装済み・試行数は暫定 |
-| T2-B seek bar task | なし | 未実装 |
+| T2 YouTube + 比較Web | `WebViewSessionManager` | A/B・Training・完了条件・CSV実装済み、Quest確認が必要 |
 | participant flow | 簡易VR menuのみ | 未実装 |
 | trial/event/trajectory統一ログ | 個別CSVのみ | 未実装 |
 | EyeTracking実験利用確認 | Adapterあり | Quest Pro確認が必要 |
 | 紙質問紙運用 | アプリ外 | UI案内と転記形式が未実装 |
 
-T2-A MVPは、片方の表示に参照項目、もう片方にスクロール可能な
-40項目リストを提示する。表示誤り、項目誤り、Miss、
-誤表示スクロールジェスチャを記録し、TrainingとMainを
-VRメニューから開始できる。Mainは現時点で各表示5試行、
-合計10試行だが、正式な試行数はNotion側の決定後に更新する。
+現在のT2は `Display_B_Back` にYouTube、`Display_A_Front` にA/Bの比較ページを表示する。
+VRメニューのT2枠は `WebViewSessionManager` のみを起動する。
 
 ## 7. ログの最新要求
 
@@ -290,7 +355,8 @@ Finish
 - mode: Practice / Main
 - log status
 
-Practiceは最低回数に達しても自動終了せず、実験者が終了する。
+T1 Practiceは最低回数に達しても自動終了せず、実験者が終了する。
+T2の操作確認はP08完了時に自動でMainへ進む。
 
 ## 9. まだ固定が必要な項目
 
@@ -299,21 +365,18 @@ Practiceは最低回数に達しても自動終了せず、実験者が終了す
 1. Proposedのfocus確定タイミング
    - grip downで確定
    - grip中に連続更新しreleaseで確定
-2. T2はT2-AとT2-Bの両方を実施するか
-3. T2-A/Bの試行数
-4. T2-BでRaycastとProposedのcursor操作をどう対応させるか
-5. Press DriftとDown Target Errorを主要評価指標に含めるか
-6. 旧T3を正式に廃止し、T2-Aへ統合するか
+2. T2完了後の選択理由・主観評価を紙、別端末、Quest内UIのどれで回収するか
+3. Press DriftとDown Target Errorを主要評価指標に含めるか
 
 ## 10. 推奨する次の整理順
 
-1. 上記8項目をNotion上で確定する
+1. 上記項目をNotion上で確定する
 2. `prototype_spec.md` を最新設計へ更新する
 3. `implementation_plan.md` を現実装からの移行計画へ置き換える
 4. Proposedのgrip semanticsをPlay ModeとQuest Proで検証する
 5. 統一ログ基盤を実装する
-6. T2-Aの試行数を確定し、Quest Proでパイロットする
-7. T2-Bの採用決定後に実装する
+6. Quest Proで固定動画のYouTube telemetryと比較Web操作をパイロットする
+7. T2の主観評価回収方法とログ値を確定する
 8. Quest単体の実験進行UIを実装する
 
 ## 11. Notion参照ページ
@@ -326,3 +389,4 @@ Practiceは最低回数に達しても自動終了せず、実験者が終了す
 - [GitHub実装と実験計画の差分](https://app.notion.com/p/36d86822de6e8118a2a5e701aaae4139)
 - [実装側画面遷移・管理UI仕様](https://app.notion.com/p/36d86822de6e81f4ba7ac00b485d0f51)
 - [パイロット実験計画](https://app.notion.com/p/37286822de6e814db057d4d6c6df5c48)
+- [T2 指示セット案：YouTube＋自作Web](https://app.notion.com/p/38886822de6e81ccb5e5fff94264f79f)

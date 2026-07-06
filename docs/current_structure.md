@@ -1,6 +1,6 @@
 # 現在のプロジェクト構成
 
-更新日: 2026-06-09
+更新日: 2026-06-25
 
 この資料は、現時点で「どのファイルが何を担当しているか」を確認するための索引です。
 Notion側の最新実験設計との差分は `Docs/experiment_design_sync.md` を参照してください。
@@ -16,13 +16,13 @@ Notion側の最新実験設計との差分は `Docs/experiment_design_sync.md` �
 - Phase 2: `RaycastBaseline` は実装済み
 - Phase 3: `ExplicitDisplayFocus` のMVPは実装済み
 - Phase 4: T1 FocusPointing は試行生成、エラー判定、CSV出力まで実装済み
-- Phase 5: T2-A Reference List MVPは実装済み。T2-B Seek Barは未実装
+- T2: YouTube + 比較WebのWebViewセッションは実装済み
 - Phase 6: OpenXR Eye Tracking Adapterは存在するが、実験利用にはQuest Pro実機確認が必要
 - Phase 7: 実験Scene分割は未完了
 - 追加実装: 独立したStudy 1レイアウト選好シーンが存在する
 
 このPhase表現はローカルの旧 `implementation_plan.md` に基づきます。
-最新Notion案では、配置予備実験、T1、T2-A、T2-B、統一ログ、
+最新Notion案では、配置予備実験、T1、YouTube + 比較WebのT2、統一ログ、
 Quest単体の実験進行UIという単位へ再編されています。
 
 仕様上の必須モジュールとの対応は次のとおりです。
@@ -41,7 +41,7 @@ Quest単体の実験進行UIという単位へ再編されています。
 | `VirtualCursorController` | `VirtualCursorController` | あり |
 | `ClickDispatcher` | `ClickDispatcher` | あり |
 | `ScrollController` | `ScrollController` | あり |
-| `TaskManager` | `FocusPointingTaskManager`、`ReferenceListTaskManager` | T1、T2-Aとして実装 |
+| `TaskManager` | `FocusPointingTaskManager`、`WebViewSessionManager` | T1、T2 WebViewとして実装 |
 | `ErrorEvaluator` | `ErrorEvaluator` | T1用あり |
 | `Logger` | `Logger`、`LayoutPreferenceLogger` | あり |
 
@@ -184,8 +184,9 @@ Unityテンプレート由来のSceneです。現在の研究プロトタイプ�
 | ファイル | 役割 |
 |---|---|
 | `Experiment/ExperimentManager.cs` | 現在条件、現在レイアウト、フレームサンプルを束ねる軽量管理役 |
-| `Tasks/FocusPointingTaskManager.cs` | T1の条件選択、Training/Main、試行生成、ターゲット表示、結果CSVを担当 |
-| `Tasks/ReferenceListTaskManager.cs` | T2-Aの参照提示、スクロールリスト、誤表示操作判定、Training/Main、CSVを担当 |
+| `Tasks/FocusPointingTaskManager.cs` | T1の3タスク選択、Training/Main、ターゲット表示、動作量集計、結果CSVを担当 |
+| `Tasks/T1TrialSequenceGenerator.cs` | 2 Display × 6位置 × 2サイズ × 2周の48試行を制約付きランダム化 |
+| `WebView/WebViewSessionManager.cs` | T2のYouTube + 比較Web統合セッション、操作確認からMainへの連続移行、完了条件、T2 CSVを担当 |
 | `Tasks/ErrorEvaluator.cs` | T1クリックをCorrect、DisplayError、TargetError、Missに分類 |
 | `Tasks/T1RayOcclusionGeometry.cs` | 手・目・2枚Displayの幾何モデルからRay遮蔽率を計算 |
 | `Tasks/T1RayOcclusionLayoutProbe.cs` | T1遮蔽配置の探索、適用、可視化、Scene保存を行う調整用ツール |
@@ -256,15 +257,15 @@ Unityテンプレート由来のSceneです。現在の研究プロトタイプ�
 1. Git上のフォルダ名は `docs/` ですが、`AGENTS.md` と各説明は `Docs/` を参照しています。
    macOSの大小文字を区別しないファイルシステムでは同じ場所ですが、
    Linux等では別パスになるため、後で表記を統一する必要があります。
-2. `Dev_Prototype.unity`、T1関連コード、T2-A関連コードには未コミット変更があります。
+2. `Dev_Prototype.unity`、T1関連コード、T2 WebView関連コードには未コミット変更があります。
 3. `LayoutPreferenceStudy`、T1遮蔽調整コード、TMP Essentials、分析結果、
    APK等が未追跡です。成果物ごとに「Git管理するもの」と「無視するもの」を決める必要があります。
 4. Unity ConsoleにはC#コンパイルエラーはありません。
    OpenXR Androidライブラリの16KB alignment警告は残っています。
-5. 仕様にある `Calibration_Debug`、`Exp_FocusPointing`、`Exp_FocusScroll`、
+5. 仕様にある `Calibration_Debug`、`Exp_FocusPointing`、
    `Exp_AttentionFocus` は独立Sceneとしてまだ存在しません。
 6. 最新Notion案では、旧 `Exp_AttentionFocus` の研究課題は主に
-   T2-A「参照しながらリスト選択」へ統合されています。
+   T2「YouTube + 比較Web」へ統合されています。
 7. ProposedのGrip操作は、旧仕様の「Grip Downで確定」と、
    最新案の「Grip中だけGaze Mode」の間で記述が異なります。
    現コードはGrip保持中に更新するため、最終仕様の固定と動作テストが必要です。

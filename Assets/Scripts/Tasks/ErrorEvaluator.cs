@@ -67,7 +67,9 @@ public class ErrorEvaluator : MonoBehaviour
             Mathf.Max(0f, targetNormalizedSize.x) * 0.5f,
             Mathf.Max(0f, targetNormalizedSize.y) * 0.5f);
         Vector2 delta = clickedNormalizedPosition - targetNormalizedPosition;
-        bool insideTarget = Mathf.Abs(delta.x) <= halfSize.x && Mathf.Abs(delta.y) <= halfSize.y;
+        bool insideTarget = halfSize.x > 0f
+            && halfSize.y > 0f
+            && IsInsideEllipse(delta, halfSize);
         if (!insideTarget)
         {
             evaluation.ResultType = FocusPointingResultType.TargetError;
@@ -78,5 +80,12 @@ public class ErrorEvaluator : MonoBehaviour
         evaluation.ResultType = FocusPointingResultType.Correct;
         evaluation.IsCorrect = true;
         return evaluation;
+    }
+
+    private static bool IsInsideEllipse(Vector2 delta, Vector2 halfSize)
+    {
+        float normalizedRadiusX = delta.x / halfSize.x;
+        float normalizedRadiusY = delta.y / halfSize.y;
+        return normalizedRadiusX * normalizedRadiusX + normalizedRadiusY * normalizedRadiusY <= 1f;
     }
 }

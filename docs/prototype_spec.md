@@ -108,15 +108,14 @@ public interface IGazeProvider
 - ターゲットサイズと重畳条件を複数条件で変える
 - 操作時間、Display error、Target error、フォーカス切替回数、カーソルワープ回数を記録する
 
-### 3. Exp_FocusScroll
+### 3. T2 Web Browsing
 
-フォーカス維持・スクロールタスク用シーン。
+YouTubeと自作比較Webを並行利用する半自由タスク。
 
-- 長い疑似Webページやコメント欄を2枚のディスプレイに表示
-- 指定されたディスプレイをフォーカスし、指定項目までスクロールする
-- 視線が別ディスプレイへ移っても入力フォーカスが維持されるかを確認する
-- 一定時間または一定試行数を連続で行う
-- 誤スクロール、フォーカス維持失敗、前半・後半でのパフォーマンスと疲労変化を記録する
+- `Display_B_Back` にYouTubeページを表示
+- `Display_A_Front` に実験用の製品比較Webページを表示
+- 候補選択前にYouTubeを最低1回、再生・停止・シークする
+- 手前Webで購入候補1〜3のいずれかを選択して完了
 
 ### 3.5. Exp_AttentionFocus
 
@@ -497,6 +496,10 @@ enum InteractionCondition
 
 - 2枚のディスプレイを切り替えながら、指定ターゲットをクリックする性能を測る。
 - Display error と Target error を分けて測る。
+- Task A（左右）、Task B（前後・入力遮蔽なし）、Task C（前後・入力遮蔽あり）を比較する。
+- 各操作手法・各タスクのブロックは48試行とし、T1本番全体を288試行とする。
+- 各Displayの候補位置は `x=0.10/0.50/0.90`、`y=0.20/0.80`、サイズは1.5度/3度とする。
+- Task Cの奥側下段3点のみを `inputOccluded` として分析する。
 
 測定：
 
@@ -507,21 +510,24 @@ enum InteractionCondition
 - cursor warp count
 - cursor correction distance after warp
 - controller movement amount
+- controller rotation amount
 
-### T2: FocusScroll / フォーカス維持スクロール
+### T2: YouTube + 比較Web
 
 目的：
 
-- 指定Displayをスクロールするタスクで、誤スクロールとフォーカス維持を評価する。
-- 視線が別Displayへ移っても、入力フォーカスが維持されるかを見る。
+- 動画を流し見しながら複数Displayを継続利用する場面の使いやすさを評価する。
+- display-local操作で、controller poseやgazeへの常時依存を減らせるかを見る。
 
 測定：
 
-- scroll completion time
-- wrong display scroll count
-- focus maintenance success rate
-- scroll interruption count
-- first-half / second-half performance change
+- task duration
+- selected candidate
+- YouTube play / pause / seek count
+- Web scroll / click amount
+- display switch count
+- controller movement / rotation amount
+- clutch count
 - subjective fatigue after block
 
 ### T3: AttentionFocus / 視覚的注意と入力フォーカスの分離

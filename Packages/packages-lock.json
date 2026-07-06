@@ -10,6 +10,20 @@
       },
       "hash": "a2a5edf8d8e3f715881c0db4589c18feff7c379f"
     },
+    "com.tlabaltoh.vkeyborad": {
+      "version": "https://github.com/TLabAltoh/TLabVKeyborad.git#upm",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "2b2755158be4a28d13384f22415782d57b9efab4"
+    },
+    "com.tlabaltoh.webview": {
+      "version": "https://github.com/TLabAltoh/TLabWebView.git#upm",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "88d68af5bcabc12d3a2f78d0e979464a388519c0"
+    },
     "com.unity.collab-proxy": {
       "version": "2.12.4",
       "depth": 0,

@@ -26,15 +26,16 @@ public static class DevPrototypeSceneBuilder
         }
 
         Transform controllerRaySource = ResolveRightControllerRaySource(hmdCamera.transform);
+        Transform leftControllerRaySource = ResolveLeftControllerRaySource(hmdCamera.transform);
 
         GameObject prototypeRoot = GameObject.Find("Prototype_Root") ?? new GameObject("Prototype_Root");
         Transform displaysRoot = EnsureChild(prototypeRoot.transform, "Displays");
 
-        Color sharedDisplayColor = new Color(0.18f, 0.32f, 0.46f, 0.86f);
+        Color sharedDisplayColor = new Color(0.125f, 0.125f, 0.125f, 1f);
         DisplaySurface displayA = CreateOrUpdateDisplay(displaysRoot, "Display_A_Front", sharedDisplayColor, string.Empty);
         DisplaySurface displayB = CreateOrUpdateDisplay(displaysRoot, "Display_B_Back", sharedDisplayColor, string.Empty);
-        WebViewDisplayBridge webViewBridgeA = GetOrAdd<WebViewDisplayBridge>(displayA.gameObject);
-        WebViewDisplayBridge webViewBridgeB = GetOrAdd<WebViewDisplayBridge>(displayB.gameObject);
+        TLabWebViewDisplayBridge tLabWebViewBridgeA = GetOrAdd<TLabWebViewDisplayBridge>(displayA.gameObject);
+        TLabWebViewDisplayBridge tLabWebViewBridgeB = GetOrAdd<TLabWebViewDisplayBridge>(displayB.gameObject);
 
         GameObject managers = GameObject.Find("Prototype_Managers") ?? new GameObject("Prototype_Managers");
         Component controlPanel = GetOrAddByTypeName(managers, "PrototypeControlPanel");
@@ -52,10 +53,11 @@ public static class DevPrototypeSceneBuilder
         ScrollController scrollController = GetOrAdd<ScrollController>(managers);
         ClickDispatcher clickDispatcher = GetOrAdd<ClickDispatcher>(managers);
         FocusPointingTaskManager focusPointingTaskManager = GetOrAdd<FocusPointingTaskManager>(managers);
-        ReferenceListTaskManager referenceListTaskManager = GetOrAdd<ReferenceListTaskManager>(managers);
+        WebViewSessionManager webViewSessionManager = GetOrAdd<WebViewSessionManager>(managers);
         T1RayOcclusionLayoutProbe rayOcclusionLayoutProbe = GetOrAdd<T1RayOcclusionLayoutProbe>(managers);
         ErrorEvaluator errorEvaluator = GetOrAdd<ErrorEvaluator>(managers);
         VRTaskMenuManager vrTaskMenuManager = GetOrAdd<VRTaskMenuManager>(managers);
+        ExitPanelController exitPanelController = GetOrAdd<ExitPanelController>(managers);
         Logger logger = GetOrAdd<Logger>(managers);
         PrototypeDebugVisualizer debugVisualizer = GetOrAdd<PrototypeDebugVisualizer>(managers);
 
@@ -67,10 +69,38 @@ public static class DevPrototypeSceneBuilder
         SetBool(layoutManager, "useFixedSceneLayout", false);
         SetBool(layoutManager, "applyOnStart", true);
 
-        SetBool(webViewBridgeA, "enableOnStart", false);
-        SetString(webViewBridgeA, "initialUrl", "https://www.youtube.com");
-        SetBool(webViewBridgeB, "enableOnStart", false);
-        SetString(webViewBridgeB, "initialUrl", "https://www.youtube.com");
+        SetBool(tLabWebViewBridgeA, "enableOnStart", false);
+        SetString(tLabWebViewBridgeA, "initialUrl", "https://www.youtube.com");
+        SetVector2Int(tLabWebViewBridgeA, "viewSize", new Vector2Int(960, 540));
+        SetVector2Int(tLabWebViewBridgeA, "textureSize", new Vector2Int(1920, 1080));
+        SetBool(tLabWebViewBridgeA, "matchDisplayAspect", true);
+        SetInt(tLabWebViewBridgeA, "fps", 24);
+        SetBool(tLabWebViewBridgeA, "limitTextureUpdatesToFps", true);
+        SetEnum(tLabWebViewBridgeA, "captureMode", TLabCaptureModePreference.HardwareBuffer);
+        SetBool(tLabWebViewBridgeA, "useBuiltInTLabKeyboard", false);
+        SetBool(tLabWebViewBridgeA, "showDisplayKeyboard", true);
+        SetBool(tLabWebViewBridgeA, "showKeyboardOnlyForTextInput", true);
+        SetFloat(tLabWebViewBridgeA, "displayKeyboardHeightNormalized", 0.34f);
+        SetInt(tLabWebViewBridgeA, "keyboardSortingOrder", 30);
+        SetInt(tLabWebViewBridgeA, "cursorSortingOrderAboveKeyboard", 31);
+        SetBool(tLabWebViewBridgeA, "loadBlankPageOnDisable", true);
+        SetBool(tLabWebViewBridgeA, "destroyPrefabOnDisable", true);
+        SetBool(tLabWebViewBridgeB, "enableOnStart", false);
+        SetString(tLabWebViewBridgeB, "initialUrl", "https://www.youtube.com");
+        SetVector2Int(tLabWebViewBridgeB, "viewSize", new Vector2Int(960, 540));
+        SetVector2Int(tLabWebViewBridgeB, "textureSize", new Vector2Int(1920, 1080));
+        SetBool(tLabWebViewBridgeB, "matchDisplayAspect", true);
+        SetInt(tLabWebViewBridgeB, "fps", 24);
+        SetBool(tLabWebViewBridgeB, "limitTextureUpdatesToFps", true);
+        SetEnum(tLabWebViewBridgeB, "captureMode", TLabCaptureModePreference.HardwareBuffer);
+        SetBool(tLabWebViewBridgeB, "useBuiltInTLabKeyboard", false);
+        SetBool(tLabWebViewBridgeB, "showDisplayKeyboard", true);
+        SetBool(tLabWebViewBridgeB, "showKeyboardOnlyForTextInput", true);
+        SetFloat(tLabWebViewBridgeB, "displayKeyboardHeightNormalized", 0.34f);
+        SetInt(tLabWebViewBridgeB, "keyboardSortingOrder", 30);
+        SetInt(tLabWebViewBridgeB, "cursorSortingOrderAboveKeyboard", 31);
+        SetBool(tLabWebViewBridgeB, "loadBlankPageOnDisable", true);
+        SetBool(tLabWebViewBridgeB, "destroyPrefabOnDisable", true);
 
         SetObject(gazeProvider, "hmdCamera", hmdCamera);
         Transform eyeTrackingRaySource = EnsureChild(managers.transform, "EyeTracking_RaySource");
@@ -121,6 +151,8 @@ public static class DevPrototypeSceneBuilder
 
         SetObject(cursorController, "inputManager", inputManager);
         SetObject(cursorController, "displayManager", displayManager);
+        SetFloat(cursorController, "cursorSpeedPixelsPerSecond", 220f);
+        SetFloat(cursorController, "accelerationPixelsPerSecond", 0f);
         SetBool(cursorController, "allowStickCursorMovement", true);
 
         SetObject(scrollController, "inputManager", inputManager);
@@ -130,7 +162,7 @@ public static class DevPrototypeSceneBuilder
         SetObject(scrollController, "virtualCursorController", cursorController);
         SetObject(scrollController, "gazeProvider", gazeProvider);
         SetObject(scrollController, "logger", logger);
-        SetObject(scrollController, "referenceListTaskManager", referenceListTaskManager);
+        SetObject(scrollController, "webViewSessionManager", webViewSessionManager);
 
         SetObject(clickDispatcher, "inputManager", inputManager);
         SetObject(clickDispatcher, "displayManager", displayManager);
@@ -139,9 +171,16 @@ public static class DevPrototypeSceneBuilder
         SetObject(clickDispatcher, "virtualCursorController", cursorController);
         SetObject(clickDispatcher, "gazeProvider", gazeProvider);
         SetObject(clickDispatcher, "focusPointingTaskManager", focusPointingTaskManager);
-        SetObject(clickDispatcher, "referenceListTaskManager", referenceListTaskManager);
+        SetObject(clickDispatcher, "webViewSessionManager", webViewSessionManager);
         SetObject(clickDispatcher, "vrTaskMenuManager", vrTaskMenuManager);
         SetObject(clickDispatcher, "logger", logger);
+        SetBool(clickDispatcher, "enableWebViewPointerDrag", true);
+        SetFloat(clickDispatcher, "webViewStickGestureDeadzone", 0.12f);
+        SetFloat(clickDispatcher, "webViewStickGestureSpeedPixelsPerSecond", 260f);
+        SetFloat(clickDispatcher, "webViewRayNeutralReleaseDelay", 0.12f);
+        SetFloat(clickDispatcher, "webViewVerticalGestureEdgeMargin", 0.08f);
+        SetFloat(clickDispatcher, "webViewVerticalGestureReentry", 0.28f);
+        SetFloat(clickDispatcher, "webViewThumbstickClickDragNeutralReleaseDelay", 0.45f);
 
         SetObject(focusPointingTaskManager, "inputManager", inputManager);
         SetObject(focusPointingTaskManager, "experimentManager", experimentManager);
@@ -151,17 +190,55 @@ public static class DevPrototypeSceneBuilder
         SetObject(focusPointingTaskManager, "virtualCursorController", cursorController);
         SetObject(focusPointingTaskManager, "displayA", displayA.transform);
         SetObject(focusPointingTaskManager, "displayB", displayB.transform);
+        SetEnum(focusPointingTaskManager, "selectedTask", T1PointingTask.TaskA_LeftRight);
+        SetEnum(focusPointingTaskManager, "selectedLayout", DisplayLayoutPreset.LeftRight);
+        SetEnum(focusPointingTaskManager, "taskOrder", T1TaskOrder.ABC);
+        SetEnum(focusPointingTaskManager, "methodOrder", T1MethodOrder.RayFirst);
+        SetBool(focusPointingTaskManager, "useLatest48TrialDesign", true);
+        SetFloat(focusPointingTaskManager, "smallTargetSizeDegrees", 1.5f);
+        SetFloat(focusPointingTaskManager, "largeTargetSizeDegrees", 3f);
+        SetString(focusPointingTaskManager, "targetOrderResourcePath", "T1/target_orders_ABCDEFG");
         SetBool(focusPointingTaskManager, "rebuildTrialsOnStart", true);
         SetBool(focusPointingTaskManager, "randomizeTrialsWithinCondition", false);
 
-        SetObject(referenceListTaskManager, "inputManager", inputManager);
-        SetObject(referenceListTaskManager, "experimentManager", experimentManager);
-        SetObject(referenceListTaskManager, "displayManager", displayManager);
-        SetObject(referenceListTaskManager, "logger", logger);
-        SetObject(referenceListTaskManager, "displayA", displayA);
-        SetObject(referenceListTaskManager, "displayB", displayB);
-        SetBool(referenceListTaskManager, "requireStartButtonBeforeTask", true);
-        SetFloat(referenceListTaskManager, "startCountdownSeconds", 3f);
+        SetObject(webViewSessionManager, "inputManager", inputManager);
+        SetObject(webViewSessionManager, "experimentManager", experimentManager);
+        SetObject(webViewSessionManager, "displayManager", displayManager);
+        SetObject(webViewSessionManager, "logger", logger);
+        SetObject(webViewSessionManager, "virtualCursorController", cursorController);
+        SetObject(webViewSessionManager, "raycastPointer", raycastPointer);
+        SetObject(webViewSessionManager, "displayA", displayA);
+        SetObject(webViewSessionManager, "displayB", displayB);
+        SetObject(webViewSessionManager, "hmdCamera", hmdCamera);
+        SetEnum(webViewSessionManager, "inputMode", WebViewInputMode.DirectScrollAndSeek);
+        SetObject(webViewSessionManager, "targetTLabWebViewBridge", tLabWebViewBridgeB);
+        SetBool(webViewSessionManager, "autoAddTLabBridgeToTargetDisplay", true);
+        SetString(webViewSessionManager, "targetDisplayId", "Display_B_Back");
+        SetString(webViewSessionManager, "initialUrl", "https://www.youtube.com");
+        SetBool(webViewSessionManager, "enableSecondaryWebView", true);
+        SetString(webViewSessionManager, "secondaryDisplayId", "Display_A_Front");
+        SetString(webViewSessionManager, "secondaryInitialUrl", "http://133.87.151.97:5173/");
+        SetEnum(webViewSessionManager, "selectedContentSet", T2ContentSet.ACampGear2024);
+        SetString(webViewSessionManager, "youtubeUrlSetA", "https://www.youtube.com/watch?v=oCKnZl-XT1Y");
+        SetString(webViewSessionManager, "youtubeUrlSetB", "https://www.youtube.com/watch?v=wIHPxl6OPOc");
+        SetString(webViewSessionManager, "comparisonPageResourceSetA", "");
+        SetString(webViewSessionManager, "comparisonPageResourceSetB", "");
+        SetFloat(webViewSessionManager, "totalTaskDurationSeconds", 600f);
+        SetFloat(webViewSessionManager, "mainD2VStartSeconds", 90f);
+        SetFloat(webViewSessionManager, "mainSemiFreeStartSeconds", 180f);
+        SetFloat(webViewSessionManager, "mainFinalizeStartSeconds", 360f);
+        SetFloat(webViewSessionManager, "practiceScrollThresholdPixels", 80f);
+        SetBool(webViewSessionManager, "autoAddTLabBridgeToSecondaryDisplay", true);
+        SetBool(webViewSessionManager, "disableOtherWebViewsOnStart", true);
+        SetString(webViewSessionManager, "startGateDisplayId", "Display_B_Back");
+        SetBool(webViewSessionManager, "requireStartButtonBeforeSession", true);
+        SetFloat(webViewSessionManager, "startCountdownSeconds", 3f);
+        SetBool(webViewSessionManager, "showInstructionPanelAboveBackDisplay", true);
+        SetVector2(webViewSessionManager, "instructionPanelSizePixels", new Vector2(1300f, 300f));
+        SetFloat(webViewSessionManager, "instructionPanelScale", 0.0009f);
+        SetInt(webViewSessionManager, "instructionPanelPhaseFontSize", 32);
+        SetInt(webViewSessionManager, "instructionPanelMessageFontSize", 44);
+        SetFloat(webViewSessionManager, "instructionPanelVerticalGapMeters", 0.08f);
 
         SetObject(rayOcclusionLayoutProbe, "hmdCamera", hmdCamera);
         SetObject(rayOcclusionLayoutProbe, "d1BackDisplay", displayB);
@@ -199,12 +276,20 @@ public static class DevPrototypeSceneBuilder
         SetObject(vrTaskMenuManager, "experimentManager", experimentManager);
         SetObject(vrTaskMenuManager, "displayManager", displayManager);
         SetObject(vrTaskMenuManager, "focusPointingTaskManager", focusPointingTaskManager);
-        SetObject(vrTaskMenuManager, "referenceListTaskManager", referenceListTaskManager);
+        SetObject(vrTaskMenuManager, "webViewSessionManager", webViewSessionManager);
         SetObject(vrTaskMenuManager, "raycastPointer", raycastPointer);
         SetObject(vrTaskMenuManager, "gazeProvider", gazeProvider);
         SetObject(vrTaskMenuManager, "gazeDisplayFocusManager", gazeDisplayFocusManager);
         SetBool(vrTaskMenuManager, "showLayoutButtons", true);
         SetBool(vrTaskMenuManager, "applySelectedLayout", true);
+
+        SetObject(exitPanelController, "hmdCamera", hmdCamera);
+        SetObject(exitPanelController, "leftControllerTransform", leftControllerRaySource);
+        SetObject(exitPanelController, "inputManager", inputManager);
+        SetObject(exitPanelController, "taskMenuManager", vrTaskMenuManager);
+        SetObject(exitPanelController, "logger", logger);
+        SetFloat(exitPanelController, "panelDistanceMeters", 1.2f);
+        SetFloat(exitPanelController, "holdToExitSeconds", 0.6f);
 
         SetObject(debugVisualizer, "inputManager", inputManager);
         SetObject(debugVisualizer, "gazeProvider", gazeProvider);
@@ -222,6 +307,7 @@ public static class DevPrototypeSceneBuilder
         SetFloat(debugVisualizer, "hitPointRadius", 0.01f);
         SetBool(debugVisualizer, "showWorldConditionLabel", true);
         SetString(debugVisualizer, "worldConditionLabelAnchorDisplayId", "Display_B_Back");
+        SetVector2(debugVisualizer, "worldConditionLabelNormalizedAnchor", new Vector2(0.5f, 1.60f));
         SetBool(debugVisualizer, "showGazeRayOnlyWhileGripHeld", true);
         SetFloat(debugVisualizer, "gazeRayStartOffset", 0.35f);
         SetFloat(debugVisualizer, "gazeRayStartWidth", 0.0035f);
@@ -283,6 +369,20 @@ public static class DevPrototypeSceneBuilder
 
         Transform debugRay = EnsureChild(fallbackParent, "Right_Controller_DebugRay");
         debugRay.localPosition = new Vector3(0.25f, -0.15f, 0.05f);
+        debugRay.localRotation = Quaternion.identity;
+        return debugRay;
+    }
+
+    private static Transform ResolveLeftControllerRaySource(Transform fallbackParent)
+    {
+        GameObject leftController = GameObject.Find("Left Controller");
+        if (leftController != null)
+        {
+            return leftController.transform;
+        }
+
+        Transform debugRay = EnsureChild(fallbackParent, "Left_Controller_DebugRay");
+        debugRay.localPosition = new Vector3(-0.25f, -0.15f, 0.05f);
         debugRay.localRotation = Quaternion.identity;
         return debugRay;
     }
@@ -421,6 +521,7 @@ public static class DevPrototypeSceneBuilder
         RectTransform cursor = EnsureRectChild(canvasTransform, "Cursor");
         Image cursorImage = GetOrAdd<Image>(cursor.gameObject);
         cursorImage.color = Color.yellow;
+        cursorImage.raycastTarget = false;
 
         Transform hitPlaneTransform = EnsureChild(displayObject.transform, "TransparentHitPlane");
         BoxCollider hitPlane = GetOrAdd<BoxCollider>(hitPlaneTransform.gameObject);
@@ -561,6 +662,38 @@ public static class DevPrototypeSceneBuilder
         if (property != null)
         {
             property.intValue = value;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+        }
+    }
+
+    private static void SetVector2Int(Object target, string propertyName, Vector2Int value)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        SerializedObject serializedObject = new SerializedObject(target);
+        SerializedProperty property = serializedObject.FindProperty(propertyName);
+        if (property != null)
+        {
+            property.vector2IntValue = value;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+        }
+    }
+
+    private static void SetVector2(Object target, string propertyName, Vector2 value)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        SerializedObject serializedObject = new SerializedObject(target);
+        SerializedProperty property = serializedObject.FindProperty(propertyName);
+        if (property != null)
+        {
+            property.vector2Value = value;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
         }
     }

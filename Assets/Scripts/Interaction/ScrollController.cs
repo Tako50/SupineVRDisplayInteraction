@@ -3,7 +3,7 @@ using UnityEngine;
 [DisallowMultipleComponent]
 /// <summary>
 /// スクロール入力を現在の条件に応じて配送する。
-/// BaselineはRayが当たっている表示、ExplicitDisplayFocusはフォーカス済み表示だけをスクロール対象にする。
+/// BaselineはRayが当たっている表示、ExplicitDisplayFocusはフォーカス済み表示だけを対象にする。
 /// </summary>
 public class ScrollController : MonoBehaviour
 {
@@ -14,7 +14,7 @@ public class ScrollController : MonoBehaviour
     [SerializeField] private VirtualCursorController virtualCursorController;
     [SerializeField] private GazeProvider gazeProvider;
     [SerializeField] private Logger logger;
-    [SerializeField] private ReferenceListTaskManager referenceListTaskManager;
+    [SerializeField] private WebViewSessionManager webViewSessionManager;
     [SerializeField] private float scrollLogInterval = 0.12f;
     [SerializeField] private float stickScrollDeadzone = 0.05f;
 
@@ -56,22 +56,57 @@ public class ScrollController : MonoBehaviour
             return;
         }
 
-        float stickVertical = inputManager.Stick.y;
-        if (Mathf.Abs(stickVertical) < stickScrollDeadzone)
-        {
-            return;
-        }
-
         DisplayHit hit = displayManager.CurrentRaycastHit;
         if (hit.Display == null)
         {
             return;
         }
 
-        if (TryHandleWebViewScroll(hit.Display, stickVertical, Time.deltaTime, hit.Normalized, out float webViewScrollPixels))
+        Vector2 stick = inputManager.Stick;
+        float stickVertical = stick.y;
+        if (Mathf.Abs(stickVertical) < stickScrollDeadzone)
         {
-            LastScrollAmount = webViewScrollPixels;
-            LastScrollDisplayId = hit.DisplayId;
+            return;
+        }
+
+        if (UsesDirectScrollAndSeekMode() && Mathf.Abs(stickVertical) <= Mathf.Abs(stick.x))
+        {
+            return;
+        }
+
+        if (HasActiveInputWebView(hit.Display))
+        {
+            // T2 Direct mode: RaycastBaseline uses trigger hold + Ray movement for Web UI drag.
+            // While trigger is held, do not layer stick scrolling on top of that pointer drag.
+            if (UsesDirectScrollAndSeekMode() && inputManager.TriggerHeld)
+            {
+                return;
+            }
+
+            // StickTouchGestureモードではClickDispatcherがWebViewへpointer down/move/upを送る。
+            // ここからScrollByを重ねず、WebView自身にscroll/dragの意味を決めさせる。
+            if (UsesStickTouchGestureMode())
+            {
+                return;
+            }
+
+            // A保持中はPointer Dragを優先し、ページスクロールを重ねない。
+            if (inputManager.SubmitHeld)
+            {
+                return;
+            }
+
+            if (TryHandleWebViewScroll(
+                hit.Display,
+                stickVertical,
+                Time.deltaTime,
+                hit.Normalized,
+                out float webViewScrollPixels))
+            {
+                LastScrollAmount = webViewScrollPixels;
+                LastScrollDisplayId = hit.DisplayId;
+            }
+
             return;
         }
 
@@ -83,7 +118,6 @@ public class ScrollController : MonoBehaviour
 
         LastScrollAmount = appliedScroll;
         LastScrollDisplayId = hit.DisplayId;
-        referenceListTaskManager?.HandleScroll(hit.DisplayId, appliedScroll, Time.time);
 
         if (Time.time - lastScrollLogTime >= scrollLogInterval)
         {
@@ -91,7 +125,13 @@ public class ScrollController : MonoBehaviour
             Ray ray = raycastPointer != null ? raycastPointer.CurrentRay : default;
             if (logger != null)
             {
-                logger.LogRaycastScroll(inputManager.CurrentCondition, hit.DisplayId, hit.Normalized, appliedScroll, ray.origin, ray.direction);
+                logger.LogRaycastScroll(
+                    inputManager.CurrentCondition,
+                    hit.DisplayId,
+                    hit.Normalized,
+                    appliedScroll,
+                    ray.origin,
+                    ray.direction);
             }
             else
             {
@@ -102,20 +142,27 @@ public class ScrollController : MonoBehaviour
 
     private void ScrollExplicitFocus()
     {
-        // ExplicitDisplayFocusでは、視線が別表示へ移ってもスクロール先はロック済み表示のまま。
-        if (!inputManager.TriggerHeld)
+        DisplaySurface focusedDisplay = displayManager.FocusedDisplay;
+        if (focusedDisplay == null)
         {
             return;
         }
 
-        float stickVertical = inputManager.Stick.y;
+        // A保持中とstick押し込み中は汎用ドラッグを優先する。
+        // トリガー＋上下は表示種類によらず相対スクロールに使う。
+        if (!inputManager.TriggerHeld || inputManager.SubmitHeld || inputManager.StickClickHeld)
+        {
+            return;
+        }
+
+        Vector2 stick = inputManager.Stick;
+        float stickVertical = stick.y;
         if (Mathf.Abs(stickVertical) < stickScrollDeadzone)
         {
             return;
         }
 
-        DisplaySurface focusedDisplay = displayManager.FocusedDisplay;
-        if (focusedDisplay == null)
+        if (UsesDirectScrollAndSeekMode() && Mathf.Abs(stickVertical) <= Mathf.Abs(stick.x))
         {
             return;
         }
@@ -124,10 +171,24 @@ public class ScrollController : MonoBehaviour
             ? virtualCursorController.NormalizedPosition
             : new Vector2(0.5f, 0.5f);
 
-        if (TryHandleWebViewScroll(focusedDisplay, stickVertical, Time.deltaTime, normalized, out float webViewScrollPixels))
+        if (HasActiveInputWebView(focusedDisplay))
         {
-            LastScrollAmount = webViewScrollPixels;
-            LastScrollDisplayId = focusedDisplay.name;
+            if (UsesStickTouchGestureMode())
+            {
+                return;
+            }
+
+            if (TryHandleWebViewScroll(
+                focusedDisplay,
+                stickVertical,
+                Time.deltaTime,
+                normalized,
+                out float webViewScrollPixels))
+            {
+                LastScrollAmount = webViewScrollPixels;
+                LastScrollDisplayId = focusedDisplay.name;
+            }
+
             return;
         }
 
@@ -139,7 +200,6 @@ public class ScrollController : MonoBehaviour
 
         LastScrollAmount = appliedScroll;
         LastScrollDisplayId = focusedDisplay.name;
-        referenceListTaskManager?.HandleScroll(focusedDisplay.name, appliedScroll, Time.time);
 
         if (Time.time - lastScrollLogTime >= scrollLogInterval)
         {
@@ -174,14 +234,40 @@ public class ScrollController : MonoBehaviour
         out float appliedScrollPixels)
     {
         appliedScrollPixels = 0f;
-        if (display == null)
-        {
-            return false;
-        }
+        TLabWebViewDisplayBridge bridge = GetWebViewBridge(display);
+        return IsActiveInputWebView(bridge)
+            && bridge.TryScroll(stickVertical, deltaTime, normalizedPosition, out appliedScrollPixels);
+    }
 
-        WebViewDisplayBridge webViewBridge = display.GetComponent<WebViewDisplayBridge>();
-        return webViewBridge != null
-            && webViewBridge.TryScroll(stickVertical, deltaTime, normalizedPosition, out appliedScrollPixels);
+    private static bool HasActiveInputWebView(DisplaySurface display)
+    {
+        return IsActiveInputWebView(GetWebViewBridge(display));
+    }
+
+    private static bool IsActiveInputWebView(TLabWebViewDisplayBridge bridge)
+    {
+        return bridge != null
+            && bridge.ConsumeExperimentInput
+            && (bridge.IsWebViewEnabled || bridge.IsReady);
+    }
+
+    private static TLabWebViewDisplayBridge GetWebViewBridge(DisplaySurface display)
+    {
+        return display != null ? display.GetComponent<TLabWebViewDisplayBridge>() : null;
+    }
+
+    private bool UsesStickTouchGestureMode()
+    {
+        return webViewSessionManager != null
+            && webViewSessionManager.IsSessionRunning
+            && webViewSessionManager.UsesStickTouchGesture;
+    }
+
+    private bool UsesDirectScrollAndSeekMode()
+    {
+        return webViewSessionManager != null
+            && webViewSessionManager.IsSessionRunning
+            && webViewSessionManager.UsesDirectScrollAndSeek;
     }
 
     private void ResolveReferences()
@@ -225,9 +311,9 @@ public class ScrollController : MonoBehaviour
             logger = FindObjectOfType<Logger>();
         }
 
-        if (referenceListTaskManager == null)
+        if (webViewSessionManager == null)
         {
-            referenceListTaskManager = FindObjectOfType<ReferenceListTaskManager>();
+            webViewSessionManager = FindObjectOfType<WebViewSessionManager>();
         }
     }
 

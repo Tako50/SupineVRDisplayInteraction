@@ -173,12 +173,16 @@ Follow Docs/prototype_spec.md.
 Implement:
 - Exp_FocusPointing scene or task mode inside Dev_Prototype first
 - TaskManager for pointing trials
+- Task A: Left/Right, Task B: Front/Back Clear, Task C: Front/Back Input Occlusion
+- 48 main trials per task/method block (2 displays x 6 positions x 2 sizes x 2 cycles)
+- Constrained deterministic trial-order generation and counterbalance metadata
 - Target generation on Display_A_Front and Display_B_Back
 - Target size conditions
 - Target display condition
 - Trial start/end timing
 - ErrorEvaluator for Display error and Target error
 - Trial CSV logging
+- Per-trial controller movement and rotation accumulation
 
 Definitions:
 - Display error: user input is sent to a display different from the instructed target display.
@@ -192,32 +196,39 @@ Done when:
 
 ---
 
-## Phase 5: T2 FocusScroll task
+## Phase 5: T2 Web Browsing task
 
 ### Codex依頼文
 
 ```text
 Goal:
-Implement Phase 5: T2 FocusScroll task.
+Implement Phase 5: T2 YouTube + comparison Web task.
 
-Follow Docs/prototype_spec.md.
+Follow Docs/experiment_design_sync.md.
 
 Implement:
-- Exp_FocusScroll scene or task mode inside Dev_Prototype first
-- Pseudo long web page / comment list content on both displays
-- Scroll target marker
-- Trial instruction: target display and target marker
-- ErrorEvaluator for wrong display scroll and focus maintenance failure
-- Trial CSV logging
+- T2 Web Browsing mode inside Dev_Prototype
+- Display_B_Back loads the YouTube page
+- Display_A_Front loads the fixed local comparison page
+- Unified practice steps: YouTube play, pause, seek backward, skip forward by 10 seconds, Web scroll, product detail, candidate add, candidate remove
+- Keep content-set, year, item ID, and video timestamps internal; do not render them on the comparison Web
+- Use the fixed category order from the current Notion T2 specification
+- Use the Notion-specified video time ranges for V2D and category positions for D2V
+- Continue from practice to Main without closing or reloading either WebView
+- 10-minute unified countdown with V2D, D2V, semi-free, and finalization instructions
+- Completion when the participant confirms 2–3 candidates on the comparison page
+- YouTube operation prerequisite before candidate selection
+- T2 event/result CSV logging
 
-Definitions:
-- Wrong scroll: scrolling a display different from the instructed target display.
-- Focus maintenance failure: input is sent to an unintended display without explicit refocus.
+Input:
+- A = click at the current ray cursor or explicit virtual cursor
+- RaycastBaseline stick = scroll / seek on the ray-hit WebView
+- ExplicitDisplayFocus trigger + stick = scroll / seek on the focused WebView
 
 Done when:
-- Participant can scroll the instructed display to a marker.
-- Both RaycastBaseline and ExplicitDisplayFocus can run the same scroll task.
-- Completion time, wrong scroll count, focus switch count, and scroll events are logged.
+- Both RaycastBaseline and ExplicitDisplayFocus can run the same WebView task.
+- Practice automatically continues to Main; completion or abort returns cleanly to condition selection.
+- T2 CSV files record completion, YouTube operations, scrolling/clicking, display switches, controller movement/rotation, and clutch count.
 ```
 
 ---
@@ -263,7 +274,7 @@ Implement:
   - Dev_Prototype
   - Calibration_Debug
   - Exp_FocusPointing
-  - Exp_FocusScroll
+- T2 remains in Dev_Prototype unless a later design explicitly creates a separate scene
 - Participant ID input
 - Condition selection
 - Trial randomization or counterbalancing placeholder
@@ -273,7 +284,7 @@ Implement:
 - README experiment operation instructions
 
 Done when:
-- A pilot participant can run through calibration, pointing task, and scroll task.
+- A pilot participant can run through calibration, T1 pointing, and T2 Web Browsing.
 - Logs are saved with participant ID, condition, task type, and trial index.
 - README explains the experiment flow.
 ```
@@ -288,7 +299,7 @@ Phase 1: Two displays + layout + hit detection
 Phase 2: RaycastBaseline
 Phase 3: ExplicitDisplayFocus
 Phase 4: T1 FocusPointing
-Phase 5: T2 FocusScroll
+Phase 5: T2 Web Browsing
 Phase 6: Meta Quest Pro Eye Tracking
 Phase 7: Experiment scenes and logging polish
 ```

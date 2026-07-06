@@ -10,9 +10,11 @@ public class VirtualCursorController : MonoBehaviour
     [SerializeField] private PrototypeInputManager inputManager;
     [SerializeField] private DisplayManager displayManager;
     [SerializeField] private GazeProvider gazeProvider;
-    [SerializeField] private float cursorSpeed = 0.55f;
+    [Tooltip("Cursor speed in display canvas pixels per second at full stick deflection.")]
+    [SerializeField] private float cursorSpeedPixelsPerSecond = 220f;
     [SerializeField] private float deadzone = 0.08f;
-    [SerializeField] private float acceleration = 0f;
+    [Tooltip("Additional pixels per second at full stick deflection.")]
+    [SerializeField] private float accelerationPixelsPerSecond = 0f;
     [SerializeField] private bool allowStickCursorMovement = true;
     [SerializeField] private bool logCursorMovement = false;
     [SerializeField] private float cursorMoveLogInterval = 0.25f;
@@ -60,32 +62,20 @@ public class VirtualCursorController : MonoBehaviour
         }
 
         Vector2 stick = inputManager.Stick;
-        if (stick.magnitude < deadzone || inputManager.TriggerHeld)
+        bool relativeScrollActive = inputManager.TriggerHeld && !inputManager.SubmitHeld;
+        if (stick.magnitude < deadzone || relativeScrollActive)
         {
-            // トリガー中はスクロール操作を優先し、カーソル移動と競合させない。
+            // トリガー＋スティックの相対スクロール中はカーソル位置を固定する。
             stick = Vector2.zero;
         }
 
-        float speed = cursorSpeed;
-        if (acceleration > 0f)
+        float speed = cursorSpeedPixelsPerSecond;
+        if (accelerationPixelsPerSecond > 0f)
         {
-            speed += acceleration * stick.magnitude;
+            speed += accelerationPixelsPerSecond * stick.magnitude;
         }
 
-        Vector2 delta = stick * speed * Time.deltaTime;
-        if (delta.sqrMagnitude > 0f)
-        {
-            NormalizedPosition = new Vector2(
-                Mathf.Clamp01(NormalizedPosition.x + delta.x),
-                Mathf.Clamp01(NormalizedPosition.y + delta.y));
-
-            if (logCursorMovement && Time.time - lastCursorMoveLogTime >= cursorMoveLogInterval)
-            {
-                lastCursorMoveLogTime = Time.time;
-                Debug.Log($"[VirtualCursor] moved displayId={focusedDisplay.name}, normalized={Format(NormalizedPosition)}");
-            }
-        }
-
+        ApplyStickDelta(focusedDisplay, stick, speed, Time.deltaTime);
         displayManager.SetCursorNormalized(focusedDisplay, NormalizedPosition, true);
 
         if (inputManager.SubmitReleased)
@@ -143,6 +133,30 @@ public class VirtualCursorController : MonoBehaviour
     public void SetStickCursorMovementEnabled(bool enabled)
     {
         allowStickCursorMovement = enabled;
+    }
+
+    private void ApplyStickDelta(DisplaySurface display, Vector2 stick, float speed, float deltaTime)
+    {
+        Vector2 canvasSize = display != null ? display.CanvasPixelSize : Vector2.one;
+        canvasSize.x = Mathf.Max(1f, canvasSize.x);
+        canvasSize.y = Mathf.Max(1f, canvasSize.y);
+
+        Vector2 deltaPixels = stick * speed * deltaTime;
+        Vector2 delta = new Vector2(deltaPixels.x / canvasSize.x, deltaPixels.y / canvasSize.y);
+        if (delta.sqrMagnitude <= 0f)
+        {
+            return;
+        }
+
+        NormalizedPosition = new Vector2(
+            Mathf.Clamp01(NormalizedPosition.x + delta.x),
+            Mathf.Clamp01(NormalizedPosition.y + delta.y));
+
+        if (logCursorMovement && Time.time - lastCursorMoveLogTime >= cursorMoveLogInterval)
+        {
+            lastCursorMoveLogTime = Time.time;
+            Debug.Log($"[VirtualCursor] moved displayId={display.name}, normalized={Format(NormalizedPosition)}");
+        }
     }
 
     private static string Format(Vector2 value)

@@ -46,7 +46,7 @@ public class PrototypeDebugVisualizer : MonoBehaviour
     [SerializeField] private Text overlayText;
     [SerializeField] private bool showWorldConditionLabel = true;
     [SerializeField] private string worldConditionLabelAnchorDisplayId = "Display_B_Back";
-    [SerializeField] private Vector2 worldConditionLabelNormalizedAnchor = new Vector2(0.5f, 1.30f);
+    [SerializeField] private Vector2 worldConditionLabelNormalizedAnchor = new Vector2(0.5f, 1.60f);
     [SerializeField] private float worldConditionLabelForwardOffset = -0.01f;
     [SerializeField] private Vector2 worldConditionLabelSize = new Vector2(520f, 72f);
     [SerializeField] private float worldConditionLabelScale = 0.0015f;
@@ -117,8 +117,8 @@ public class PrototypeDebugVisualizer : MonoBehaviour
             return;
         }
 
-        GUI.Box(new Rect(12f, 12f, 540f, 292f), "Explicit Display Focus Debug");
-        GUI.Label(new Rect(24f, 40f, 500f, 250f), BuildOverlayText());
+        GUI.Box(new Rect(12f, 12f, 540f, 312f), "Explicit Display Focus Debug");
+        GUI.Label(new Rect(24f, 40f, 500f, 270f), BuildOverlayText());
     }
 
     private void ResolveReferences()
@@ -194,7 +194,15 @@ public class PrototypeDebugVisualizer : MonoBehaviour
         GameObject canvasObject = new GameObject("Prototype_DebugOverlayCanvas");
         canvasObject.transform.SetParent(transform, false);
         Canvas canvas = canvasObject.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        Camera overlayCamera = Camera.main;
+        canvas.renderMode = overlayCamera != null
+            ? RenderMode.ScreenSpaceCamera
+            : RenderMode.ScreenSpaceOverlay;
+        canvas.worldCamera = overlayCamera;
+        if (overlayCamera != null)
+        {
+            canvas.planeDistance = Mathf.Max(overlayCamera.nearClipPlane + 0.01f, 0.5f);
+        }
         canvas.sortingOrder = 1000;
         canvasObject.AddComponent<CanvasScaler>();
         canvasObject.AddComponent<GraphicRaycaster>();
@@ -587,6 +595,9 @@ public class PrototypeDebugVisualizer : MonoBehaviour
             ? $"{eyeTrackingAdapter.IsEyeTrackingAvailable} permission={eyeTrackingAdapter.HasEyeTrackingPermission} device={eyeTrackingAdapter.LastDeviceName} tracked={eyeTrackingAdapter.LastIsTrackedValue:0.0} delta={eyeTrackingAdapter.LastForwardDeltaDegrees:0.00}"
             : "No adapter";
         string debugInput = debugInputProvider != null && debugInputProvider.IsEnabled ? "Enabled" : "Disabled";
+        string rightTrigger = inputManager != null
+            ? $"value={inputManager.TriggerValue:0.00} held={inputManager.TriggerHeld} pressed={inputManager.TriggerPressed} released={inputManager.TriggerReleased}"
+            : "No input manager";
         string lastClick = clickDispatcher != null ? clickDispatcher.LastClickResult : "None";
         string lastScroll = scrollController != null
             ? $"{scrollController.LastScrollDisplayId} {scrollController.LastScrollAmount:0.000}"
@@ -613,6 +624,7 @@ public class PrototypeDebugVisualizer : MonoBehaviour
             $"Cursor normalized: {cursorPosition}\n" +
             $"Layout: {layout}\n" +
             $"Debug input: {debugInput}\n" +
+            $"Right trigger: {rightTrigger}\n" +
             $"Last click: {lastClick}\n" +
             $"Last scroll: {lastScroll}\n" +
             $"FocusPointing trial: {trial}";
