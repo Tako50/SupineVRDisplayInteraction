@@ -23,6 +23,8 @@ public class TaskStartGate : MonoBehaviour
     private bool waitingForButton;
     private bool countdownRunning;
     private float countdownEndTime;
+    private int lastCountdownNumber;
+    private SyncMarkerController syncMarkerController;
 
     public static TaskStartGate GetOrCreate(DisplaySurface targetDisplay)
     {
@@ -67,10 +69,12 @@ public class TaskStartGate : MonoBehaviour
         ApplyRect();
         waitingForButton = true;
         countdownRunning = false;
+        lastCountdownNumber = 0;
         gameObject.SetActive(true);
         gateRect.SetAsLastSibling();
         gateImage.color = buttonColor;
         gateText.text = "START";
+        syncMarkerController = SyncMarkerController.GetOrCreate();
     }
 
     public bool TryHandleClick(string displayId, Vector2 normalizedClickPosition)
@@ -87,6 +91,7 @@ public class TaskStartGate : MonoBehaviour
 
         countdownRunning = true;
         countdownEndTime = Time.time + countdownSeconds;
+        lastCountdownNumber = 0;
         gateImage.color = countdownColor;
         UpdateCountdownText();
         Debug.Log($"{logPrefix} start button pressed. countdown={countdownSeconds:0.0}s");
@@ -187,5 +192,19 @@ public class TaskStartGate : MonoBehaviour
         float remaining = Mathf.Max(0f, countdownEndTime - Time.time);
         int count = Mathf.Max(1, Mathf.CeilToInt(remaining));
         gateText.text = count.ToString(CultureInfo.InvariantCulture);
+
+        if (count != lastCountdownNumber)
+        {
+            lastCountdownNumber = count;
+            if (count >= 1 && count <= 3 && countdownSeconds > 0f)
+            {
+                if (syncMarkerController == null)
+                {
+                    syncMarkerController = SyncMarkerController.GetOrCreate();
+                }
+
+                syncMarkerController?.PlayCountdownBeep();
+            }
+        }
     }
 }

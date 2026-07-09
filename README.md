@@ -52,10 +52,10 @@ Useful development controls:
 - `2`: apply Layout 2 `LeftRight`
 - `3`: apply Layout 3 `UpDown`
 - `WASD` or arrow keys: stick fallback for cursor movement
-- Release `Space`: submit/click fallback
+- Release `Space`: A-button submit/click fallback
 - `Tab`: switch between `RaycastBaseline` and `ExplicitDisplayFocus`
 - `G`: grip fallback for focus confirmation
-- `Left Shift`: trigger fallback; in a WebView session, hold it with `W` / `S` for Explicit scroll
+- `Left Shift`: trigger fallback; trigger alone never clicks, and in a WebView session hold it with `W` / `S` for Explicit scroll
 - `Left Control`: right stick click fallback; in a WebView session, tap it once to start Explicit Web UI drag, then use `WASD` / arrow keys
 - `X`: simulate aiming at the left-side exit panel and holding the left trigger
 - `R`: clear the focused display
@@ -66,7 +66,7 @@ Useful development controls:
 - the right controller ray uses a single `Physics.Raycast`
 - only the first `DisplaySurface` hit receives input
 - the cursor follows the ray hit position on the hit display
-- Releasing A / right trigger / `Space` / `Left Shift` clicks at the ray-hit position
+- Releasing A / `Space` clicks at the ray-hit position; right trigger alone does not click
 - in the default T2 WebView mode, A is a standalone click, vertical stick scrolls, and trigger hold + Ray movement sends Web UI drag
 - right stick vertical / `W` / `S` scrolls only the currently hit display
 - `UpDownDepth` preserves the existing T1 front/back ray-occlusion geometry
@@ -83,75 +83,32 @@ Useful development controls:
 - focus remains locked until grip is pressed again on another candidate
 - cursor warps to the gaze hit position when focus is confirmed
 - right stick / `WASD` moves the virtual cursor inside the focused display
-- Releasing A / right trigger / `Space` / `Left Shift` clicks at the virtual cursor on the focused display
+- Releasing A / `Space` clicks at the virtual cursor on the focused display; right trigger alone does not click
 - in the default T2 WebView mode, A is a standalone click; trigger + vertical stick scrolls, and one stick click latches Web UI drag from the virtual cursor until the stick stays neutral briefly
 - outside a running WebView session, right trigger + right stick vertical, or `Left Shift` + `W` / `S`, keeps the existing relative-scroll behavior
 - moving gaze to another display after focus is locked does not redirect click or scroll input
 
 The debug overlay shows the current condition, focus state, focused display, and gaze candidate ids. Gaze highlight is managed separately from interaction focus by `GazeDisplayFocusManager`.
 
-## Independent Gaze Highlight Conditions
+## Fixed Visual Feedback
 
 `GazeDisplayFocusManager` highlights the current pointing target as visual feedback only:
 
 - `RaycastBaseline`: the first display hit by the controller Ray
 - `ExplicitDisplayFocus`: the foremost display under the gaze ray
 
-It does not change the input target, explicit input focus, cursor, click, or scroll destination.
+It does not change the input target, explicit input focus, cursor, click, or scroll destination. Highlight is fixed ON for both methods and is no longer selectable in the task menu.
 
-The existing `InteractionCondition` and the independent `highlightEnabled` flag form these four experiment conditions:
+Controller-Ray feedback is also fixed by method:
 
-- `RaycastBaseline` + highlight OFF
-- `RaycastBaseline` + highlight ON
-- `ExplicitDisplayFocus` + highlight OFF
-- `ExplicitDisplayFocus` + highlight ON
+- `RaycastBaseline`: display the `Long` controller Ray (`4.0m` by default).
+- `ExplicitDisplayFocus`: hide the controller Ray.
 
-At the start of a condition, call either:
-
-```csharp
-gazeDisplayFocusManager.SetHighlightEnabled(true);
-experimentManager.SetInteractionAndHighlight(
-    InteractionCondition.RaycastBaseline,
-    false);
-```
-
-In the in-app task menu, select `Highlight OFF` or `Highlight ON` before starting Training or Main. The selected state is displayed in the menu status card and is applied independently of the interaction method.
-
-In `Dev_Prototype`, attach `GazeDisplayFocusManager` to `Prototype_Managers` and assign `PrototypeInputManager`, `GazeProvider`, `DisplayManager`, and `EditorDebugInputProvider`. `Highlight Enabled` controls the initial state, `Debug Toggle With Keyboard` enables the Editor-only `H` shortcut, and `Log State Changes` logs only target or enabled-state changes. Each display uses its existing `DisplaySurface`; its `Visible Panel` must reference the panel `Image`.
-
-Turning highlight OFF immediately calls `SetFocused(false)` for every `DisplaySurface`. The highlight is rendered as a runtime `GazeHighlightFrame` child with four uGUI `Image` edges, so the display face keeps its base color and only the border glows. `Gaze Highlight Color`, `Gaze Highlight Strength`, and `Gaze Highlight Border Thickness Pixels` control the frame appearance.
-
-## Per-Condition Controller Ray Display Settings
-
-The visible controller Ray is configured per experiment condition, independently from the cursor:
-
-- `Ray OFF` / `Ray ON`: hide or show the controller Ray visual.
-- `Short` / `Medium` / `Long`: choose the visible Ray length for the currently selected method + highlight condition.
-
-This is a visual setting only. `RaycastBaseline` still uses the existing controller-ray hit test for cursor position, clicking, scrolling, and occlusion reproduction. When the interaction method is `ExplicitDisplayFocus`, the controller Ray is not used for display selection.
-
-`ExperimentManager` has four Inspector settings:
-
-- `Raycast Highlight Off Ray`
-- `Raycast Highlight On Ray`
-- `Proposed Highlight Off Ray`
-- `Proposed Highlight On Ray`
-
-Each setting has its own `Ray Visual Enabled` and `Ray Length Level`, so the four experiment conditions can use different Ray lengths. In the in-app task menu, the `CONDITION RAY` buttons edit only the currently selected method + highlight condition.
-
-External scripts can apply the same settings through:
-
-```csharp
-experimentManager.SetRayVisualEnabled(true);
-experimentManager.SetRayLengthLevel(RayVisualLengthLevel.Medium);
-experimentManager.SetRayVisualSettings(true, RayVisualLengthLevel.Long);
-```
-
-The default visible lengths are configured on `RaycastPointer`: Short `1.5m`, Medium `2.5m`, and Long `4.0m`.
+The task menu therefore contains only task, interaction method, T1 layout/T2 content set, and session-start controls. Its status card shows the fixed highlight and Ray behavior for the selected method.
 
 ## T2 YouTube + Comparison Web Task
 
-T2 implements the Notion `T2 指示セット案：YouTube＋自作Web` semi-free task. The back display runs YouTube and the front display runs a fixed experiment comparison page. The participant uses both displays and completes the task by confirming 2–3 purchase candidates on the front page.
+T2 implements the Notion `T2 指示セット案：YouTube＋自作Web` semi-free task. The back display runs YouTube and the front display runs a fixed experiment comparison page. The participant uses both displays, builds a candidate list, and completes the task by confirming one final candidate on the front page.
 
 T2 uses `TLabWebViewDisplayBridge`, backed by the free MIT-licensed UPM packages from `TLabAltoh/TLabWebView` and `TLabAltoh/TLabVKeyborad`.
 
@@ -163,32 +120,33 @@ T2 uses `TLabWebViewDisplayBridge`, backed by the free MIT-licensed UPM packages
 When `Consume Experiment Input` is enabled, the current experiment input path is reused:
 
 - `WebViewSessionManager > Input Mode = Direct Scroll And Seek` is the default trial mode.
-- A is a standalone click in both conditions. A is not combined with stick movement, and right trigger alone does not click during the WebView session.
+- A is the only click/selection input in both conditions and in both T1 and T2. A is not combined with stick movement, and right trigger alone does not click.
 - `RaycastBaseline`: vertical stick scrolls the WebView under the ray; trigger hold + Ray movement sends Web UI drag.
 - `ExplicitDisplayFocus`: trigger + vertical stick scrolls the focused WebView; one right stick click starts Web UI drag from the virtual cursor, stick movement drags it, and a brief neutral pause or second stick click releases it.
-- Web UI drag sends pointer down / move / up to the WebView, so YouTube's seek bar can be manipulated through the page UI instead of relative video-time seek.
+- Web UI drag starts pointer down only after movement exceeds a small threshold, then sends pointer move / up to the WebView. This prevents a stationary trigger or stick-click press from becoming a Web click while allowing YouTube's seek bar to be manipulated through the page UI.
 - Scroll directly updates the WebView page's relative scroll position. Web UI drag depends on the active page element under the pointer.
 - Stick cursor and Web UI drag speeds are pixel-based so horizontal and vertical motion have the same canvas-pixel speed. Tune `Prototype_Managers > VirtualCursorController > Cursor Speed Pixels Per Second` and `Prototype_Managers > ClickDispatcher > Web View Stick Gesture Speed Pixels Per Second`. Current defaults are `220` px/s for cursor movement and `260` px/s for Web UI drag.
 - `Stick Touch Gesture` remains available in the Inspector for comparison, and `Legacy Direct Scroll And Submit Drag` remains available for rollback.
 - To restore the previous direct `ScrollBy` plus A-held drag path, set `WebViewSessionManager > Input Mode = Legacy Direct Scroll And Submit Drag`.
 - During a WebView session, the right controller B button navigates back one page on the display currently under the Baseline ray or focused by `ExplicitDisplayFocus`. In the Editor, the equivalent debug key is `Tab`. Outside a running WebView session, B / `Tab` retains its existing condition-toggle behavior.
+- T2 forces the YouTube HTML video element to `muted = false` and `volume = 1.0` when telemetry attaches or playback starts. Tune `WebViewSessionManager > Force Youtube Unmuted` and `Youtube Forced Volume` if this needs to be disabled or lowered.
 
 This keeps WebView browsing independent from the interaction method. TLab is pulled through UPM git dependencies rather than copying package sources into `Assets/`.
 
 In `Dev_Prototype`, the T2 menu launches only the current YouTube + comparison task. To try it:
 
 1. Select `T2 Web Browsing` in the VR task menu.
-2. Select `Set A 2024` or `Set B 2025`.
-3. Select `Raycast Baseline` or `Explicit Display Focus` and the desired highlight/ray settings. T2 always uses `UpDownDepth` regardless of the T1 layout selection.
+2. Select `Content A` or `Content B`.
+3. Select `Raycast Baseline` or `Explicit Display Focus`. Highlight/Ray feedback is applied automatically, and T2 always uses `UpDownDepth` regardless of the T1 layout selection.
 4. Press `START T2 TASK`.
 5. Press the in-display `START` gate and wait for the countdown.
-6. `Display_B_Back` opens the fixed 2024/2025 YouTube URL. `Display_A_Front` opens the common 20-product comparison Web.
+6. `Display_B_Back` opens the selected content's YouTube URL. `Display_A_Front` opens the common 20-product comparison Web through `WebViewSessionManager.Secondary Initial Url`.
 
 T2 also shows a passive world-space instruction panel above `Display_B_Back`. It mirrors the current training step, main-task instruction, completion state, and late-task reminder without adding a collider or receiving controller input. The panel uses the back display's transform, so it stays fixed with the experiment displays and does not follow head direction. Panel size, scale, and phase/message font sizes are adjustable on `WebViewSessionManager`. T2 is currently fixed to `UpDownDepth`; the other layout presets remain available only for T1.
 
-T2 runs as one continuous 10-minute session. Practice follows eight checks in order: YouTube play, pause, seek backward, skip forward by 10 seconds, Web scroll, product-detail open, candidate add, and candidate remove. After P08, it automatically changes to Main without closing or reloading either WebView and without returning to condition selection. Practice candidates are cleared at the transition, while the pages remain loaded. The instruction panel shows the interaction condition and a countdown from `10:00` throughout the session.
+T2 runs as one continuous 10-minute session. Practice is a fixed 90-second operation-check window and follows eight checks in order: YouTube play, pause, seek backward, skip forward by 10 seconds, Web scroll, product-detail open, candidate add, and candidate remove. If P08 finishes early, the panel shows a waiting message until Main starts; if practice is still incomplete at 90 seconds, T2 logs `practice_timeout` and moves to Main. Practice candidates are cleared at the transition, while the pages remain loaded. The instruction panel shows the interaction condition and a countdown from `10:00` throughout the session.
 
-Main presents the set-specific V2D instruction first, the D2V instruction after 1:30, semi-free comparison after 3:00, and candidate finalization after 6:00. V2D identifies the target by a designated video time range; D2V identifies it by its fixed position within the Web category and completes only when the video is paused within that product's appearance range. The fixed videos are `oCKnZl-XT1Y` for Set A (2024) and `wIHPxl6OPOc` for Set B (2025). Participants confirm 2–3 candidates, and at least one Main-phase YouTube play, pause, or seek is required before confirmation.
+Main is the remaining 8:30. V2D and D2V each have an expected 90-second window and a hard 150-second upper limit; if either required task is still incomplete at its upper limit, T2 logs the timeout and ends as `fail`. Semi-free comparison runs after D2V completes and candidate confirmation begins at Main `8:00`. V2D identifies the target by a designated video time range. D2V uses strict completion: during the D2V stage, the target Web detail must have been opened and YouTube must be paused within the configured target appearance range; seek while already paused is also checked as a paused target time. Internally, Content A uses video `oCKnZl-XT1Y` and Content B uses `wIHPxl6OPOc`. Participants confirm one final candidate, and at least one Main-phase YouTube play, pause, or seek is required before confirmation.
 
 T2 writes separate `Logs/T2/t2_events_*.csv` and `t2_results_*.csv` files under `Application.persistentDataPath`. The summary includes participant/session/counterbalance identifiers, method, content set, duration, selected candidates, V2D/D2V completion times, candidate add/remove and detail counts, YouTube operation counts and pause time, Web scroll/click amount, display switches, controller movement/rotation, clutch count, and result.
 
@@ -403,7 +361,7 @@ Rows are written when a condition is entered, left, or recentered. The CSV recor
 
 ## T2 キャンプギア比較Web
 
-T2実験で手前ディスプレイに表示する、React + TypeScript + Vite製の静的Webアプリをルート直下に置いています。商品は必ず「カテゴリ一覧 → 商品一覧 → 商品詳細」の順に探し、詳細画面から候補へ追加します。検索機能はありません。
+T2実験で手前ディスプレイに表示する、React + TypeScript + Vite製の静的Webアプリをルート直下に置いています。商品は必ず「カテゴリ一覧 → カテゴリ内の商品 → 商品詳細」の順に探し、詳細画面から候補へ追加します。検索機能はありません。
 
 ### 起動方法
 
@@ -429,9 +387,9 @@ Quest上のUnity WebViewから開発用HTTPサーバーを表示するため、`
 
 - ホーム: カテゴリ一覧または候補リストへ移動
 - カテゴリ一覧: 5カテゴリから1つを選択
-- 商品一覧: 選択カテゴリの商品カードを表示
+- カテゴリ内の商品: 選択カテゴリの商品カードを表示
 - 商品詳細: 商品情報・動画内の見た目を確認して候補へ追加
-- 候補リスト: 候補の削除と確定。確定後は候補数のみ表示
+- 候補リスト: 候補の削除と、最終候補1つの確定
 
 ### `items.json` の編集方法
 
@@ -439,4 +397,4 @@ Quest上のUnity WebViewから開発用HTTPサーバーを表示するため、`
 
 ### ログの保存・書き出し方法
 
-`category_open`、`product_open`、`add_candidate`、`remove_candidate`、`confirm_candidates`、`back` をブラウザの `localStorage` に保存します。保存キーは `t2_web_logs` です。画面右下の「ログを書き出す」を押すと、保存済みログを `logs.json` としてダウンロードします。候補リストは同じブラウザの `t2_web_candidates` に保存されます。
+`category_open`、`product_open`、`add_candidate`、`remove_candidate`、`candidate_list_open`、`confirm_candidates`、`back` をブラウザの `localStorage` に保存します。保存キーは `t2_web_logs` です。参加者画面にはログ書き出しボタンを表示しません。候補リストは同じブラウザの `t2_web_candidates` に保存されます。

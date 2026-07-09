@@ -251,7 +251,7 @@ center = HMD position + HMD forward * distance
 |---|---|---|
 | 対象指定 | 右コントローラの向き | controller rayをHitPlaneへ飛ばす |
 | カーソル移動 | controller rayの交点 | ray hit位置にカーソルを表示 |
-| クリック | Aボタンまたは右トリガー短押し | hit中のUI要素をクリック |
+| クリック | Aボタン | hit中のUI要素をクリック。右トリガー単押しではクリックしない |
 | スクロール | rayを当てた状態でスティック | hit中のディスプレイをスクロール |
 | フォーカス切替 | rayが当たったディスプレイ | 最前面hitを操作対象にする |
 
@@ -265,7 +265,7 @@ center = HMD position + HMD forward * distance
 | ディスプレイフォーカス確定 | 右グリップ | gaze候補から入力先Displayを確定する |
 | カーソル初期配置 | 右グリップ確定時 | focus確定と同時に、該当Display内のgaze hit位置へcursorを配置する |
 | カーソル微調整 | 右スティック | focus中のDisplay内で相対移動する |
-| クリック | Aボタンまたは右トリガー短押し | focus中Displayのcursor位置にあるUI要素をクリックする |
+| クリック | Aボタン | focus中Displayのcursor位置にあるUI要素をクリックする。右トリガー単押しではクリックしない |
 | スクロール | 右トリガー＋右スティック上下 | focus中Displayをスクロールする。視線が他Displayへ移っても、明示的にfocus変更されるまでは入力先を維持する |
 | フォーカス解除・再指定 | 再度右グリップ | 現在のgaze候補に基づいて入力先Displayとcursor位置を更新する |
 
@@ -431,10 +431,10 @@ cursor = clamp(cursor, displayRect)
 
 責務：
 
-- Aボタン押下または右トリガー短押しを検出
+- Aボタン押下を検出する。右トリガー単押しはクリックとして扱わない
 - 現在の条件に応じてクリック位置を決める
 - ベースラインではray hit位置
-- 提案手法ではvirtual cursor位置。右トリガー＋スティック上下でスクロールした場合、トリガーを離してもクリック扱いにしない
+- 提案手法ではvirtual cursor位置。右トリガーはスクロール修飾入力としてのみ扱う
 - UI要素またはタスクターゲットへクリックイベントを送る
 - ミスクリックをLoggerへ送る
 

@@ -1434,8 +1434,8 @@ MonoBehaviour:
   displayManager: {fileID: 1045802448}
   rightControllerTransform: {fileID: 2098682404}
   rayLine: {fileID: 0}
-  showRayLine: 0
-  rayLengthLevel: 1
+  showRayLine: 1
+  rayLengthLevel: 2
   shortRayLength: 1.5
   mediumRayLength: 2.5
   longRayLength: 4
@@ -1597,32 +1597,11 @@ MonoBehaviour:
   debugInputProvider: {fileID: 1045802454}
   logger: {fileID: 1045802441}
   startingCondition: 0
-  startingHighlightEnabled: 1
   startingLayout: 0
   applyStartingLayoutOnStart: 1
   allowLayoutSwitching: 1
   lockDisplaysAfterStart: 1
   debugLogIntervalSeconds: 0.5
-  raycastHighlightOffRay:
-    interactionMethod: 0
-    highlightEnabled: 0
-    rayVisualEnabled: 0
-    rayLengthLevel: 1
-  raycastHighlightOnRay:
-    interactionMethod: 0
-    highlightEnabled: 1
-    rayVisualEnabled: 0
-    rayLengthLevel: 1
-  proposedHighlightOffRay:
-    interactionMethod: 1
-    highlightEnabled: 0
-    rayVisualEnabled: 0
-    rayLengthLevel: 1
-  proposedHighlightOnRay:
-    interactionMethod: 1
-    highlightEnabled: 1
-    rayVisualEnabled: 0
-    rayLengthLevel: 1
 --- !u!4 &1045802452
 Transform:
   m_ObjectHideFlags: 0
@@ -1681,7 +1660,6 @@ MonoBehaviour:
   stickClickKey: 306
   exitHoldKey: 120
   resetFocusKey: 114
-  highlightToggleKey: 104
   upDownDepthKey: 49
   leftRightKey: 50
   upDownKey: 51
@@ -1896,7 +1874,6 @@ MonoBehaviour:
   displayManager: {fileID: 1045802448}
   debugInputProvider: {fileID: 1045802454}
   highlightEnabled: 1
-  debugToggleWithKeyboard: 1
   logStateChanges: 1
   currentFocusedTarget: {fileID: 0}
   currentInteractionMethod: 0
@@ -1940,12 +1917,18 @@ MonoBehaviour:
   selectedContentSet: 0
   youtubeUrlSetA: https://www.youtube.com/watch?v=oCKnZl-XT1Y
   youtubeUrlSetB: https://www.youtube.com/watch?v=wIHPxl6OPOc
+  forceYoutubeUnmuted: 1
+  youtubeForcedVolume: 1
+  d2vPauseRangeSetASeconds: {x: 473, y: 514}
+  d2vPauseRangeSetBSeconds: {x: 295, y: 321}
   comparisonPageResourceSetA: 
   comparisonPageResourceSetB: 
   totalTaskDurationSeconds: 600
+  trainingDurationSeconds: 90
   mainD2VStartSeconds: 90
   mainSemiFreeStartSeconds: 180
-  mainFinalizeStartSeconds: 360
+  mainRequiredStageTimeoutSeconds: 150
+  mainFinalizeStartSeconds: 480
   practiceScrollThresholdPixels: 80
   returnDelayAfterCompletionSeconds: 2
   telemetryRefreshSeconds: 0.75

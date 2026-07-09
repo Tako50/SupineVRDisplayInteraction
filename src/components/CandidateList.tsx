@@ -4,7 +4,7 @@ interface CandidateListProps {
   candidates: Item[]
   confirmedIds: string[] | null
   onRemove: (item: Item) => void
-  onConfirm: () => void
+  onConfirm: (item: Item) => void
   onBack: () => void
 }
 
@@ -21,7 +21,7 @@ export default function CandidateList({
       <div className="page-heading">
         <p className="eyebrow">CANDIDATES</p>
         <h1 id="candidates-title">候補リスト</h1>
-        <p>追加した商品から、候補を2〜3個に絞って確定してください。</p>
+        <p>追加した商品から、最終候補を1つ選んで確定してください。</p>
       </div>
 
       {candidates.length > 0 ? (
@@ -33,9 +33,18 @@ export default function CandidateList({
                 <p>{item.brand} · {item.price}</p>
               </div>
               <button
+                className="final-button"
+                data-t2-candidate={item.item_id}
+                onClick={() => onConfirm(item)}
+                disabled={confirmedIds !== null}
+              >
+                この商品に決定
+              </button>
+              <button
                 className="danger-button"
                 data-t2-action={`remove_candidate:${item.item_id}`}
                 onClick={() => onRemove(item)}
+                disabled={confirmedIds !== null}
               >
                 削除
               </button>
@@ -49,18 +58,9 @@ export default function CandidateList({
         </div>
       )}
 
-      <button
-        className="confirm-button"
-        data-t2-candidate={candidates.map((item) => item.item_id).join(',')}
-        onClick={onConfirm}
-        disabled={candidates.length < 2 || candidates.length > 3}
-      >
-        候補を確定（2〜3個）
-      </button>
-
       {confirmedIds && (
         <section className="confirmation" aria-live="polite">
-          <strong>{confirmedIds.length}個の候補を確定しました</strong>
+          <strong>最終候補を確定しました</strong>
         </section>
       )}
     </main>

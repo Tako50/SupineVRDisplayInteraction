@@ -41,6 +41,7 @@ export type LogEventName =
   | 'product_open'
   | 'add_candidate'
   | 'remove_candidate'
+  | 'candidate_list_open'
   | 'confirm_candidates'
   | 'back'
 

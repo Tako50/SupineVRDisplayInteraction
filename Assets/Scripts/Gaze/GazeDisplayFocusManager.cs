@@ -11,11 +11,8 @@ public class GazeDisplayFocusManager : MonoBehaviour
     [SerializeField] private PrototypeInputManager inputManager;
     [SerializeField] private GazeProvider gazeProvider;
     [SerializeField] private DisplayManager displayManager;
-    [SerializeField] private EditorDebugInputProvider debugInputProvider;
-
     [Header("Highlight")]
-    public bool highlightEnabled = true;
-    public bool debugToggleWithKeyboard = true;
+    [SerializeField, HideInInspector] private bool highlightEnabled = true;
     [SerializeField] private bool logStateChanges = true;
 
     [Header("Runtime State (Read Only)")]
@@ -33,16 +30,14 @@ public class GazeDisplayFocusManager : MonoBehaviour
     private void Awake()
     {
         ResolveReferences();
+        highlightEnabled = true;
         currentInteractionMethod = inputManager != null
             ? inputManager.CurrentCondition
             : InteractionCondition.RaycastBaseline;
         appliedHighlightEnabled = highlightEnabled;
         initialized = true;
 
-        if (!highlightEnabled)
-        {
-            ClearAllHighlights(false);
-        }
+        RefreshHighlightTarget();
     }
 
     private void Update()
@@ -52,18 +47,10 @@ public class GazeDisplayFocusManager : MonoBehaviour
             ? inputManager.CurrentCondition
             : currentInteractionMethod;
 
-        if (debugToggleWithKeyboard
-            && debugInputProvider != null
-            && debugInputProvider.IsEnabled
-            && debugInputProvider.HighlightTogglePressed)
+        // Experiment highlight is fixed ON for both methods.
+        if (!initialized || !highlightEnabled || !appliedHighlightEnabled)
         {
-            SetHighlightEnabled(!highlightEnabled);
-        }
-
-        // Inspectorでpublic fieldを直接変更した場合も、そのフレームで表示へ反映する。
-        if (!initialized || highlightEnabled != appliedHighlightEnabled)
-        {
-            ApplyHighlightEnabledChange(highlightEnabled);
+            SetHighlightEnabled(true);
         }
     }
 
@@ -86,41 +73,29 @@ public class GazeDisplayFocusManager : MonoBehaviour
 
     public void SetHighlightEnabled(bool enabled)
     {
-        if (highlightEnabled == enabled && initialized && appliedHighlightEnabled == enabled)
+        if (highlightEnabled && initialized && appliedHighlightEnabled)
         {
-            if (!enabled)
-            {
-                ClearAllHighlights(false);
-            }
-
             return;
         }
 
-        highlightEnabled = enabled;
-        ApplyHighlightEnabledChange(enabled);
+        highlightEnabled = true;
+        ApplyHighlightEnabledChange();
     }
 
-    private void ApplyHighlightEnabledChange(bool enabled)
+    private void ApplyHighlightEnabledChange()
     {
         initialized = true;
-        appliedHighlightEnabled = enabled;
+        appliedHighlightEnabled = true;
         currentInteractionMethod = inputManager != null
             ? inputManager.CurrentCondition
             : currentInteractionMethod;
 
-        if (enabled)
-        {
-            RefreshHighlightTarget();
-        }
-        else
-        {
-            ClearAllHighlights(true);
-        }
+        RefreshHighlightTarget();
 
         if (logStateChanges)
         {
             Debug.Log(
-                $"[GazeDisplayFocusManager] highlightEnabled={enabled}, interactionMethod={currentInteractionMethod}");
+                $"[GazeDisplayFocusManager] highlightEnabled=True, interactionMethod={currentInteractionMethod}");
         }
     }
 
@@ -224,9 +199,5 @@ public class GazeDisplayFocusManager : MonoBehaviour
                 : FindObjectOfType<DisplayManager>();
         }
 
-        if (debugInputProvider == null)
-        {
-            debugInputProvider = FindObjectOfType<EditorDebugInputProvider>();
-        }
     }
 }

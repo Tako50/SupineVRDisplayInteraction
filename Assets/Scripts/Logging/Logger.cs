@@ -101,6 +101,34 @@ public class Logger : MonoBehaviour
         Debug.Log($"[Logger] event={eventName}, condition={condition}, displayId={displayId}, normalized={FormatVector(normalized)}");
     }
 
+    public void LogSyncMarker(string markerName, InteractionCondition condition, string details, float timestamp)
+    {
+        string safeMarkerName = string.IsNullOrWhiteSpace(markerName) ? "UNKNOWN" : markerName.Trim();
+        if (writeCsv && writer != null)
+        {
+            writer.WriteLine(string.Join(",",
+                timestamp.ToString("0.000", CultureInfo.InvariantCulture),
+                "SyncMarker",
+                condition,
+                safeMarkerName,
+                Escape(details),
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                "0.000",
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                "False"));
+            writer.Flush();
+        }
+
+        Debug.Log($"SyncMarker, {safeMarkerName}, {timestamp.ToString("0.000", CultureInfo.InvariantCulture)}");
+    }
+
     public void LogRaycastHit(InteractionCondition condition, string displayId, Vector2 normalized, Vector3 rayOrigin, Vector3 rayDirection)
     {
         WriteBaselineEvent("RaycastHit", condition, displayId, normalized, string.Empty, 0f, rayOrigin, rayDirection);

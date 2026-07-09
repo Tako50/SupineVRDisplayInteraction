@@ -23,13 +23,6 @@ public class VRTaskMenuManager : MonoBehaviour
         SelectT2ContentSetB,
         SelectRaycastBaseline,
         SelectExplicitDisplayFocus,
-        SelectHighlightOff,
-        SelectHighlightOn,
-        SelectRayVisualOff,
-        SelectRayVisualOn,
-        SelectRayLengthShort,
-        SelectRayLengthMedium,
-        SelectRayLengthLong,
         SelectUpDownDepth,
         SelectLeftRight,
         SelectUpDown,
@@ -65,38 +58,23 @@ public class VRTaskMenuManager : MonoBehaviour
 
     private static readonly MenuButtonSpec[] SelectionButtonSpecs =
     {
-        new MenuButtonSpec(MenuAction.SelectT1FocusPointing, "T1 Target Selection", new Rect(0.06f, 0.695f, 0.42f, 0.075f)),
-        new MenuButtonSpec(MenuAction.SelectT2WebBrowsing, "T2 Web Browsing", new Rect(0.52f, 0.695f, 0.42f, 0.075f)),
-        new MenuButtonSpec(MenuAction.SelectRaycastBaseline, "Raycast Baseline", new Rect(0.06f, 0.565f, 0.42f, 0.075f)),
-        new MenuButtonSpec(MenuAction.SelectExplicitDisplayFocus, "Explicit Display Focus", new Rect(0.52f, 0.565f, 0.42f, 0.075f))
+        new MenuButtonSpec(MenuAction.SelectT1FocusPointing, "T1 Target Selection", new Rect(0.06f, 0.650f, 0.42f, 0.085f)),
+        new MenuButtonSpec(MenuAction.SelectT2WebBrowsing, "T2 Web Browsing", new Rect(0.52f, 0.650f, 0.42f, 0.085f)),
+        new MenuButtonSpec(MenuAction.SelectRaycastBaseline, "Raycast Baseline", new Rect(0.06f, 0.455f, 0.42f, 0.085f)),
+        new MenuButtonSpec(MenuAction.SelectExplicitDisplayFocus, "Explicit Display Focus", new Rect(0.52f, 0.455f, 0.42f, 0.085f))
     };
 
     private static readonly MenuButtonSpec[] LayoutButtonSpecs =
     {
-        new MenuButtonSpec(MenuAction.SelectUpDownDepth, "A  Left / Right", new Rect(0.06f, 0.225f, 0.28f, 0.055f)),
-        new MenuButtonSpec(MenuAction.SelectLeftRight, "B  Up / Down", new Rect(0.36f, 0.225f, 0.28f, 0.055f)),
-        new MenuButtonSpec(MenuAction.SelectUpDown, "C  Up / Down + Depth", new Rect(0.66f, 0.225f, 0.28f, 0.055f))
+        new MenuButtonSpec(MenuAction.SelectUpDownDepth, "A  Left / Right", new Rect(0.06f, 0.270f, 0.28f, 0.060f)),
+        new MenuButtonSpec(MenuAction.SelectLeftRight, "B  Up / Down", new Rect(0.36f, 0.270f, 0.28f, 0.060f)),
+        new MenuButtonSpec(MenuAction.SelectUpDown, "C  Up / Down + Depth", new Rect(0.66f, 0.270f, 0.28f, 0.060f))
     };
 
     private static readonly MenuButtonSpec[] T2ContentSetButtonSpecs =
     {
-        new MenuButtonSpec(MenuAction.SelectT2ContentSetA, "Set A  2024", new Rect(0.06f, 0.225f, 0.42f, 0.055f)),
-        new MenuButtonSpec(MenuAction.SelectT2ContentSetB, "Set B  2025", new Rect(0.52f, 0.225f, 0.42f, 0.055f))
-    };
-
-    private static readonly MenuButtonSpec[] HighlightButtonSpecs =
-    {
-        new MenuButtonSpec(MenuAction.SelectHighlightOff, "Highlight OFF", new Rect(0.06f, 0.455f, 0.42f, 0.06f)),
-        new MenuButtonSpec(MenuAction.SelectHighlightOn, "Highlight ON", new Rect(0.52f, 0.455f, 0.42f, 0.06f))
-    };
-
-    private static readonly MenuButtonSpec[] RayVisualButtonSpecs =
-    {
-        new MenuButtonSpec(MenuAction.SelectRayVisualOff, "Ray OFF", new Rect(0.06f, 0.345f, 0.18f, 0.06f)),
-        new MenuButtonSpec(MenuAction.SelectRayVisualOn, "Ray ON", new Rect(0.26f, 0.345f, 0.18f, 0.06f)),
-        new MenuButtonSpec(MenuAction.SelectRayLengthShort, "Short", new Rect(0.48f, 0.345f, 0.14f, 0.06f)),
-        new MenuButtonSpec(MenuAction.SelectRayLengthMedium, "Medium", new Rect(0.64f, 0.345f, 0.14f, 0.06f)),
-        new MenuButtonSpec(MenuAction.SelectRayLengthLong, "Long", new Rect(0.80f, 0.345f, 0.14f, 0.06f))
+        new MenuButtonSpec(MenuAction.SelectT2ContentSetA, "Content A", new Rect(0.06f, 0.270f, 0.42f, 0.060f)),
+        new MenuButtonSpec(MenuAction.SelectT2ContentSetB, "Content B", new Rect(0.52f, 0.270f, 0.42f, 0.060f))
     };
 
     private static readonly MenuButtonSpec[] TaskControlButtonSpecs =
@@ -145,9 +123,6 @@ public class VRTaskMenuManager : MonoBehaviour
     private Text layoutSectionText;
     private Text statusText;
     private InteractionCondition selectedCondition = InteractionCondition.RaycastBaseline;
-    private bool selectedHighlightEnabled = true;
-    private bool selectedRayVisualEnabled = false;
-    private RayVisualLengthLevel selectedRayLengthLevel = RayVisualLengthLevel.Medium;
     private DisplayLayoutPreset selectedLayout = DisplayLayoutPreset.UpDownDepth;
     private PrototypeTask selectedTask = PrototypeTask.T1FocusPointing;
     private T2ContentSet selectedT2ContentSet = T2ContentSet.ACampGear2024;
@@ -171,8 +146,6 @@ public class VRTaskMenuManager : MonoBehaviour
         ResolveReferences();
         EnsureMenu();
         SyncConditionFromInput();
-        SyncHighlightFromManager();
-        SyncRayVisualFromManager();
         UpdateVisibility();
         UpdateVisualState();
         SetConditionSelectionContentMode();
@@ -269,34 +242,6 @@ public class VRTaskMenuManager : MonoBehaviour
                 selectedCondition = InteractionCondition.ExplicitDisplayFocus;
                 ApplySelectionsToManagers();
                 break;
-            case MenuAction.SelectHighlightOff:
-                selectedHighlightEnabled = false;
-                ApplySelectionsToManagers();
-                break;
-            case MenuAction.SelectHighlightOn:
-                selectedHighlightEnabled = true;
-                ApplySelectionsToManagers();
-                break;
-            case MenuAction.SelectRayVisualOff:
-                selectedRayVisualEnabled = false;
-                ApplySelectionsToManagers(true);
-                break;
-            case MenuAction.SelectRayVisualOn:
-                selectedRayVisualEnabled = true;
-                ApplySelectionsToManagers(true);
-                break;
-            case MenuAction.SelectRayLengthShort:
-                selectedRayLengthLevel = RayVisualLengthLevel.Short;
-                ApplySelectionsToManagers(true);
-                break;
-            case MenuAction.SelectRayLengthMedium:
-                selectedRayLengthLevel = RayVisualLengthLevel.Medium;
-                ApplySelectionsToManagers(true);
-                break;
-            case MenuAction.SelectRayLengthLong:
-                selectedRayLengthLevel = RayVisualLengthLevel.Long;
-                ApplySelectionsToManagers(true);
-                break;
             case MenuAction.SelectUpDownDepth:
                 selectedLayout = DisplayLayoutPreset.LeftRight;
                 ApplySelectionsToManagers();
@@ -342,12 +287,11 @@ public class VRTaskMenuManager : MonoBehaviour
         UpdateVisualState();
         Debug.Log(
             $"[VRTaskMenu] action={action}, task={selectedTask}, condition={selectedCondition}, "
-            + $"highlightEnabled={selectedHighlightEnabled}, "
-            + $"rayVisualEnabled={selectedRayVisualEnabled}, rayLength={selectedRayLengthLevel}, "
+            + $"highlightEnabled=True, baselineRay=Long, explicitRay=Off, "
             + $"layout={selectedLayout}, t2ContentSet={selectedT2ContentSet}");
     }
 
-    private void ApplySelectionsToManagers(bool writeSelectedRayVisual = false)
+    private void ApplySelectionsToManagers()
     {
         if (focusPointingTaskManager != null)
         {
@@ -369,23 +313,15 @@ public class VRTaskMenuManager : MonoBehaviour
 
         if (experimentManager != null)
         {
-            experimentManager.SetHighlightEnabled(selectedHighlightEnabled);
-            if (writeSelectedRayVisual)
-            {
-                experimentManager.SetRayVisualSettings(selectedRayVisualEnabled, selectedRayLengthLevel);
-            }
-            else
-            {
-                SyncSelectedRayVisualFromExperimentManager();
-            }
+            experimentManager.SetHighlightEnabled(true);
+            experimentManager.ApplyRayVisualForCurrentCondition();
         }
         else
         {
-            gazeDisplayFocusManager?.SetHighlightEnabled(selectedHighlightEnabled);
-            if (writeSelectedRayVisual)
-            {
-                raycastPointer?.SetRayVisualSettings(selectedRayVisualEnabled, selectedRayLengthLevel);
-            }
+            gazeDisplayFocusManager?.SetHighlightEnabled(true);
+            raycastPointer?.SetRayVisualSettings(
+                selectedCondition == InteractionCondition.RaycastBaseline,
+                RayVisualLengthLevel.Long);
         }
 
         if (applySelectedLayout && experimentManager != null && (inputManager == null || !inputManager.IsConditionLocked))
@@ -408,18 +344,6 @@ public class VRTaskMenuManager : MonoBehaviour
             selectedLayout = focusPointingTaskManager != null
                 ? focusPointingTaskManager.SelectedLayout
                 : experimentManager.CurrentLayout;
-            selectedHighlightEnabled = experimentManager.HighlightEnabled;
-            SyncSelectedRayVisualFromExperimentManager();
-        }
-        else if (gazeDisplayFocusManager != null)
-        {
-            selectedHighlightEnabled = gazeDisplayFocusManager.HighlightEnabled;
-        }
-
-        if (experimentManager == null && raycastPointer != null)
-        {
-            selectedRayVisualEnabled = raycastPointer.RayVisualEnabled;
-            selectedRayLengthLevel = raycastPointer.RayLengthLevel;
         }
 
         if (webViewSessionManager != null)
@@ -445,50 +369,6 @@ public class VRTaskMenuManager : MonoBehaviour
 
             webViewSessionManager?.SetSelectedCondition(selectedCondition);
         }
-    }
-
-    private void SyncHighlightFromManager()
-    {
-        if (IsTaskRunning())
-        {
-            return;
-        }
-
-        if (experimentManager != null)
-        {
-            selectedHighlightEnabled = experimentManager.HighlightEnabled;
-        }
-        else if (gazeDisplayFocusManager != null)
-        {
-            selectedHighlightEnabled = gazeDisplayFocusManager.HighlightEnabled;
-        }
-    }
-
-    private void SyncRayVisualFromManager()
-    {
-        if (IsTaskRunning())
-        {
-            return;
-        }
-
-        if (experimentManager != null)
-        {
-            SyncSelectedRayVisualFromExperimentManager();
-        }
-        else if (raycastPointer != null)
-        {
-            selectedRayVisualEnabled = raycastPointer.RayVisualEnabled;
-            selectedRayLengthLevel = raycastPointer.RayLengthLevel;
-        }
-    }
-
-    private void SyncSelectedRayVisualFromExperimentManager()
-    {
-        RayVisualConditionSettings settings = experimentManager.GetRayVisualSettingsForCondition(
-            selectedCondition,
-            selectedHighlightEnabled);
-        selectedRayVisualEnabled = settings.rayVisualEnabled;
-        selectedRayLengthLevel = settings.rayLengthLevel;
     }
 
     private void EnsureMenu()
@@ -536,7 +416,7 @@ public class VRTaskMenuManager : MonoBehaviour
         Text title = CreateText(
             chrome,
             "Title",
-            "EXPERIMENT TASK MENU",
+            "EXPERIMENT SETUP",
             new Rect(0.06f, 0.91f, 0.88f, 0.07f),
             20,
             TextAnchor.MiddleLeft);
@@ -555,23 +435,13 @@ public class VRTaskMenuManager : MonoBehaviour
             14,
             TextAnchor.MiddleLeft);
 
-        CreateSectionLabel(chrome, "TaskSection", "TASK", new Rect(0.06f, 0.770f, 0.88f, 0.035f));
-        CreateSectionLabel(chrome, "MethodSection", "INTERACTION METHOD", new Rect(0.06f, 0.645f, 0.88f, 0.035f));
-        CreateSectionLabel(
-            chrome,
-            "HighlightSection",
-            "VISUAL HIGHLIGHT",
-            new Rect(0.06f, 0.520f, 0.88f, 0.035f));
-        CreateSectionLabel(
-            chrome,
-            "RaySection",
-            "CONDITION RAY",
-            new Rect(0.06f, 0.410f, 0.88f, 0.035f));
+        CreateSectionLabel(chrome, "TaskSection", "TASK", new Rect(0.06f, 0.745f, 0.88f, 0.035f));
+        CreateSectionLabel(chrome, "MethodSection", "INTERACTION METHOD", new Rect(0.06f, 0.550f, 0.88f, 0.035f));
         layoutSectionText = CreateSectionLabel(
             chrome,
             "LayoutSection",
             "DISPLAY LAYOUT",
-            new Rect(0.06f, 0.290f, 0.88f, 0.035f));
+            new Rect(0.06f, 0.340f, 0.88f, 0.035f));
         layoutSection = layoutSectionText.gameObject;
         CreateSectionLabel(chrome, "RunSection", "BEGIN SESSION", new Rect(0.06f, 0.170f, 0.88f, 0.035f));
 
@@ -614,8 +484,6 @@ public class VRTaskMenuManager : MonoBehaviour
     {
         buttons.Clear();
         AddButtonSpecs(SelectionButtonSpecs, createObjects);
-        AddButtonSpecs(HighlightButtonSpecs, createObjects);
-        AddButtonSpecs(RayVisualButtonSpecs, createObjects);
         if (showLayoutButtons)
         {
             AddButtonSpecs(LayoutButtonSpecs, createObjects);
@@ -765,15 +633,7 @@ public class VRTaskMenuManager : MonoBehaviour
             case MenuAction.SelectT1FocusPointing:
             case MenuAction.SelectT2WebBrowsing:
             case MenuAction.SelectExplicitDisplayFocus:
-            case MenuAction.SelectHighlightOff:
-            case MenuAction.SelectHighlightOn:
-            case MenuAction.SelectRayVisualOff:
-            case MenuAction.SelectRayVisualOn:
                 return 19;
-            case MenuAction.SelectRayLengthShort:
-            case MenuAction.SelectRayLengthMedium:
-            case MenuAction.SelectRayLengthLong:
-                return 15;
             case MenuAction.SelectUpDownDepth:
             case MenuAction.SelectLeftRight:
             case MenuAction.SelectUpDown:
@@ -964,9 +824,9 @@ public class VRTaskMenuManager : MonoBehaviour
                 : selectedLayout;
             statusText.text =
                 $"{GetTaskDisplayName(selectedTask)}  |  {GetConditionDisplayName(selectedCondition)}" +
-                $"  |  Highlight {(selectedHighlightEnabled ? "ON" : "OFF")}" +
-                $"  |  Ray {(selectedRayVisualEnabled ? "ON" : "OFF")} {GetRayLengthDisplayName(selectedRayLengthLevel)}" +
-                $"{orderSummary}  |  {GetLayoutDisplayName(activeLayout)}";
+                $"{orderSummary}  |  {GetLayoutDisplayName(activeLayout)}\n" +
+                $"Visual feedback: Highlight ON  |  Controller Ray " +
+                $"{(selectedCondition == InteractionCondition.RaycastBaseline ? "Long" : "OFF")}";
         }
 
         if (menuPanel != null)
@@ -992,8 +852,8 @@ public class VRTaskMenuManager : MonoBehaviour
     private static string GetT2ContentSetDisplayName(T2ContentSet contentSet)
     {
         return contentSet == T2ContentSet.ACampGear2024
-            ? "Set A 2024"
-            : "Set B 2025";
+            ? "Content A"
+            : "Content B";
     }
 
     private static void SetButtonRect(ref MenuButton button, Rect normalizedRect)
@@ -1017,19 +877,6 @@ public class VRTaskMenuManager : MonoBehaviour
                 return "Task C";
             default:
                 return "Legacy Up/Down + Depth";
-        }
-    }
-
-    private static string GetRayLengthDisplayName(RayVisualLengthLevel level)
-    {
-        switch (level)
-        {
-            case RayVisualLengthLevel.Short:
-                return "Short";
-            case RayVisualLengthLevel.Long:
-                return "Long";
-            default:
-                return "Medium";
         }
     }
 
@@ -1127,13 +974,6 @@ public class VRTaskMenuManager : MonoBehaviour
             || (action == MenuAction.SelectT2ContentSetB && selectedT2ContentSet == T2ContentSet.BCampGear2025)
             || (action == MenuAction.SelectRaycastBaseline && selectedCondition == InteractionCondition.RaycastBaseline)
             || (action == MenuAction.SelectExplicitDisplayFocus && selectedCondition == InteractionCondition.ExplicitDisplayFocus)
-            || (action == MenuAction.SelectHighlightOff && !selectedHighlightEnabled)
-            || (action == MenuAction.SelectHighlightOn && selectedHighlightEnabled)
-            || (action == MenuAction.SelectRayVisualOff && !selectedRayVisualEnabled)
-            || (action == MenuAction.SelectRayVisualOn && selectedRayVisualEnabled)
-            || (action == MenuAction.SelectRayLengthShort && selectedRayLengthLevel == RayVisualLengthLevel.Short)
-            || (action == MenuAction.SelectRayLengthMedium && selectedRayLengthLevel == RayVisualLengthLevel.Medium)
-            || (action == MenuAction.SelectRayLengthLong && selectedRayLengthLevel == RayVisualLengthLevel.Long)
             || (action == MenuAction.SelectUpDownDepth && selectedLayout == DisplayLayoutPreset.LeftRight)
             || (action == MenuAction.SelectLeftRight && selectedLayout == DisplayLayoutPreset.UpDown)
             || (action == MenuAction.SelectUpDown && selectedLayout == DisplayLayoutPreset.UpDownDepth);

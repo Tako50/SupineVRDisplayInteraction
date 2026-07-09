@@ -3,7 +3,6 @@ import itemsData from './data/items.json'
 import CandidateList from './components/CandidateList'
 import CategoryList from './components/CategoryList'
 import Home from './components/Home'
-import LogExportButton from './components/LogExportButton'
 import ProductDetail from './components/ProductDetail'
 import ProductList from './components/ProductList'
 import { logEvent } from './utils/logger'
@@ -97,6 +96,11 @@ export default function App() {
     setView(to)
   }
 
+  const openCandidates = (from: string) => {
+    logEvent('candidate_list_open', { from })
+    setView({ name: 'candidates' })
+  }
+
   const currentItem = view.name === 'detail'
     ? items.find((item) => item.item_id === view.itemId)
     : undefined
@@ -107,7 +111,7 @@ export default function App() {
         <Home
           candidateCount={candidateIds.length}
           onOpenCategories={() => setView({ name: 'categories' })}
-          onOpenCandidates={() => setView({ name: 'candidates' })}
+          onOpenCandidates={() => openCandidates('home')}
         />
       )}
 
@@ -126,10 +130,12 @@ export default function App() {
         <ProductList
           category={view.category}
           items={items.filter((item) => item.category === view.category)}
+          candidateCount={candidateIds.length}
           onOpenProduct={(item) => {
             logEvent('product_open', { item_id: item.item_id })
             setView({ name: 'detail', category: view.category, itemId: item.item_id })
           }}
+          onOpenCandidates={() => openCandidates('products')}
           onBack={() => goBack({ name: 'categories' }, 'products')}
         />
       )}
@@ -139,13 +145,17 @@ export default function App() {
           item={currentItem}
           isCandidate={candidateIds.includes(currentItem.item_id)}
           candidateLimitReached={candidateIds.length >= 3}
+          candidateCount={candidateIds.length}
           onAddCandidate={(item) => {
             if (candidateIds.includes(item.item_id) || candidateIds.length >= 3) return
             setCandidateIds((current) => [...current, item.item_id])
             setConfirmedIds(null)
             logEvent('add_candidate', { item_id: item.item_id })
           }}
-          onBack={() => goBack({ name: 'products', category: view.category }, 'detail')}
+          onBackToProducts={() => goBack({ name: 'products', category: view.category }, 'detail')}
+          onBackToCategories={() => goBack({ name: 'categories' }, 'detail')}
+          onBackHome={() => goBack({ name: 'home' }, 'detail')}
+          onOpenCandidates={() => openCandidates('detail')}
         />
       )}
 
@@ -167,16 +177,14 @@ export default function App() {
             setConfirmedIds(null)
             logEvent('remove_candidate', { item_id: item.item_id })
           }}
-          onConfirm={() => {
-            const selectedItemIds = [...candidateIds]
-            setConfirmedIds(selectedItemIds)
-            logEvent('confirm_candidates', { item_ids: selectedItemIds })
+          onConfirm={(item) => {
+            setConfirmedIds([item.item_id])
+            logEvent('confirm_candidates', { item_id: item.item_id, item_ids: [item.item_id] })
           }}
           onBack={() => goBack({ name: 'home' }, 'candidates')}
         />
       )}
 
-      <LogExportButton />
     </div>
   )
 }

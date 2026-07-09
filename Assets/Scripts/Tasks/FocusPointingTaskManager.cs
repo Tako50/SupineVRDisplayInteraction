@@ -244,6 +244,9 @@ public class FocusPointingTaskManager : MonoBehaviour
     private Quaternion previousControllerRotation;
     private float controllerMovementMeters;
     private float controllerRotationDegrees;
+    private SyncMarkerController syncMarkerController;
+    private bool startSyncMarkerLogged;
+    private bool endSyncMarkerLogged;
     private static Sprite circleTargetSprite;
 
     public bool IsRunning => trialRunning;
@@ -384,6 +387,7 @@ public class FocusPointingTaskManager : MonoBehaviour
 
     public void ReturnToConditionSelection()
     {
+        FocusPointingTaskPhase endedPhase = currentPhase;
         trialRunning = false;
         taskRunning = false;
         currentTrial = null;
@@ -402,6 +406,9 @@ public class FocusPointingTaskManager : MonoBehaviour
             inputManager.UnlockCondition();
         }
 
+        EmitEndSyncMarkerIfNeeded(endedPhase, "return_to_condition_selection");
+        startSyncMarkerLogged = false;
+        endSyncMarkerLogged = false;
         Debug.Log("[FocusPointingTask] returned to condition selection");
     }
 
@@ -421,6 +428,9 @@ public class FocusPointingTaskManager : MonoBehaviour
 
         taskRunning = true;
         activeTaskCondition = selectedCondition;
+        startSyncMarkerLogged = false;
+        endSyncMarkerLogged = false;
+        syncMarkerController = SyncMarkerController.GetOrCreate();
         currentTrialListIndex = FindIndexBeforeFirstTrialForCondition(activeTaskCondition);
 
         if (inputManager != null)
@@ -508,6 +518,7 @@ public class FocusPointingTaskManager : MonoBehaviour
         ResetControllerMotionMetrics();
         trialRunning = true;
         ShowTargetForCurrentTrial();
+        EmitStartSyncMarkerIfNeeded();
         Debug.Log(
             $"[FocusPointingTask] start phase={currentPhase}, list={currentTrial.targetOrderList}, "
             + $"conditionName={currentTrial.conditionName}, trialInCondition={currentTrial.trialIndexInCondition}, "
@@ -612,6 +623,7 @@ public class FocusPointingTaskManager : MonoBehaviour
         SetDisplayContentMode(DisplayContentMode.ConditionSelection);
         CloseTargetSelectionCsv();
         CloseT1ResultsCsv();
+        EmitEndSyncMarkerIfNeeded(currentPhase, "completed");
 
         if (currentPhase == FocusPointingTaskPhase.MainTask && returnToConditionSelectionAfterMainTask)
         {
@@ -625,7 +637,47 @@ public class FocusPointingTaskManager : MonoBehaviour
         }
 
         currentPhase = FocusPointingTaskPhase.ConditionSelection;
+        startSyncMarkerLogged = false;
+        endSyncMarkerLogged = false;
         Debug.Log("[FocusPointingTask] completed task");
+    }
+
+    private void EmitStartSyncMarkerIfNeeded()
+    {
+        if (startSyncMarkerLogged)
+        {
+            return;
+        }
+
+        startSyncMarkerLogged = true;
+        GetSyncMarkerController()?.MarkStart(
+            logger,
+            activeTaskCondition,
+            $"T1;phase={currentPhase};task={selectedTask};layout={selectedLayout}");
+    }
+
+    private void EmitEndSyncMarkerIfNeeded(FocusPointingTaskPhase endedPhase, string reason)
+    {
+        if (!startSyncMarkerLogged || endSyncMarkerLogged)
+        {
+            return;
+        }
+
+        endSyncMarkerLogged = true;
+        GetSyncMarkerController()?.MarkEnd(
+            logger,
+            activeTaskCondition,
+            $"T1;phase={endedPhase};task={selectedTask};reason={reason}");
+    }
+
+    private SyncMarkerController GetSyncMarkerController()
+    {
+        if (syncMarkerController == null)
+        {
+            syncMarkerController = SyncMarkerController.GetOrCreate();
+        }
+
+        return syncMarkerController;
     }
 
     private void EnsureDefaultTrials()

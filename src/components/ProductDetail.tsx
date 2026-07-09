@@ -5,20 +5,34 @@ interface ProductDetailProps {
   item: Item
   isCandidate: boolean
   candidateLimitReached: boolean
+  candidateCount: number
   onAddCandidate: (item: Item) => void
-  onBack: () => void
+  onBackToProducts: () => void
+  onBackToCategories: () => void
+  onBackHome: () => void
+  onOpenCandidates: () => void
 }
 
 export default function ProductDetail({
   item,
   isCandidate,
   candidateLimitReached,
+  candidateCount,
   onAddCandidate,
-  onBack,
+  onBackToProducts,
+  onBackToCategories,
+  onBackHome,
+  onOpenCandidates,
 }: ProductDetailProps) {
   return (
     <main className="screen detail-screen" aria-labelledby="detail-title">
-      <button className="back-button" onClick={onBack}>← 商品一覧に戻る</button>
+      <div className="screen-toolbar">
+        <button className="back-button" onClick={onBackToProducts}>← {item.category}の商品に戻る</button>
+        <button className="back-button" onClick={onOpenCandidates}>
+          候補リストを見る
+          <span className="count-badge">{candidateCount}</span>
+        </button>
+      </div>
       <div className="detail-layout">
         <ProductImage item={item} className="detail-image" />
         <section className="detail-content">
@@ -35,7 +49,7 @@ export default function ProductDetail({
           </dl>
           <div className="detail-actions">
             <button
-              className="primary-button"
+              className="primary-button candidate-action"
               data-t2-action={`add_candidate:${item.item_id}`}
               onClick={() => onAddCandidate(item)}
               disabled={isCandidate || candidateLimitReached}
@@ -46,7 +60,16 @@ export default function ProductDetail({
                   ? '候補は3個までです'
                   : '候補に追加'}
             </button>
-            <button className="secondary-button" onClick={onBack}>商品一覧に戻る</button>
+            {isCandidate && (
+              <p className="candidate-added-message" aria-live="polite">候補に追加しました。</p>
+            )}
+            <button className="secondary-button" onClick={onBackToProducts}>同じカテゴリを見る</button>
+            <button className="secondary-button" onClick={onBackToCategories}>別のカテゴリを探す</button>
+            <button className="secondary-button" onClick={onOpenCandidates}>
+              候補リストを見る
+              <span className="count-badge">{candidateCount}</span>
+            </button>
+            <button className="secondary-button" onClick={onBackHome}>ホームに戻る</button>
           </div>
         </section>
       </div>

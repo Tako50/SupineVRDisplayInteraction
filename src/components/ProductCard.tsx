@@ -4,10 +4,11 @@ import ProductImage from './ProductImage'
 
 interface ProductCardProps {
   item: Item
+  orderNumber: number
   onOpen: (item: Item) => void
 }
 
-export default function ProductCard({ item, onOpen }: ProductCardProps) {
+export default function ProductCard({ item, orderNumber, onOpen }: ProductCardProps) {
   const open = () => onOpen(item)
 
   return (
@@ -18,6 +19,7 @@ export default function ProductCard({ item, onOpen }: ProductCardProps) {
     >
       <ProductImage item={item} className="product-card-image" />
       <div className="product-card-body">
+        <p className="product-card-order">{orderNumber}番</p>
         <h2>{item.product_name}</h2>
         <button
           className="primary-button compact"

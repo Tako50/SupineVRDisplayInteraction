@@ -28,7 +28,6 @@ public class EditorDebugInputProvider : MonoBehaviour
     [SerializeField] private KeyCode stickClickKey = KeyCode.LeftControl;
     [SerializeField] private KeyCode exitHoldKey = KeyCode.X;
     [SerializeField] private KeyCode resetFocusKey = KeyCode.R;
-    [SerializeField] private KeyCode highlightToggleKey = KeyCode.H;
     [SerializeField] private KeyCode upDownDepthKey = KeyCode.Alpha1;
     [SerializeField] private KeyCode leftRightKey = KeyCode.Alpha2;
     [SerializeField] private KeyCode upDownKey = KeyCode.Alpha3;
@@ -62,7 +61,6 @@ public class EditorDebugInputProvider : MonoBehaviour
     public bool ExitReleased { get; private set; }
     public bool ToggleConditionPressed { get; private set; }
     public bool ResetFocusPressed { get; private set; }
-    public bool HighlightTogglePressed { get; private set; }
     public bool UpDownDepthPressed { get; private set; }
     public bool LeftRightPressed { get; private set; }
     public bool UpDownPressed { get; private set; }
@@ -103,7 +101,6 @@ public class EditorDebugInputProvider : MonoBehaviour
         ExitReleased = GetKeyUp(exitHoldKey);
         ToggleConditionPressed = GetKeyDown(toggleConditionKey);
         ResetFocusPressed = GetKeyDown(resetFocusKey);
-        HighlightTogglePressed = GetKeyDown(highlightToggleKey);
         UpDownDepthPressed = GetKeyDown(upDownDepthKey);
         LeftRightPressed = GetKeyDown(leftRightKey);
         UpDownPressed = GetKeyDown(upDownKey);
@@ -133,7 +130,6 @@ public class EditorDebugInputProvider : MonoBehaviour
         ExitReleased = false;
         ToggleConditionPressed = false;
         ResetFocusPressed = false;
-        HighlightTogglePressed = false;
         UpDownDepthPressed = false;
         LeftRightPressed = false;
         UpDownPressed = false;

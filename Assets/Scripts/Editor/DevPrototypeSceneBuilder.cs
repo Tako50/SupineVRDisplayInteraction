@@ -122,7 +122,6 @@ public static class DevPrototypeSceneBuilder
         SetObject(experimentManager, "debugInputProvider", debugInputProvider);
         SetObject(experimentManager, "logger", logger);
         SetEnum(experimentManager, "startingCondition", InteractionCondition.RaycastBaseline);
-        SetBool(experimentManager, "startingHighlightEnabled", true);
         SetBool(experimentManager, "applyStartingLayoutOnStart", true);
         SetBool(experimentManager, "allowLayoutSwitching", true);
 
@@ -135,16 +134,14 @@ public static class DevPrototypeSceneBuilder
         SetObject(gazeDisplayFocusManager, "inputManager", inputManager);
         SetObject(gazeDisplayFocusManager, "gazeProvider", gazeProvider);
         SetObject(gazeDisplayFocusManager, "displayManager", displayManager);
-        SetObject(gazeDisplayFocusManager, "debugInputProvider", debugInputProvider);
         SetBool(gazeDisplayFocusManager, "highlightEnabled", true);
-        SetBool(gazeDisplayFocusManager, "debugToggleWithKeyboard", true);
         SetBool(gazeDisplayFocusManager, "logStateChanges", true);
 
         SetObject(raycastPointer, "inputManager", inputManager);
         SetObject(raycastPointer, "displayManager", displayManager);
         SetObject(raycastPointer, "rightControllerTransform", controllerRaySource);
-        SetBool(raycastPointer, "showRayLine", false);
-        SetEnum(raycastPointer, "rayLengthLevel", RayVisualLengthLevel.Medium);
+        SetBool(raycastPointer, "showRayLine", true);
+        SetEnum(raycastPointer, "rayLengthLevel", RayVisualLengthLevel.Long);
         SetFloat(raycastPointer, "shortRayLength", 1.5f);
         SetFloat(raycastPointer, "mediumRayLength", 2.5f);
         SetFloat(raycastPointer, "longRayLength", 4f);
@@ -221,12 +218,18 @@ public static class DevPrototypeSceneBuilder
         SetEnum(webViewSessionManager, "selectedContentSet", T2ContentSet.ACampGear2024);
         SetString(webViewSessionManager, "youtubeUrlSetA", "https://www.youtube.com/watch?v=oCKnZl-XT1Y");
         SetString(webViewSessionManager, "youtubeUrlSetB", "https://www.youtube.com/watch?v=wIHPxl6OPOc");
+        SetBool(webViewSessionManager, "forceYoutubeUnmuted", true);
+        SetFloat(webViewSessionManager, "youtubeForcedVolume", 1f);
+        SetVector2(webViewSessionManager, "d2vPauseRangeSetASeconds", new Vector2(473f, 514f));
+        SetVector2(webViewSessionManager, "d2vPauseRangeSetBSeconds", new Vector2(295f, 321f));
         SetString(webViewSessionManager, "comparisonPageResourceSetA", "");
         SetString(webViewSessionManager, "comparisonPageResourceSetB", "");
         SetFloat(webViewSessionManager, "totalTaskDurationSeconds", 600f);
+        SetFloat(webViewSessionManager, "trainingDurationSeconds", 90f);
         SetFloat(webViewSessionManager, "mainD2VStartSeconds", 90f);
         SetFloat(webViewSessionManager, "mainSemiFreeStartSeconds", 180f);
-        SetFloat(webViewSessionManager, "mainFinalizeStartSeconds", 360f);
+        SetFloat(webViewSessionManager, "mainRequiredStageTimeoutSeconds", 150f);
+        SetFloat(webViewSessionManager, "mainFinalizeStartSeconds", 480f);
         SetFloat(webViewSessionManager, "practiceScrollThresholdPixels", 80f);
         SetBool(webViewSessionManager, "autoAddTLabBridgeToSecondaryDisplay", true);
         SetBool(webViewSessionManager, "disableOtherWebViewsOnStart", true);

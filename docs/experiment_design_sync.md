@@ -1,6 +1,6 @@
 # 実験設計とUnity実装の同期状況
 
-更新日: 2026-07-02
+更新日: 2026-07-06
 
 ## 1. この資料の目的
 
@@ -76,7 +76,7 @@ grip down:
 挙動としては最新案に近い。ただし、focus確定のタイミングを
 grip down、grip中、grip releaseのどこに置くかは明文化とテストが必要である。
 
-### 3.1 WebView入力の試行仕様（2026-06-26更新）
+### 3.1 クリック・WebView入力の試行仕様（2026-07-06更新）
 
 T2 Web Browsingでは、YouTubeのseek bar操作感をRaycastBaselineに近づけるため、
 Web UI dragを本番入力に戻す。ただし長いページスクロールはdragではなく相対scroll
@@ -85,6 +85,7 @@ Web UI dragを本番入力に戻す。ただし長いページスクロールは
 ```text
 共通:
   A単独 = cursor位置のclick
+  trigger単独 = clickしない
   Web UI drag = WebViewへpointer down / move / upを送る
   scroll = WebViewの相対scroll
 
@@ -97,7 +98,6 @@ ExplicitDisplayFocus:
   stick押し込み開始 = focused displayのvirtual cursor位置でpointer down
   stick移動 = Web UI drag
   stickが短時間neutralを維持、またはstick再押し = pointer up
-  trigger単独 = clickしない
 ```
 
 Unity実装では既存Sceneとの互換性のため `WebViewSessionManager.InputMode` の
@@ -105,8 +105,27 @@ Unity実装では既存Sceneとの互換性のため `WebViewSessionManager.Inpu
 更新する。比較・ロールバック用に旧 `StickTouchGesture` と
 `LegacyDirectScrollAndSubmitDrag` も残す。`TLabWebViewDisplayBridge.TrySeekHorizontal`
 は実装上残すが、既定T2操作では直接呼ばない。
-この決定はWebViewセッションに限定し、T1や疑似2Dコンテンツの入力仕様は変更しない。
+クリック入力はT1、T2、疑似2Dコンテンツを含めてAボタンへ統一し、
+trigger単独ではclickしない。T2のWeb UI dragは移動量が閾値を超えた時点で
+pointer downを開始し、triggerまたはstick押し込みだけでWeb clickが発生しないようにする。
 Quest Pro実機でWeb UI dragの安定性、scroll速度、TLabのtexture更新fpsを検証する必要がある。
+
+### 3.2 視覚フィードバックの固定（2026-07-06更新）
+
+実験開始画面ではhighlightとcontroller Rayを参加者・実験者が選択しない。
+
+```text
+共通:
+  display highlight = 常にON
+
+RaycastBaseline:
+  controller Ray = Longを表示
+
+ExplicitDisplayFocus:
+  controller Ray = 非表示
+```
+
+開始画面はtask、interaction method、T1配置またはT2 content set、開始操作だけを表示する。
 
 ## 4. 実験構成の更新
 
@@ -268,6 +287,7 @@ Task Cの指定された奥側下段3点だけを `inputOccluded`、それ以外
 |---|---|---|
 | 3種類の配置予備実験 | `LayoutPreferenceStudy` | 実装済み |
 | Raycast Baseline | `RaycastPointer` ほか | 実装済み |
+| 視覚フィードバック固定 | Highlight常時ON、Baseline Long Ray、Proposed Ray非表示 | 実装済み |
 | display-local cursor | `VirtualCursorController` | 実装済み |
 | grip中gaze mode | 現コードはgrip中に更新 | 要仕様固定・テスト |
 | T1 3タスク・48試行/ブロック | `FocusPointingTaskManager`、`T1TrialSequenceGenerator` | 実装済み |
