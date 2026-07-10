@@ -35,8 +35,8 @@ public class WebViewSessionManager : MonoBehaviour
     {
         PlayYouTube,
         PauseYouTube,
-        SeekYouTube,
         SkipForwardTenSeconds,
+        SeekYouTube,
         ScrollComparisonPage,
         OpenProductDetail,
         AddCandidate,
@@ -1397,10 +1397,10 @@ public class WebViewSessionManager : MonoBehaviour
                 return "P01　奥のYouTube動画を再生してください。";
             case T2TrainingStep.PauseYouTube:
                 return "P02　奥のYouTube動画を一時停止してください。";
-            case T2TrainingStep.SeekYouTube:
-                return "P03　奥のYouTube動画を少し戻してください。";
             case T2TrainingStep.SkipForwardTenSeconds:
-                return "P04　奥のYouTube動画を10秒スキップしてください。";
+                return "P03　奥のYouTube動画を10秒スキップしてください。";
+            case T2TrainingStep.SeekYouTube:
+                return "P04　奥のYouTube動画をシークバー操作で少し戻してください。";
             case T2TrainingStep.ScrollComparisonPage:
                 return "P05　手前のWebページを少し下にスクロールしてください。";
             case T2TrainingStep.OpenProductDetail:

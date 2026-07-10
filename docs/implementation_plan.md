@@ -210,7 +210,7 @@ Implement:
 - T2 Web Browsing mode inside Dev_Prototype
 - Display_B_Back loads the YouTube page
 - Display_A_Front loads the fixed local comparison page
-- Unified practice steps: YouTube play, pause, seek backward, skip forward by 10 seconds, Web scroll, product detail, candidate add, candidate remove
+- Unified practice steps: YouTube play, pause, skip forward by 10 seconds, seek backward with the seek bar, Web scroll, product detail, candidate add, candidate remove
 - Keep content-set, year, item ID, and video timestamps internal; do not render them on the comparison Web
 - Use the fixed category order from the current Notion T2 specification
 - Use the Notion-specified video time ranges for V2D and category positions for D2V
