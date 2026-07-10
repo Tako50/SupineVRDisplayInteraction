@@ -12,6 +12,7 @@ public class ScrollController : MonoBehaviour
     [SerializeField] private RaycastPointer raycastPointer;
     [SerializeField] private FocusManager focusManager;
     [SerializeField] private VirtualCursorController virtualCursorController;
+    [SerializeField] private ClickDispatcher clickDispatcher;
     [SerializeField] private GazeProvider gazeProvider;
     [SerializeField] private Logger logger;
     [SerializeField] private WebViewSessionManager webViewSessionManager;
@@ -148,9 +149,15 @@ public class ScrollController : MonoBehaviour
             return;
         }
 
-        // A保持中とstick押し込み中は汎用ドラッグを優先する。
+        // Web UI dragが成立した後は、triggerを保持したままでも相対スクロールを重ねない。
+        if (clickDispatcher != null && clickDispatcher.IsExplicitTriggerWebViewPointerDragActive)
+        {
+            return;
+        }
+
+        // A保持中は汎用ドラッグを優先する。
         // トリガー＋上下は表示種類によらず相対スクロールに使う。
-        if (!inputManager.TriggerHeld || inputManager.SubmitHeld || inputManager.StickClickHeld)
+        if (!inputManager.TriggerHeld || inputManager.SubmitHeld)
         {
             return;
         }
@@ -299,6 +306,11 @@ public class ScrollController : MonoBehaviour
         if (virtualCursorController == null)
         {
             virtualCursorController = FindObjectOfType<VirtualCursorController>();
+        }
+
+        if (clickDispatcher == null)
+        {
+            clickDispatcher = FindObjectOfType<ClickDispatcher>();
         }
 
         if (gazeProvider == null)

@@ -66,7 +66,7 @@ public class WebViewSessionManager : MonoBehaviour
     [SerializeField] private bool autoAddTLabBridgeToTargetDisplay = true;
 
     [Header("Input")]
-    [Tooltip("Direct Scroll And Seek is the T2 default: Baseline uses trigger+Ray for Web UI drag, Explicit uses stick-click+stick for Web UI drag, and Explicit trigger+vertical stick scrolls.")]
+    [Tooltip("Direct Scroll And Seek is the T2 default: Baseline uses trigger+Ray for Web UI drag, Explicit uses trigger+horizontal stick for Web UI drag, and Explicit trigger+vertical stick scrolls.")]
     [SerializeField] private WebViewInputMode inputMode = WebViewInputMode.DirectScrollAndSeek;
 
     [Header("Session")]

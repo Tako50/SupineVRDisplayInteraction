@@ -38,6 +38,11 @@ public class RaycastPointer : MonoBehaviour
     [Min(0.0001f)]
     [SerializeField] private float rayEndWidth = 0.001f;
     [SerializeField] private Color rayColor = new Color(0.4f, 0.8f, 1f, 0.55f);
+    [Tooltip("Draw the visible Ray over display surfaces so screenshots do not make it look hidden by the hit plane.")]
+    [SerializeField] private bool drawRayVisualOnTop = true;
+    [Tooltip("Keep the Ray endpoint slightly in front of the first hit surface to avoid z-fighting in screenshots.")]
+    [Min(0f)]
+    [SerializeField] private float rayHitSurfaceOffsetMeters = 0.01f;
     [SerializeField] private bool logRayVisualSettingChanges = true;
 
     public Ray CurrentRay { get; private set; }
@@ -96,7 +101,7 @@ public class RaycastPointer : MonoBehaviour
             float hitDistance = Vector3.Distance(pointerRay.origin, hit.Hit.point);
             if (hitDistance <= visibleLength)
             {
-                lineEnd = hit.Hit.point;
+                lineEnd = GetVisibleHitLineEnd(pointerRay, hit.Hit.point);
             }
 
             if (inputManager.SubmitReleased)
@@ -174,11 +179,36 @@ public class RaycastPointer : MonoBehaviour
         rayLine.endWidth = rayEndWidth;
         if (rayLine.sharedMaterial == null)
         {
-            rayLine.material = new Material(Shader.Find("Sprites/Default"));
+            rayLine.material = CreateRayLineMaterial();
         }
 
+        rayLine.sortingOrder = drawRayVisualOnTop ? 100 : 0;
         rayLine.startColor = rayColor;
         rayLine.endColor = rayColor;
+    }
+
+    private Material CreateRayLineMaterial()
+    {
+        Shader shader = drawRayVisualOnTop
+            ? Shader.Find("UI/NoZTest")
+            : null;
+
+        if (shader == null)
+        {
+            shader = Shader.Find("Sprites/Default");
+        }
+
+        Material material = new Material(shader);
+        material.name = drawRayVisualOnTop
+            ? "RaycastPointer_Visual_Overlay"
+            : "RaycastPointer_Visual";
+        material.color = Color.white;
+        if (drawRayVisualOnTop)
+        {
+            material.renderQueue = 5000;
+        }
+
+        return material;
     }
 
     private void UpdateRayLine(Vector3 start, Vector3 end)
@@ -270,6 +300,19 @@ public class RaycastPointer : MonoBehaviour
         longRayLength = Mathf.Max(0.01f, longRayLength);
         rayStartWidth = Mathf.Max(0.0001f, rayStartWidth);
         rayEndWidth = Mathf.Max(0.0001f, rayEndWidth);
+        rayHitSurfaceOffsetMeters = Mathf.Max(0f, rayHitSurfaceOffsetMeters);
+    }
+
+    private Vector3 GetVisibleHitLineEnd(Ray pointerRay, Vector3 hitPoint)
+    {
+        if (rayHitSurfaceOffsetMeters <= 0f)
+        {
+            return hitPoint;
+        }
+
+        float hitDistance = Vector3.Distance(pointerRay.origin, hitPoint);
+        float visibleDistance = Mathf.Max(0f, hitDistance - rayHitSurfaceOffsetMeters);
+        return pointerRay.origin + pointerRay.direction * visibleDistance;
     }
 
     private void SetRayVisible(bool visible)

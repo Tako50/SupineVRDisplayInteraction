@@ -67,6 +67,7 @@ public class DisplaySurface : MonoBehaviour
 
     private void Awake()
     {
+        EnsureDisplayPartsActive();
         CachePanelImage();
         EnsureCursorVisual();
         EnsureHighlightFrame();
@@ -84,6 +85,7 @@ public class DisplaySurface : MonoBehaviour
         gazeHighlightFrame = null;
         gazeHighlightEdges = null;
         hasCachedBasePanelColor = false;
+        EnsureDisplayPartsActive();
         ApplyConfiguration();
     }
 
@@ -188,6 +190,8 @@ public class DisplaySurface : MonoBehaviour
 
     public void ApplyConfiguration()
     {
+        EnsureDisplayPartsActive();
+
         if (worldSpaceCanvas != null)
         {
             worldSpaceCanvas.renderMode = RenderMode.WorldSpace;
@@ -244,6 +248,24 @@ public class DisplaySurface : MonoBehaviour
         ApplyScrollOffset();
     }
 
+    private void EnsureDisplayPartsActive()
+    {
+        if (worldSpaceCanvas != null)
+        {
+            worldSpaceCanvas.gameObject.SetActive(true);
+        }
+
+        if (visiblePanel != null)
+        {
+            visiblePanel.gameObject.SetActive(true);
+        }
+
+        if (transparentHitPlane != null)
+        {
+            transparentHitPlane.gameObject.SetActive(true);
+        }
+    }
+
     private Vector3 ComputeCanvasScale()
     {
         if (physicalSizeMeters.x <= 0f
@@ -298,6 +320,7 @@ public class DisplaySurface : MonoBehaviour
         Texture2D texture = new Texture2D(textureSize, textureSize, TextureFormat.RGBA32, false)
         {
             name = "GeneratedCircleCursorSprite",
+            hideFlags = HideFlags.HideAndDontSave,
             filterMode = FilterMode.Bilinear,
             wrapMode = TextureWrapMode.Clamp
         };
@@ -323,6 +346,7 @@ public class DisplaySurface : MonoBehaviour
             new Vector2(0.5f, 0.5f),
             textureSize);
         circleCursorSprite.name = "GeneratedCircleCursorSprite";
+        circleCursorSprite.hideFlags = HideFlags.HideAndDontSave;
         return circleCursorSprite;
     }
 

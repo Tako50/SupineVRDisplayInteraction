@@ -3,7 +3,7 @@ using UnityEngine;
 [DisallowMultipleComponent]
 /// <summary>
 /// Aボタンをクリックへ変換する。トリガー単押しはクリックに使わない。
-/// 既定のDirectScrollAndSeekではBaselineのtrigger+RayとExplicitのstick押し込みラッチ+stickでWeb UI dragする。
+/// 既定のDirectScrollAndSeekではBaselineのtrigger+RayとExplicitのtrigger+horizontal stickでWeb UI dragする。
 /// BaselineはRay、ExplicitDisplayFocusはフォーカス表示上の仮想カーソルをポインター位置に使う。
 /// </summary>
 public class ClickDispatcher : MonoBehaviour
@@ -13,8 +13,7 @@ public class ClickDispatcher : MonoBehaviour
         None,
         Submit,
         Stick,
-        Trigger,
-        ThumbstickClick
+        Trigger
     }
 
     private enum WebViewStickGestureAxis
@@ -54,14 +53,14 @@ public class ClickDispatcher : MonoBehaviour
     [SerializeField] private bool invertWebViewStickGestureX = false;
     [SerializeField] private bool invertWebViewStickGestureY = false;
     [Header("WebView Direct Drag")]
-    [Tooltip("Minimum pointer movement in display canvas pixels before a latched Web UI drag sends pointer down. This prevents trigger or stick-click taps from becoming Web clicks.")]
+    [Tooltip("Minimum pointer movement in display canvas pixels before a latched Web UI drag sends pointer down. This prevents trigger taps from becoming Web clicks.")]
     [Min(0f)]
     [SerializeField] private float webViewDirectDragStartThresholdPixels = 16f;
-    [Tooltip("ExplicitDisplayFocus only: after starting Web UI drag with a stick click, release pointer up after the stick stays neutral this long. Press stick click again to release immediately.")]
-    [Min(0f)]
-    [SerializeField] private float webViewThumbstickClickDragNeutralReleaseDelay = 0.45f;
-
     public string LastClickResult { get; private set; } = "None";
+    public bool IsExplicitTriggerWebViewPointerDragActive =>
+        activeWebViewDragBridge != null
+        && activeWebViewDragCondition == InteractionCondition.ExplicitDisplayFocus
+        && activeWebViewPointerActivation == WebViewPointerActivation.Trigger;
 
     private TLabWebViewDisplayBridge activeWebViewDragBridge;
     private DisplaySurface activeWebViewDragDisplay;
@@ -71,13 +70,11 @@ public class ClickDispatcher : MonoBehaviour
     private WebViewPointerActivation activeWebViewPointerActivation;
     private WebViewStickGestureAxis activeWebViewStickGestureAxis;
     private float webViewRayNeutralStartTime = -1f;
-    private float webViewThumbstickClickNeutralStartTime = -1f;
     private TLabWebViewDisplayBridge pendingWebViewDragBridge;
     private DisplaySurface pendingWebViewDragDisplay;
     private Vector2 pendingWebViewDragStartNormalized;
     private WebViewPointerActivation pendingWebViewDragActivation;
     private InteractionCondition pendingWebViewDragCondition;
-    private float pendingWebViewThumbstickNeutralStartTime = -1f;
 
     private void Awake()
     {
@@ -208,9 +205,8 @@ public class ClickDispatcher : MonoBehaviour
         }
 
         if (inputManager.CurrentCondition == InteractionCondition.ExplicitDisplayFocus
-            && inputManager.StickClickPressed
-            && !inputManager.TriggerHeld
-            && TryLatchDirectWebViewDrag(WebViewPointerActivation.ThumbstickClick))
+            && inputManager.TriggerPressed
+            && TryLatchDirectWebViewDrag(WebViewPointerActivation.Trigger))
         {
             return true;
         }
@@ -232,30 +228,6 @@ public class ClickDispatcher : MonoBehaviour
         if (pendingWebViewDragActivation == WebViewPointerActivation.Trigger)
         {
             if (!inputManager.TriggerHeld)
-            {
-                ClearPendingDirectWebViewDrag();
-                return true;
-            }
-        }
-        else if (pendingWebViewDragActivation == WebViewPointerActivation.ThumbstickClick)
-        {
-            if (inputManager.StickClickPressed)
-            {
-                ClearPendingDirectWebViewDrag();
-                return true;
-            }
-
-            if (inputManager.StickClickHeld
-                || inputManager.Stick.magnitude >= webViewStickGestureDeadzone)
-            {
-                pendingWebViewThumbstickNeutralStartTime = -1f;
-            }
-            else if (pendingWebViewThumbstickNeutralStartTime < 0f)
-            {
-                pendingWebViewThumbstickNeutralStartTime = Time.unscaledTime;
-            }
-            else if (Time.unscaledTime - pendingWebViewThumbstickNeutralStartTime
-                     >= Mathf.Max(0f, webViewThumbstickClickDragNeutralReleaseDelay))
             {
                 ClearPendingDirectWebViewDrag();
                 return true;
@@ -314,35 +286,9 @@ public class ClickDispatcher : MonoBehaviour
         {
             case WebViewPointerActivation.Trigger:
                 return !inputManager.TriggerHeld;
-            case WebViewPointerActivation.ThumbstickClick:
-                return ShouldEndThumbstickClickWebViewDrag();
             default:
                 return false;
         }
-    }
-
-    private bool ShouldEndThumbstickClickWebViewDrag()
-    {
-        if (inputManager.StickClickPressed)
-        {
-            webViewThumbstickClickNeutralStartTime = -1f;
-            return true;
-        }
-
-        if (inputManager.Stick.magnitude >= webViewStickGestureDeadzone)
-        {
-            webViewThumbstickClickNeutralStartTime = -1f;
-            return false;
-        }
-
-        if (webViewThumbstickClickNeutralStartTime < 0f)
-        {
-            webViewThumbstickClickNeutralStartTime = Time.unscaledTime;
-            return false;
-        }
-
-        return Time.unscaledTime - webViewThumbstickClickNeutralStartTime
-            >= Mathf.Max(0f, webViewThumbstickClickDragNeutralReleaseDelay);
     }
 
     private bool UpdateLegacyWebViewSubmitDrag()
@@ -603,7 +549,6 @@ public class ClickDispatcher : MonoBehaviour
         pendingWebViewDragStartNormalized = normalized;
         pendingWebViewDragActivation = activation;
         pendingWebViewDragCondition = inputManager.CurrentCondition;
-        pendingWebViewThumbstickNeutralStartTime = -1f;
         LastClickResult = $"{display.name} webViewDragLatched=True activation={activation}";
         return true;
     }
@@ -622,7 +567,6 @@ public class ClickDispatcher : MonoBehaviour
         activeWebViewPointerActivation = activation;
         activeWebViewStickGestureAxis = WebViewStickGestureAxis.None;
         webViewRayNeutralStartTime = -1f;
-        webViewThumbstickClickNeutralStartTime = -1f;
     }
 
     private void UpdateActiveWebViewPointerDrag()
@@ -667,7 +611,6 @@ public class ClickDispatcher : MonoBehaviour
         activeWebViewPointerActivation = WebViewPointerActivation.None;
         activeWebViewStickGestureAxis = WebViewStickGestureAxis.None;
         webViewRayNeutralStartTime = -1f;
-        webViewThumbstickClickNeutralStartTime = -1f;
     }
 
     private Vector2 GetWebViewDragPosition(
@@ -791,7 +734,6 @@ public class ClickDispatcher : MonoBehaviour
         pendingWebViewDragDisplay = null;
         pendingWebViewDragActivation = WebViewPointerActivation.None;
         pendingWebViewDragCondition = default;
-        pendingWebViewThumbstickNeutralStartTime = -1f;
     }
 
     private bool ShouldDispatchClickThisFrame()

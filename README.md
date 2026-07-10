@@ -55,8 +55,7 @@ Useful development controls:
 - Release `Space`: A-button submit/click fallback
 - `Tab`: switch between `RaycastBaseline` and `ExplicitDisplayFocus`
 - `G`: grip fallback for focus confirmation
-- `Left Shift`: trigger fallback; trigger alone never clicks, and in a WebView session hold it with `W` / `S` for Explicit scroll
-- `Left Control`: right stick click fallback; in a WebView session, tap it once to start Explicit Web UI drag, then use `WASD` / arrow keys
+- `Left Shift`: trigger fallback; trigger alone never clicks, and in a WebView session hold it with `W` / `S` for Explicit scroll or `A` / `D` for Explicit Web UI drag
 - `X`: simulate aiming at the left-side exit panel and holding the left trigger
 - `R`: clear the focused display
 - right stick vertical, or `W` / `S`: scroll the currently ray-hit display in `RaycastBaseline`
@@ -84,7 +83,7 @@ Useful development controls:
 - cursor warps to the gaze hit position when focus is confirmed
 - right stick / `WASD` moves the virtual cursor inside the focused display
 - Releasing A / `Space` clicks at the virtual cursor on the focused display; right trigger alone does not click
-- in the default T2 WebView mode, A is a standalone click; trigger + vertical stick scrolls, and one stick click latches Web UI drag from the virtual cursor until the stick stays neutral briefly
+- in the default T2 WebView mode, A is a standalone click; trigger + vertical stick scrolls, while trigger + horizontal stick latches Web UI drag from the virtual cursor until trigger release
 - outside a running WebView session, right trigger + right stick vertical, or `Left Shift` + `W` / `S`, keeps the existing relative-scroll behavior
 - moving gaze to another display after focus is locked does not redirect click or scroll input
 
@@ -122,8 +121,8 @@ When `Consume Experiment Input` is enabled, the current experiment input path is
 - `WebViewSessionManager > Input Mode = Direct Scroll And Seek` is the default trial mode.
 - A is the only click/selection input in both conditions and in both T1 and T2. A is not combined with stick movement, and right trigger alone does not click.
 - `RaycastBaseline`: vertical stick scrolls the WebView under the ray; trigger hold + Ray movement sends Web UI drag.
-- `ExplicitDisplayFocus`: trigger + vertical stick scrolls the focused WebView; one right stick click starts Web UI drag from the virtual cursor, stick movement drags it, and a brief neutral pause or second stick click releases it.
-- Web UI drag starts pointer down only after movement exceeds a small threshold, then sends pointer move / up to the WebView. This prevents a stationary trigger or stick-click press from becoming a Web click while allowing YouTube's seek bar to be manipulated through the page UI.
+- `ExplicitDisplayFocus`: trigger + vertical stick scrolls the focused WebView; trigger + horizontal stick starts Web UI drag from the virtual cursor, stick movement drags it, and trigger release ends it.
+- Web UI drag starts pointer down only after movement exceeds a small threshold, then sends pointer move / up to the WebView. This prevents a stationary trigger press from becoming a Web click while allowing YouTube's seek bar to be manipulated through the page UI.
 - Scroll directly updates the WebView page's relative scroll position. Web UI drag depends on the active page element under the pointer.
 - Stick cursor and Web UI drag speeds are pixel-based so horizontal and vertical motion have the same canvas-pixel speed. Tune `Prototype_Managers > VirtualCursorController > Cursor Speed Pixels Per Second` and `Prototype_Managers > ClickDispatcher > Web View Stick Gesture Speed Pixels Per Second`. Current defaults are `220` px/s for cursor movement and `260` px/s for Web UI drag.
 - `Stick Touch Gesture` remains available in the Inspector for comparison, and `Legacy Direct Scroll And Submit Drag` remains available for rollback.
@@ -182,7 +181,7 @@ For editor validation:
 5. Press `G` to confirm focus and warp the cursor.
 6. Use `WASD` or arrow keys to move the focused cursor.
 7. Press `Space` to click during a WebView session.
-8. Hold `Left Shift` and press `W` / `S` to scroll the focused WebView, or tap `Left Control` once and use `WASD` / arrow keys for Web UI drag.
+8. Hold `Left Shift` and press `W` / `S` to scroll the focused WebView, or hold `Left Shift` and press `A` / `D` for Web UI drag.
 9. Hold `X` to validate the left-side exit panel without XR controllers.
 
 ## Phase 4 FocusPointing Task Skeleton

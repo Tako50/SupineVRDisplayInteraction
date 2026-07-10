@@ -10,6 +10,7 @@ public class VirtualCursorController : MonoBehaviour
     [SerializeField] private PrototypeInputManager inputManager;
     [SerializeField] private DisplayManager displayManager;
     [SerializeField] private GazeProvider gazeProvider;
+    [SerializeField] private WebViewSessionManager webViewSessionManager;
     [Tooltip("Cursor speed in display canvas pixels per second at full stick deflection.")]
     [SerializeField] private float cursorSpeedPixelsPerSecond = 220f;
     [SerializeField] private float deadzone = 0.08f;
@@ -62,11 +63,19 @@ public class VirtualCursorController : MonoBehaviour
         }
 
         Vector2 stick = inputManager.Stick;
-        bool relativeScrollActive = inputManager.TriggerHeld && !inputManager.SubmitHeld;
+        bool horizontalDirectWebDrag = IsHorizontalDirectWebViewDragCandidate(stick);
+        bool relativeScrollActive = inputManager.TriggerHeld
+            && !inputManager.SubmitHeld
+            && !horizontalDirectWebDrag;
         if (stick.magnitude < deadzone || relativeScrollActive)
         {
-            // トリガー＋スティックの相対スクロール中はカーソル位置を固定する。
+            // トリガー＋上下の相対スクロール中はカーソル位置を固定する。
             stick = Vector2.zero;
+        }
+        else if (horizontalDirectWebDrag)
+        {
+            // YouTube seek barなどのWeb UI drag中は、斜め入力でバーから外れないよう水平だけ動かす。
+            stick.y = 0f;
         }
 
         float speed = cursorSpeedPixelsPerSecond;
@@ -104,6 +113,38 @@ public class VirtualCursorController : MonoBehaviour
         {
             gazeProvider = FindObjectOfType<GazeProvider>();
         }
+
+        if (webViewSessionManager == null)
+        {
+            webViewSessionManager = FindObjectOfType<WebViewSessionManager>();
+        }
+    }
+
+    private bool IsHorizontalDirectWebViewDragCandidate(Vector2 stick)
+    {
+        if (!inputManager.TriggerHeld || inputManager.SubmitHeld)
+        {
+            return false;
+        }
+
+        if (webViewSessionManager == null
+            || !webViewSessionManager.IsSessionRunning
+            || !webViewSessionManager.UsesDirectScrollAndSeek
+            || displayManager == null
+            || displayManager.FocusedDisplay == null)
+        {
+            return false;
+        }
+
+        TLabWebViewDisplayBridge bridge = displayManager.FocusedDisplay.GetComponent<TLabWebViewDisplayBridge>();
+        if (bridge == null
+            || !bridge.ConsumeExperimentInput
+            || (!bridge.IsWebViewEnabled && !bridge.IsReady))
+        {
+            return false;
+        }
+
+        return Mathf.Abs(stick.x) > Mathf.Abs(stick.y);
     }
 
     private void UpdateCursorFromGaze(DisplaySurface focusedDisplay)

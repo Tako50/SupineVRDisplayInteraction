@@ -148,6 +148,7 @@ public static class DevPrototypeSceneBuilder
 
         SetObject(cursorController, "inputManager", inputManager);
         SetObject(cursorController, "displayManager", displayManager);
+        SetObject(cursorController, "webViewSessionManager", webViewSessionManager);
         SetFloat(cursorController, "cursorSpeedPixelsPerSecond", 220f);
         SetFloat(cursorController, "accelerationPixelsPerSecond", 0f);
         SetBool(cursorController, "allowStickCursorMovement", true);
@@ -157,6 +158,7 @@ public static class DevPrototypeSceneBuilder
         SetObject(scrollController, "raycastPointer", raycastPointer);
         SetObject(scrollController, "focusManager", focusManager);
         SetObject(scrollController, "virtualCursorController", cursorController);
+        SetObject(scrollController, "clickDispatcher", clickDispatcher);
         SetObject(scrollController, "gazeProvider", gazeProvider);
         SetObject(scrollController, "logger", logger);
         SetObject(scrollController, "webViewSessionManager", webViewSessionManager);
@@ -177,7 +179,6 @@ public static class DevPrototypeSceneBuilder
         SetFloat(clickDispatcher, "webViewRayNeutralReleaseDelay", 0.12f);
         SetFloat(clickDispatcher, "webViewVerticalGestureEdgeMargin", 0.08f);
         SetFloat(clickDispatcher, "webViewVerticalGestureReentry", 0.28f);
-        SetFloat(clickDispatcher, "webViewThumbstickClickDragNeutralReleaseDelay", 0.45f);
 
         SetObject(focusPointingTaskManager, "inputManager", inputManager);
         SetObject(focusPointingTaskManager, "experimentManager", experimentManager);
@@ -471,12 +472,14 @@ public static class DevPrototypeSceneBuilder
         DisplaySurface surface = GetOrAdd<DisplaySurface>(displayObject);
 
         Transform canvasTransform = EnsureChild(displayObject.transform, "WorldSpaceCanvas");
+        canvasTransform.gameObject.SetActive(true);
         Canvas canvas = GetOrAdd<Canvas>(canvasTransform.gameObject);
         canvasTransform = canvas.transform;
         GetOrAdd<CanvasScaler>(canvasTransform.gameObject);
         GetOrAdd<GraphicRaycaster>(canvasTransform.gameObject);
 
         RectTransform panel = EnsureRectChild(canvasTransform, "VisiblePanel");
+        panel.gameObject.SetActive(true);
         Image panelImage = GetOrAdd<Image>(panel.gameObject);
         panelImage.color = panelColor;
         GetOrAdd<RectMask2D>(panel.gameObject);
@@ -527,6 +530,7 @@ public static class DevPrototypeSceneBuilder
         cursorImage.raycastTarget = false;
 
         Transform hitPlaneTransform = EnsureChild(displayObject.transform, "TransparentHitPlane");
+        hitPlaneTransform.gameObject.SetActive(true);
         BoxCollider hitPlane = GetOrAdd<BoxCollider>(hitPlaneTransform.gameObject);
 
         surface.AssignParts(canvas, panel, hitPlane, cursor);
