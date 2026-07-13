@@ -2,7 +2,8 @@ import type { Item } from '../types'
 
 interface CandidateListProps {
   candidates: Item[]
-  confirmedIds: string[] | null
+  pendingConfirmationId: string | null
+  confirmationError: string
   onRemove: (item: Item) => void
   onConfirm: (item: Item) => void
   onBack: () => void
@@ -10,7 +11,8 @@ interface CandidateListProps {
 
 export default function CandidateList({
   candidates,
-  confirmedIds,
+  pendingConfirmationId,
+  confirmationError,
   onRemove,
   onConfirm,
   onBack,
@@ -36,15 +38,15 @@ export default function CandidateList({
                 className="final-button"
                 data-t2-candidate={item.item_id}
                 onClick={() => onConfirm(item)}
-                disabled={confirmedIds !== null}
+                disabled={pendingConfirmationId !== null}
               >
-                この商品に決定
+                {pendingConfirmationId === item.item_id ? '確定処理中…' : 'この商品に決定'}
               </button>
               <button
                 className="danger-button"
                 data-t2-action={`remove_candidate:${item.item_id}`}
                 onClick={() => onRemove(item)}
-                disabled={confirmedIds !== null}
+                disabled={pendingConfirmationId !== null}
               >
                 削除
               </button>
@@ -58,9 +60,10 @@ export default function CandidateList({
         </div>
       )}
 
-      {confirmedIds && (
-        <section className="confirmation" aria-live="polite">
-          <strong>最終候補を確定しました</strong>
+      {confirmationError && (
+        <section className="confirmation-error" role="alert">
+          <strong>候補を確定できませんでした</strong>
+          <p>{confirmationError}</p>
         </section>
       )}
     </main>

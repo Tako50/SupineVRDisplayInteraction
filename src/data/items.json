@@ -9,7 +9,7 @@
     "category": "収納・ゴミ箱",
     "image": "/images/a01_bucket_shelf_mesh.jpg",
     "short_description": "メッシュ素材の収納シェルフ。2段に重ねて使用できる。",
-    "web_description": "TOKYO CRAFTSのバケットシェルフメッシュ。外して洗えるメッシュ収納で，キャンプ小物を整理しやすい。",
+    "web_description": "仕舞う・置く・運ぶときの収まりを整え，美しいキャンプサイトをつくるための収納ケース。中身に合わせて柔軟に形を変え，棚のように重ねたり，畳んで持ち運んだりできる。自宅で道具を詰めた状態から，キャンプ場でそのまま収納棚として使えるため，設営と片付けの手間も減らせる。",
     "visual_features": "メッシュ状の収納棚，2段に重ねて置ける，黒系のフレーム。",
     "weight": "❌",
     "price": "¥4,980",
@@ -18,7 +18,7 @@
     "start_time": "00:53",
     "end_time": "02:28",
     "appearance_duration": "1分35秒",
-    "product_url": "https://amzn.to/3Phqj3Y",
+    "product_url": "https://tokyocrafts.jp/products/products-036-bucketshelfmesh",
     "demo_type": [
       "収納"
     ],
@@ -38,7 +38,7 @@
     "category": "収納・ゴミ箱",
     "image": "/images/a02_side_storage_box.webp",
     "short_description": "サイドに取り付けやすい小型収納ボックス。",
-    "web_description": "RATEL WORKSのSIDE STORAGE BOX。ナイロン素材の小型収納で，キャンプ小物の整理に使える。",
+    "web_description": "テーブルやチェアの脇に取り付け，座ったまま必要なものをすぐ取り出すためのサイド収納。散らかりやすいカトラリーやスパイスをまとめ，卓上をすっきり保てる。よく使うナイフなどは外側のポケットへ分けて収納でき，食事や調理の途中でも必要な道具へすぐ手を伸ばせる。",
     "visual_features": "黒系のサイド収納ボックス，コンパクトな横長形状。",
     "weight": "約400g",
     "price": "4,250円（税込）",
@@ -47,7 +47,7 @@
     "start_time": "02:34",
     "end_time": "04:24",
     "appearance_duration": "1分50秒",
-    "product_url": "https://ratelworks.jp/product/bag/sid...",
+    "product_url": "https://ratelworks.jp/product/bag/sidestragebox/",
     "demo_type": [
       "収納"
     ],
@@ -67,7 +67,7 @@
     "category": "照明・ガジェット",
     "image": "/images/a03_honooto.jpg",
     "short_description": "炎のようなライトとBluetoothスピーカーを備えたガジェット。",
-    "web_description": "Bluetoothスピーカー機能搭載。炎ライトのみ約20時間，炎ライト＋スピーカー約5時間使用可能。",
+    "web_description": "炎のように揺らぐ灯りとBluetoothスピーカーを一体化し，火を使わずに焚き火のような光と音楽を楽しめるランタン。アウトドアの夜にも室内のくつろぎ時間にも使える。テーブルの上に置くだけで，明かりと音の両方から落ち着いた雰囲気をつくれるため，食事や団らんの時間にも合わせやすい。",
     "visual_features": "炎のように揺らぐライト，円筒形の本体，スピーカー機能付き。",
     "weight": "386g",
     "price": "¥4,356（最安値）",
@@ -76,7 +76,7 @@
     "start_time": "04:44",
     "end_time": "06:05",
     "appearance_duration": "1分21秒",
-    "product_url": "楽天市場などで販売",
+    "product_url": "https://forestjapan.co.jp/led-lantern-speaker/",
     "demo_type": [
       "点灯",
       "使用"
@@ -97,7 +97,7 @@
     "category": "居住・寝具",
     "image": "/images/a04_sky_eye_tc.jpg",
     "short_description": "ポリコットン素材のソロ向けテント。",
-    "web_description": "GOGlampingのSKY EYE TC。ポリコットン素材とA7075超々ジュラルミンポールを用いたテント。",
+    "web_description": "天窓から昼の空や夜の星を眺め，自然とのつながりを楽しむための自立式テント。前後ドアと天窓で風通しを確保し，カンガルーテントとしても活用できる。寝転んだまま空を眺められることを中心に設計されており，タープや大型シェルターと組み合わせれば季節に応じた過ごし方ができる。",
     "visual_features": "コンパクトなテント，ポールで立ち上がるシェルター形状。",
     "weight": "約2.8kg",
     "price": "¥10,980（税込）",
@@ -106,7 +106,7 @@
     "start_time": "06:21",
     "end_time": "07:32",
     "appearance_duration": "1分11秒",
-    "product_url": "https://amzn.to/4eI3zEO",
+    "product_url": "https://www.goglampingjp.com/products/goglamping-tent-tc-skyeye",
     "demo_type": [
       "設置",
       "展開"
@@ -127,7 +127,7 @@
     "category": "収納・ゴミ箱",
     "image": "/images/a05_camp_gear_bag.webp",
     "short_description": "キャンプ道具をまとめて持ち運べる大型ギアバッグ。",
-    "web_description": "1680Dナイロン表地とPVCコーティング裏地を用いた大型キャンプギアバッグ。収納時は薄くでき，キャンプ道具をまとめて持ち運べる。",
+    "web_description": "キャンプで散らばりやすい小物を18個のポケットに整理し，ひとつにまとめるギアバッグ。可変式の間仕切りと緩衝材により，用途に合わせた収納空間をつくれる。ランタンなどの壊れやすい道具と細かな調理用品を同じバッグで分けて運べるほか，付属ストラップで持ち運びやすい。",
     "visual_features": "グレーの大型バッグ，RATEL WORKSロゴ，持ち手とファスナー付き，収納棚上に設置。",
     "weight": "約2.2kg",
     "price": "8,700円（税込）",
@@ -136,7 +136,7 @@
     "start_time": "07:53",
     "end_time": "08:34",
     "appearance_duration": "41秒",
-    "product_url": "https://amzn.to/3NtU1BF",
+    "product_url": "https://ratelworks.jp/product/bag/camp-gear-bag2/",
     "demo_type": [
       "収納"
     ],
@@ -156,7 +156,7 @@
     "category": "収納・ゴミ箱",
     "image": "/images/a06_hidebox.webp",
     "short_description": "折りたたみ式の箱型収納。上に天板を載せて使える。",
-    "web_description": "ポリエステル生地とアルミポールを用いた折りたたみ式の収納ボックス。天板を載せることでサイドテーブル的にも使える。",
+    "web_description": "キャンプサイトを美しく保つために生まれた「仕分けて隠す」ゴミ箱。ゴミを分別しながらフラップで中身を隠し，使わないときはコンパクトに畳める。フラップは景観を整えるだけでなく，夜間に野生動物からゴミを守る役割も持ち，蓋の上は小物置きとして活用できる。",
     "visual_features": "折りたたまれた薄い状態から箱型に展開し，上に天板を載せられる。",
     "weight": "約1.8kg",
     "price": "6,580円（税込）",
@@ -165,7 +165,7 @@
     "start_time": "08:48",
     "end_time": "09:27",
     "appearance_duration": "39秒",
-    "product_url": "https://ratelworks.jp/product/other/h...",
+    "product_url": "https://ratelworks.jp/product/furniture/hidebox/",
     "demo_type": [
       "展開",
       "収納"
@@ -186,7 +186,7 @@
     "category": "火器・調理用品",
     "image": "/images/a07_eco_kitchen_cleaner.jpg",
     "short_description": "水を多く含むキッチンクリーナー。キャンプ後の洗浄に使える。",
-    "web_description": "GREEN MOTIONのエコキッチンクリーナー。洗浄成分と天然精油を含むクリーナー。",
+    "web_description": "日々の暮らしから環境への気づきを促すクリーナー。海洋タンカー事故処理の研究から生まれた洗浄・分解技術で汚れを落とし，使用後の成分が自然へ還ることを目指している。油汚れへ少量を吹きかけて拭き取る使い方ができ，水を使いにくいキャンプ場での調理後の片付けにも取り入れやすい。",
     "visual_features": "小型ボトルのクリーナー，キッチン周りの清掃用途。",
     "weight": "❌",
     "price": "リフィルセット価格 ¥3,774",
@@ -195,7 +195,7 @@
     "start_time": "09:41",
     "end_time": "11:11",
     "appearance_duration": "1分30秒",
-    "product_url": "https://amzn.to/3BPdOJA",
+    "product_url": "https://www.marcs.co.jp/brand/green-motion",
     "demo_type": [
       "使用"
     ],
@@ -215,7 +215,7 @@
     "category": "居住・寝具",
     "image": "/images/a08_dome_x6_pro.webp",
     "short_description": "ストーブジャック付きの大型ドーム型テント。",
-    "web_description": "POMOLY DOME X6 PRO。ストーブジャックを標準装備したオールシーズン対応の大型テント。",
+    "web_description": "冬キャンプと通年のアウトドアを想定した自立式ドーム型ホットテント。強風や積雪に耐える対称フレームと，薪ストーブを安全に使うための耐熱グランドシートを備える。ストーブ使用時でも複数人が過ごせる居住空間があり，床を外せばアイスフィッシングなどの冬の活動拠点としても使える。",
     "visual_features": "大型ドームテント，複数人が入れる高さのあるシェルター。",
     "weight": "8.5kg",
     "price": "¥110,399",
@@ -224,7 +224,7 @@
     "start_time": "11:28",
     "end_time": "12:11",
     "appearance_duration": "43秒",
-    "product_url": "https://www.pomolygears.com/",
+    "product_url": "https://www.pomoly.com/POMOLY-Dome-X6-Pro-Dome-Tent-for-Camping-Family-Freestanding-Tent-Large-Round-Tent-4-6-Person-Hot-Tent-p2604095.html",
     "demo_type": [
       "設置",
       "展開"
@@ -245,7 +245,7 @@
     "category": "居住・寝具",
     "image": "/images/a09_down_sleeping_bag_600g.jpg",
     "short_description": "800FPのダウンを使ったスリーピングバッグ。",
-    "web_description": "BROOKLYN OUTDOOR COMPANYのダウンスリーピングバッグ。800FPで，NANGA製品と比較して約1万円安い。",
+    "web_description": "高品質な800FPダウンの暖かさと，化繊では得にくいコンパクトさの両立を目指した寝袋。ストレッチ縫製とボックスキルト構造により，快適性と保温性を高めている。首元とファスナー内側のドラフトチューブが冷気の侵入を抑え，収納時は小さくまとめて持ち運べる。",
     "visual_features": "ダークグレーの寝袋，広げて寝具として使用する。",
     "weight": "1070g",
     "price": "¥33,980",
@@ -254,7 +254,7 @@
     "start_time": "12:26",
     "end_time": "14:10",
     "appearance_duration": "1分44秒",
-    "product_url": "https://amzn.to/4abxEKM",
+    "product_url": "https://brooklynoutdoorcompany.jp/blogs/pressrelease/press01",
     "demo_type": [
       "設置",
       "使用"
@@ -275,7 +275,7 @@
     "category": "ファニチャー",
     "image": "/images/a10_half_fold_mini_table.jpg",
     "short_description": "半分に折りたためる鉄製ミニテーブル。",
-    "web_description": "スチール製の折りたたみミニテーブル。粉体塗装で仕上げられており，焚き火まわりのサイドテーブルとして使える。",
+    "web_description": "ソロキャンプやチェア横で使うサイドテーブルに適した，折り畳み式の小型テーブル。コンパクトに持ち運びながら，必要なときにすぐ天板を広げられる。飲み物やランタン，調理中の小物を手の届く位置へまとめたい場面に使いやすく，限られたスペースにも置きやすい。",
     "visual_features": "黒いメッシュ状の天板，半分に折りたためる鉄製ミニテーブル，ランタンを載せて使用。",
     "weight": "1.5kg",
     "price": "¥9,800（税込¥10,780）",
@@ -284,7 +284,7 @@
     "start_time": "14:18",
     "end_time": "15:57",
     "appearance_duration": "1分39秒",
-    "product_url": "❌",
+    "product_url": "https://www.naturetones.net/view/item/000000000167",
     "demo_type": [
       "展開"
     ],
@@ -304,7 +304,7 @@
     "category": "居住・寝具",
     "image": "/images/b01_northgaze.jpg",
     "short_description": "ポリコットンT/C素材のワンポールテント。",
-    "web_description": "ポリコットンT/C素材のワンポールテント。大型で高さがあり，別途購入の跳ね上げポールで前面をキャノピー化できる。",
+    "web_description": "薪ストーブを使う冬キャンプのための，広い居住空間を持つワンポールテント。前面を大きく開いてキャノピー化でき，調理やくつろぎの空間を外へ拡張できる。中央に高さがあるためテント内で動きやすく，季節や天候に合わせて閉じた空間と開放的なリビングを切り替えられる。",
     "visual_features": "ベージュのワンポールテント，前面キャノピー，OneTigrisロゴ，跳ね上げポールあり。",
     "weight": "7kg",
     "price": "¥31,000（税込）",
@@ -313,7 +313,7 @@
     "start_time": "01:31",
     "end_time": "03:45",
     "appearance_duration": "2分14秒",
-    "product_url": "https://amzn.to/49BmbGH",
+    "product_url": "https://camping.onetigris.com/ja/products/northgaze-tc-chimney-tent",
     "demo_type": [
       "設置",
       "展開"
@@ -334,7 +334,7 @@
     "category": "収納・ゴミ箱",
     "image": "/images/b02_cutlery_case.jpg",
     "short_description": "ナイロン素材のコンパクトなカトラリーケース。",
-    "web_description": "SotoLaboのドライメッシュカトラリーケース。ナイロン素材で，収納時にコンパクトな形状になる。",
+    "web_description": "洗ったカトラリーを濡れたまま入れ，吊るして乾燥させ，そのまま食卓の箸立てとして使うためのケース。ドライネット・運搬ケース・箸立ての役割をひとつにまとめている。細かなメッシュが虫やほこりの侵入を抑えながら水を逃がすため，屋外での洗い物から次の食事までをひと続きに扱える。",
     "visual_features": "黒系のコンパクトなメッシュケース，手で持ってサイズ感を示している。",
     "weight": "約500g",
     "price": "¥3,850（税込）",
@@ -343,7 +343,7 @@
     "start_time": "04:55",
     "end_time": "05:21",
     "appearance_duration": "26秒",
-    "product_url": "https://amzn.to/4pjzvnW",
+    "product_url": "https://sotolabo.com/shopdetail/000000000209/",
     "demo_type": [
       "収納"
     ],
@@ -363,7 +363,7 @@
     "category": "収納・ゴミ箱",
     "image": "/images/b03_code_unit_multibag.jpg",
     "short_description": "黒い横長の収納バッグ。内側に袋を取り付けて箱型収納として使える。",
-    "web_description": "TOKYO CRAFTSのコードユニットマルチバッグ。600Dポリエステル表地とPVCコーティング裏地を用いた収納バッグ。",
+    "web_description": "コードユニットと組み合わせ，収納・ゴミ箱・運搬バッグへ役割を変えられるシステムプロダクト。サイトの機能とレイアウトを，用途に合わせて拡張できる。ファスナーを閉じれば道具を運ぶバッグになり，吊り下げれば収納や分別用のボックスとして使えるため，設営から撤収まで役割を変えられる。",
     "visual_features": "黒い横長バッグ，TOKYO CRAFTSロゴ，手で持って見せている。",
     "weight": "7kg（動画テロップ表記）",
     "price": "¥12,970（税込）",
@@ -372,7 +372,7 @@
     "start_time": "05:55",
     "end_time": "07:13",
     "appearance_duration": "1分18秒",
-    "product_url": "https://amzn.to/4jjxGpw",
+    "product_url": "https://tokyocrafts.jp/products/products-083-coordunit-multibag",
     "demo_type": [
       "収納",
       "展開"
@@ -393,7 +393,7 @@
     "category": "居住・寝具",
     "image": "/images/b04_exclusive_sleeping_bag.jpg",
     "short_description": "スペイン産ダックダウン600gを使ったスリーピングバッグ。",
-    "web_description": "NANGA × TACOMA FUJI RECORDSのエクスクルーシブスリーピングバッグ。スペイン産ダックダウン600gを使用し，快適使用温度1℃に対応。",
+    "web_description": "NANGAの30周年とTACOMA FUJI RECORDSの15周年を記念したコラボレーション寝袋。架空の野外調査計画「BIGFOOT SURVEY PROJECT」の世界観を，NANGAの寝袋へ落とし込んでいる。アウトドア用品としての保温性を持ちながら，両ブランドらしい物語性とグラフィックを楽しめる特別仕様となっている。",
     "visual_features": "ブラウン系の寝袋，テント内に広げた状態，スクエア寄りの形状。",
     "weight": "約1,196g",
     "price": "¥69,300（税込）",
@@ -402,7 +402,7 @@
     "start_time": "07:27",
     "end_time": "08:37",
     "appearance_duration": "1分10秒",
-    "product_url": "https://item.rakuten.co.jp/m-outdoor/...",
+    "product_url": "https://nanga.jp/feature/campaign/collaboration-with-tacoma-fuji-records/",
     "demo_type": [
       "設置",
       "使用"
@@ -423,7 +423,7 @@
     "category": "火器・調理用品",
     "image": "/images/b05_paseco_jkh1s.jpg",
     "short_description": "キャンプ場で暖房用途として使える対流型ストーブ。",
-    "web_description": "PASECOの対流型ストーブ JKH-1S。キャンプ場で暖房用途として紹介されている。",
+    "web_description": "屋外のキャンプサイトで扱いやすいサイズと長い燃焼時間を備えた対流形石油ストーブ。従来モデルから消火装置の復帰機能や素材・組立を見直し，安全性と耐久性を高めている。周囲へ熱を広げる対流形のため，寒い季節の屋外リビングやシェルター内で暖を取る場面に向いている。",
     "visual_features": "白色の対流型ストーブ，中央部が赤く光っている，キャンプサイトで使用。",
     "weight": "5.3kg",
     "price": "¥19,800（税込）",
@@ -452,7 +452,7 @@
     "category": "照明・ガジェット",
     "image": "/images/b06_safe_co_detector.png",
     "short_description": "CO濃度・温度・湿度を表示する小型チェッカー。",
-    "web_description": "CARGO CONTAINERのSAFE CO-DETECTOR。一酸化炭素濃度を表示する小型チェッカーで，長時間使用できる。",
+    "web_description": "テント内の一酸化炭素濃度を確認し，暖房器具を使うキャンプの安全管理を助ける携帯型チェッカー。小型でサイトへ持ち込みやすく，濃度を継続して見守れる。温度や湿度も同じ画面で確認できるため，ストーブ使用中の空気環境をまとめて把握し，換気を判断する手がかりにできる。",
     "visual_features": "ベージュ色の小型デジタル表示機器，CO濃度・温度・湿度が液晶に表示される。",
     "weight": "143.5g",
     "price": "¥8,480（税込）",
@@ -461,7 +461,7 @@
     "start_time": "10:31",
     "end_time": "12:21",
     "appearance_duration": "1分50秒",
-    "product_url": "https://amzn.to/4bcxh6b",
+    "product_url": "https://cargo-container.shop/products/cc-safe-co-detector",
     "demo_type": [
       "使用"
     ],
@@ -481,7 +481,7 @@
     "category": "照明・ガジェット",
     "image": "/images/b07_surround_light_pro.png",
     "short_description": "高輝度の横長LEDライト。",
-    "web_description": "CARGO CONTAINERのSURROUND LIGHT PRO。150〜5400ルーメンの明るさに対応する横長LEDライト。",
+    "web_description": "サイト全体を360度明るく照らす，CARGO CONTAINERのフラッグシップランタン。光量と色温度を細かく調整でき，スマートフォンからの操作にも対応する。大きなテントやファミリーサイトを1台で広く照らしたい場面に向き，キャンプだけでなく停電時の防災照明としても活用できる。",
     "visual_features": "白色の横長LEDライト，暗所で強く点灯，背後に炎音が見える。",
     "weight": "907g",
     "price": "¥23,800（税込）",
@@ -490,7 +490,7 @@
     "start_time": "12:39",
     "end_time": "15:08",
     "appearance_duration": "2分29秒",
-    "product_url": "https://cargo-container.shop/products...",
+    "product_url": "https://cargo-container.shop/products/cc-surround-light-pro",
     "demo_type": [
       "点灯"
     ],
@@ -510,7 +510,7 @@
     "category": "火器・調理用品",
     "image": "/images/b08_okamadon.jpg",
     "short_description": "調理・盛り付け用途のキャンプギア。",
-    "web_description": "OLD MOUNTAINのOKAMADON。動画内で調理・食事まわりのギアとして紹介される。",
+    "web_description": "シェラカップで1合の本格釜飯を楽しむための木製の釜蓋。調理道具をスタッキングして荷物を小さくでき，機能・意匠・携帯性を兼ね備えた長く使える道具として設計されている。裏面の模様は装飾だけでなく木の反りを抑える構造にもなっており，ソロキャンプや登山で本格的な炊飯を楽しめる。",
     "visual_features": "木製または器状の調理系ギア，食事場面で使用。",
     "weight": "❌",
     "price": "❌",
@@ -519,7 +519,7 @@
     "start_time": "15:21",
     "end_time": "15:42",
     "appearance_duration": "21秒",
-    "product_url": "https://old-mountain.stores.jp/items/...",
+    "product_url": "https://oldmountain.jp/products/okamadon",
     "demo_type": [
       "使用",
       "調理"
@@ -540,7 +540,7 @@
     "category": "火器・調理用品",
     "image": "/images/b09_jingisukan_pan.jpg",
     "short_description": "肉と野菜を一緒に焼ける南部鉄器のジンギスカン鍋。",
-    "web_description": "岩鋳の焼肉ジンギスカン鍋。中央が盛り上がった形状で，肉と野菜を一緒に調理できる。",
+    "web_description": "肉の余分な脂を落としながら，野菜も香ばしく焼き上げる南部鉄器の焼肉鍋。蓄熱性のある鋳鉄で，ジンギスカンらしい焼き料理を卓上や屋外で楽しめる。中央で肉を焼き，周囲へ野菜を並べる形状により，ひとつの鍋で食材ごとの火の入り方を調整しやすい。",
     "visual_features": "黒い鉄鍋，中央が盛り上がった形状，肉と野菜を焼いている。",
     "weight": "約3kg",
     "price": "¥9,900（税込）",
@@ -549,7 +549,7 @@
     "start_time": "15:48",
     "end_time": "16:36",
     "appearance_duration": "48秒",
-    "product_url": "https://amzn.to/4q84dBC",
+    "product_url": "https://iwachu.co.jp/products/23006",
     "demo_type": [
       "調理"
     ],
@@ -569,7 +569,7 @@
     "category": "照明・ガジェット",
     "image": "/images/b10_dietz78_lantern.jpg",
     "short_description": "ブロンズゴールドのハリケーンランタン。",
-    "web_description": "DIETZ78のハリケーンランタン。ブロンズゴールドの独自塗装とKronglasグローブが特徴。",
+    "web_description": "燃料を灯す自然な炎と，ハリケーンランタンらしいクラシックな佇まいを楽しむオイルランタン。ブロンズゴールド仕上げとKronglasグローブが，点灯時も消灯時もサイトの雰囲気を演出する。強い作業灯というよりも，食事や団らんの時間に穏やかな明かりを添え，夜のキャンプらしい空間をつくる道具として楽しめる。",
     "visual_features": "ブロンズゴールドのランタン，暗所で明かりが点灯している，右側にスペック表示。",
     "weight": "約470g",
     "price": "¥19,300（税込）",
@@ -578,7 +578,7 @@
     "start_time": "18:13",
     "end_time": "18:48",
     "appearance_duration": "35秒",
-    "product_url": "https://amzn.to/491s5Rk",
+    "product_url": "https://dietz-japan.com/",
     "demo_type": [
       "点灯"
     ],

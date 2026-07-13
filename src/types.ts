@@ -43,6 +43,7 @@ export type LogEventName =
   | 'remove_candidate'
   | 'candidate_list_open'
   | 'confirm_candidates'
+  | 'reset_candidates_and_home'
   | 'back'
 
 export interface T2WebLog {

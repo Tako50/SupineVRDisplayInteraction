@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import itemsData from './data/items.json'
 import CandidateList from './components/CandidateList'
 import CategoryList from './components/CategoryList'
+import ConfirmedCandidate from './components/ConfirmedCandidate'
 import Home from './components/Home'
 import ProductDetail from './components/ProductDetail'
 import ProductList from './components/ProductList'
@@ -37,10 +38,14 @@ type View =
   | { name: 'products'; category: Category }
   | { name: 'detail'; category: Category; itemId: string }
   | { name: 'candidates' }
+  | { name: 'confirmed'; itemId: string }
 
 declare global {
   interface Window {
     t2ResetCandidates?: () => void
+    t2ConfirmCandidate?: (itemId: string) => void
+    t2RejectCandidate?: (message: string) => void
+    __t2UnitySend?: (type: string, value: string) => void
   }
 }
 
@@ -58,7 +63,8 @@ function loadCandidateIds(): string[] {
 export default function App() {
   const [view, setView] = useState<View>({ name: 'home' })
   const [candidateIds, setCandidateIds] = useState<string[]>(loadCandidateIds)
-  const [confirmedIds, setConfirmedIds] = useState<string[] | null>(null)
+  const [pendingConfirmationId, setPendingConfirmationId] = useState<string | null>(null)
+  const [confirmationError, setConfirmationError] = useState('')
 
   useEffect(() => {
     try {
@@ -74,12 +80,37 @@ export default function App() {
 
   useEffect(() => {
     window.t2ResetCandidates = () => {
+      try {
+        localStorage.setItem(CANDIDATES_STORAGE_KEY, '[]')
+      } catch (error) {
+        console.warn('候補リストを消去できませんでした。', error)
+      }
       setCandidateIds([])
-      setConfirmedIds(null)
+      setPendingConfirmationId(null)
+      setConfirmationError('')
       setView({ name: 'home' })
+    }
+    window.t2ConfirmCandidate = (itemId) => {
+      const item = items.find((candidate) => candidate.item_id === itemId)
+      setPendingConfirmationId(null)
+      if (!item) {
+        setConfirmationError('確定した商品を表示できませんでした。実験者にお知らせください。')
+        setView({ name: 'candidates' })
+        return
+      }
+
+      setConfirmationError('')
+      setView({ name: 'confirmed', itemId: item.item_id })
+    }
+    window.t2RejectCandidate = (message) => {
+      setPendingConfirmationId(null)
+      setConfirmationError(message || '条件を確認して、もう一度選択してください。')
+      setView({ name: 'candidates' })
     }
     return () => {
       delete window.t2ResetCandidates
+      delete window.t2ConfirmCandidate
+      delete window.t2RejectCandidate
     }
   }, [])
 
@@ -102,6 +133,9 @@ export default function App() {
   }
 
   const currentItem = view.name === 'detail'
+    ? items.find((item) => item.item_id === view.itemId)
+    : undefined
+  const confirmedItem = view.name === 'confirmed'
     ? items.find((item) => item.item_id === view.itemId)
     : undefined
 
@@ -149,7 +183,8 @@ export default function App() {
           onAddCandidate={(item) => {
             if (candidateIds.includes(item.item_id) || candidateIds.length >= 3) return
             setCandidateIds((current) => [...current, item.item_id])
-            setConfirmedIds(null)
+            setPendingConfirmationId(null)
+            setConfirmationError('')
             logEvent('add_candidate', { item_id: item.item_id })
           }}
           onBackToProducts={() => goBack({ name: 'products', category: view.category }, 'detail')}
@@ -171,18 +206,58 @@ export default function App() {
       {view.name === 'candidates' && (
         <CandidateList
           candidates={candidates}
-          confirmedIds={confirmedIds}
+          pendingConfirmationId={pendingConfirmationId}
+          confirmationError={confirmationError}
           onRemove={(item) => {
             setCandidateIds((current) => current.filter((id) => id !== item.item_id))
-            setConfirmedIds(null)
+            setPendingConfirmationId(null)
+            setConfirmationError('')
             logEvent('remove_candidate', { item_id: item.item_id })
           }}
           onConfirm={(item) => {
-            setConfirmedIds([item.item_id])
+            setPendingConfirmationId(item.item_id)
+            setConfirmationError('')
             logEvent('confirm_candidates', { item_id: item.item_id, item_ids: [item.item_id] })
+            if (typeof window.__t2UnitySend !== 'function') {
+              window.t2ConfirmCandidate?.(item.item_id)
+            }
           }}
           onBack={() => goBack({ name: 'home' }, 'candidates')}
         />
+      )}
+
+      {view.name === 'confirmed' && confirmedItem && (
+        <ConfirmedCandidate
+          item={confirmedItem}
+          onResetAndReturnHome={() => {
+            try {
+              localStorage.setItem(CANDIDATES_STORAGE_KEY, '[]')
+            } catch (error) {
+              console.warn('候補リストを消去できませんでした。', error)
+            }
+            setCandidateIds([])
+            setPendingConfirmationId(null)
+            setConfirmationError('')
+            logEvent('reset_candidates_and_home', { item_id: confirmedItem.item_id })
+            setView({ name: 'home' })
+            window.__t2UnitySend?.('action', 'reset_candidates_and_home')
+          }}
+        />
+      )}
+
+      {view.name === 'confirmed' && !confirmedItem && (
+        <main className="screen empty-state">
+          <h1>確定した商品を表示できません</h1>
+          <button
+            className="primary-button"
+            onClick={() => {
+              window.t2ResetCandidates?.()
+              window.__t2UnitySend?.('action', 'reset_candidates_and_home')
+            }}
+          >
+            候補を消去してホームに戻る
+          </button>
+        </main>
       )}
 
     </div>

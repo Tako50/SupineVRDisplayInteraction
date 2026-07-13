@@ -38,14 +38,13 @@ export default function ProductDetail({
         <section className="detail-content">
           <h1 id="detail-title">{item.product_name}</h1>
           <p className="brand detail-brand">{item.brand}</p>
-          <p className="detail-description">{item.web_description}</p>
           <dl className="spec-list">
             <div><dt>カテゴリ</dt><dd>{item.category}</dd></div>
             <div><dt>サイズ</dt><dd>{item.size}</dd></div>
             <div><dt>重量</dt><dd>{item.weight}</dd></div>
             <div><dt>価格</dt><dd>{item.price}</dd></div>
             <div><dt>素材</dt><dd>{item.material}</dd></div>
-            <div className="visual-feature"><dt>動画内での見た目・特徴</dt><dd>{item.visual_features}</dd></div>
+            <div className="product-introduction"><dt>商品紹介</dt><dd>{item.web_description}</dd></div>
           </dl>
           <div className="detail-actions">
             <button

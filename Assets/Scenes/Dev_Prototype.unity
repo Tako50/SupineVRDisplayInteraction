@@ -1905,7 +1905,7 @@ MonoBehaviour:
   initialUrl: https://www.youtube.com
   enableSecondaryWebView: 1
   secondaryDisplayId: Display_A_Front
-  secondaryInitialUrl: http://133.87.151.97:5173/
+  secondaryInitialUrl: http://133.87.151.95:5173/
   autoAddTLabBridgeToSecondaryDisplay: 1
   disableOtherWebViewsOnStart: 1
   disableWebViewOnReturn: 1
@@ -1919,18 +1919,17 @@ MonoBehaviour:
   youtubeUrlSetB: https://www.youtube.com/watch?v=wIHPxl6OPOc
   forceYoutubeUnmuted: 1
   youtubeForcedVolume: 1
-  d2vPauseRangeSetASeconds: {x: 473, y: 514}
-  d2vPauseRangeSetBSeconds: {x: 295, y: 321}
+  d2vPauseRangeSetASeconds: {x: 688, y: 743}
+  d2vPauseRangeSetBSeconds: {x: 948, y: 1011}
   comparisonPageResourceSetA: 
   comparisonPageResourceSetB: 
   totalTaskDurationSeconds: 600
-  trainingDurationSeconds: 90
-  mainD2VStartSeconds: 90
-  mainSemiFreeStartSeconds: 180
-  mainRequiredStageTimeoutSeconds: 150
-  mainFinalizeStartSeconds: 480
+  practiceStageTimeoutSeconds: 0
+  v2dStageTimeoutSeconds: 0
+  d2vStageTimeoutSeconds: 0
+  semiFreeStageTimeoutSeconds: 0
+  finalizeStageTimeoutSeconds: 0
   practiceScrollThresholdPixels: 80
-  returnDelayAfterCompletionSeconds: 2
   telemetryRefreshSeconds: 0.75
   requireStartButtonBeforeSession: 1
   startGateDisplayId: Display_B_Back

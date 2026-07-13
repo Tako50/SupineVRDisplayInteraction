@@ -210,13 +210,17 @@ Implement:
 - T2 Web Browsing mode inside Dev_Prototype
 - Display_B_Back loads the YouTube page
 - Display_A_Front loads the fixed local comparison page
-- Unified practice steps: YouTube play, pause, skip forward by 10 seconds, seek backward with the seek bar, Web scroll, product detail, candidate add, candidate remove
+- Unified practice steps: YouTube pause, play, skip forward by 10 seconds, seek backward with the seek bar, Web scroll, product detail, candidate add, candidate remove
 - Keep content-set, year, item ID, and video timestamps internal; do not render them on the comparison Web
 - Use the fixed category order from the current Notion T2 specification
 - Use the Notion-specified video time ranges for V2D and category positions for D2V
 - Continue from practice to Main without closing or reloading either WebView
-- 10-minute unified countdown with V2D, D2V, semi-free, and finalization instructions
-- Completion when the participant confirms 2–3 candidates on the comparison page
+- Immediate task-completion-driven progression through V2D, D2V, semi-free comparison, and finalization, without fixed post-completion waits
+- Keep the 10-minute overall limit and countdown
+- Keep inspector-configurable timeouts for Practice, V2D, D2V, semi-free comparison, and finalization; confirm their values before enabling them
+- Completion when the participant confirms one final item after completing V2D, D2V, and semi-free candidate addition
+- Stop timing and write the result when the final item is confirmed, then keep its image and product information visible for the post-task questionnaire
+- After the questionnaire, clear all persisted candidates, restore the comparison Web home view, and return Unity to condition selection
 - YouTube operation prerequisite before candidate selection
 - T2 event/result CSV logging
 

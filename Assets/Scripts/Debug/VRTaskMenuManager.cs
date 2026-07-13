@@ -9,6 +9,9 @@ using UnityEngine.UI;
 /// </summary>
 public class VRTaskMenuManager : MonoBehaviour
 {
+    private const string RaycastingMethodLabel = "Raycasting";
+    private const string GazeJoystickMethodLabel = "Gaze + Joystick";
+
     private enum PrototypeTask
     {
         T1FocusPointing,
@@ -60,8 +63,8 @@ public class VRTaskMenuManager : MonoBehaviour
     {
         new MenuButtonSpec(MenuAction.SelectT1FocusPointing, "T1 Target Selection", new Rect(0.06f, 0.650f, 0.42f, 0.085f)),
         new MenuButtonSpec(MenuAction.SelectT2WebBrowsing, "T2 Web Browsing", new Rect(0.52f, 0.650f, 0.42f, 0.085f)),
-        new MenuButtonSpec(MenuAction.SelectRaycastBaseline, "Raycast Baseline", new Rect(0.06f, 0.455f, 0.42f, 0.085f)),
-        new MenuButtonSpec(MenuAction.SelectExplicitDisplayFocus, "Explicit Display Focus", new Rect(0.52f, 0.455f, 0.42f, 0.085f))
+        new MenuButtonSpec(MenuAction.SelectRaycastBaseline, RaycastingMethodLabel, new Rect(0.06f, 0.455f, 0.42f, 0.085f)),
+        new MenuButtonSpec(MenuAction.SelectExplicitDisplayFocus, GazeJoystickMethodLabel, new Rect(0.52f, 0.455f, 0.42f, 0.085f))
     };
 
     private static readonly MenuButtonSpec[] LayoutButtonSpecs =
@@ -845,8 +848,8 @@ public class VRTaskMenuManager : MonoBehaviour
     private static string GetConditionDisplayName(InteractionCondition condition)
     {
         return condition == InteractionCondition.ExplicitDisplayFocus
-            ? "Explicit Display Focus"
-            : "Raycast Baseline";
+            ? GazeJoystickMethodLabel
+            : RaycastingMethodLabel;
     }
 
     private static string GetT2ContentSetDisplayName(T2ContentSet contentSet)

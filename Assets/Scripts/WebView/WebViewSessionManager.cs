@@ -33,8 +33,8 @@ public class WebViewSessionManager : MonoBehaviour
 {
     private enum T2TrainingStep
     {
-        PlayYouTube,
         PauseYouTube,
+        PlayYouTube,
         SkipForwardTenSeconds,
         SeekYouTube,
         ScrollComparisonPage,
@@ -97,9 +97,9 @@ public class WebViewSessionManager : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField] private float youtubeForcedVolume = 1f;
     [Tooltip("Strict D2V completion range for Content A. The task completes only when the D2V target detail has been opened and YouTube is paused within this range during the D2V stage.")]
-    [SerializeField] private Vector2 d2vPauseRangeSetASeconds = new Vector2(473f, 514f);
+    [SerializeField] private Vector2 d2vPauseRangeSetASeconds = new Vector2(688f, 743f);
     [Tooltip("Strict D2V completion range for Content B. The task completes only when the D2V target detail has been opened and YouTube is paused within this range during the D2V stage.")]
-    [SerializeField] private Vector2 d2vPauseRangeSetBSeconds = new Vector2(295f, 321f);
+    [SerializeField] private Vector2 d2vPauseRangeSetBSeconds = new Vector2(948f, 1011f);
     [Tooltip("Optional TextAsset Resources path for a packaged T2 page. Leave empty to use Secondary Initial Url.")]
     [SerializeField] private string comparisonPageResourceSetA = "";
     [Tooltip("Optional TextAsset Resources path for a packaged T2 page. Leave empty to use Secondary Initial Url.")]
@@ -107,23 +107,24 @@ public class WebViewSessionManager : MonoBehaviour
 
     [Header("T2 Procedure")]
     [Min(10f)]
-    [FormerlySerializedAs("mainTaskDurationSeconds")]
     [SerializeField] private float totalTaskDurationSeconds = 600f;
+    [Tooltip("Practice stage timeout in seconds. Set to 0 until the experiment value is decided.")]
     [Min(0f)]
-    [SerializeField] private float trainingDurationSeconds = 90f;
+    [SerializeField] private float practiceStageTimeoutSeconds;
+    [Tooltip("V2D stage timeout in seconds. Set to 0 until the experiment value is decided.")]
     [Min(0f)]
-    [SerializeField] private float mainD2VStartSeconds = 90f;
+    [SerializeField] private float v2dStageTimeoutSeconds;
+    [Tooltip("D2V stage timeout in seconds. Set to 0 until the experiment value is decided.")]
     [Min(0f)]
-    [SerializeField] private float mainSemiFreeStartSeconds = 180f;
+    [SerializeField] private float d2vStageTimeoutSeconds;
+    [Tooltip("Semi-free comparison stage timeout in seconds. Set to 0 until the experiment value is decided.")]
     [Min(0f)]
-    [SerializeField] private float mainRequiredStageTimeoutSeconds = 150f;
+    [SerializeField] private float semiFreeStageTimeoutSeconds;
+    [Tooltip("Final candidate confirmation stage timeout in seconds. Set to 0 until the experiment value is decided.")]
     [Min(0f)]
-    [FormerlySerializedAs("mainSelectionReminderSeconds")]
-    [SerializeField] private float mainFinalizeStartSeconds = 480f;
+    [SerializeField] private float finalizeStageTimeoutSeconds;
     [Min(1f)]
     [SerializeField] private float practiceScrollThresholdPixels = 80f;
-    [Min(0f)]
-    [SerializeField] private float returnDelayAfterCompletionSeconds = 2f;
     [Min(0.1f)]
     [SerializeField] private float telemetryRefreshSeconds = 0.75f;
 
@@ -170,14 +171,9 @@ public class WebViewSessionManager : MonoBehaviour
     private float unifiedTaskStartTime;
     private float taskEndTime;
     private float nextTelemetryRefreshTime;
-    private float autoReturnTime = -1f;
-    private bool mainReminderShown;
+    private float currentStageStartTime;
     private T2MainStage mainStage;
-    private float d2vStageStartTime = -1f;
-    private float semiFreeStageStartTime = -1f;
-    private bool v2dExpectedTimeExceeded;
-    private bool d2vExpectedTimeExceeded;
-    private bool requiredStageFailureTriggered;
+    private bool awaitingPostTaskReset;
     private bool resultWritten;
     private string selectedCandidate = string.Empty;
     private string pendingResult = string.Empty;
@@ -196,10 +192,10 @@ public class WebViewSessionManager : MonoBehaviour
     private int candidateRemoveCount;
     private float v2dCompletionTime = -1f;
     private float d2vCompletionTime = -1f;
+    private bool v2dTargetDetailOpened;
     private bool d2vTargetDetailOpened;
     private bool practiceCandidatesReset;
     private bool practiceCompletionLogged;
-    private bool practiceTimeoutLogged;
     private int displaySwitchCount;
     private int clutchCount;
     private float controllerMovementAmount;
@@ -388,6 +384,7 @@ public class WebViewSessionManager : MonoBehaviour
         }
 
         taskActive = false;
+        awaitingPostTaskReset = false;
         currentPhase = WebViewSessionPhase.ConditionSelection;
         HideStartGate();
         SetInstructionPanelVisible(false);
@@ -434,14 +431,9 @@ public class WebViewSessionManager : MonoBehaviour
 
     public void OnWebViewTaskMessage(string message)
     {
-        if (!taskActive || string.IsNullOrWhiteSpace(message))
+        if (string.IsNullOrWhiteSpace(message))
         {
             return;
-        }
-
-        if (taskStartTime <= 0f)
-        {
-            BeginTaskMeasurement();
         }
 
         string[] fields = message.Split(new[] { '|' }, 4);
@@ -453,6 +445,29 @@ public class WebViewSessionManager : MonoBehaviour
         string role = fields[1];
         string eventType = fields[2];
         string value = fields.Length >= 4 ? fields[3] : string.Empty;
+        if (awaitingPostTaskReset)
+        {
+            if (string.Equals(role, "web", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(eventType, "action", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(value, "reset_candidates_and_home", StringComparison.Ordinal))
+            {
+                logger?.LogEvent("T2Web_ResetCandidatesAndHome", activeCondition, secondaryDisplayId, Vector2.zero);
+                awaitingPostTaskReset = false;
+                ReturnToConditionSelection();
+            }
+            return;
+        }
+
+        if (!taskActive)
+        {
+            return;
+        }
+
+        if (taskStartTime <= 0f)
+        {
+            BeginTaskMeasurement();
+        }
+
         if (string.Equals(role, "youtube", StringComparison.OrdinalIgnoreCase))
         {
             HandleYouTubeTelemetry(eventType, value);
@@ -594,6 +609,7 @@ public class WebViewSessionManager : MonoBehaviour
         }
 
         taskStartTime = Time.time;
+        currentStageStartTime = taskStartTime;
         if (unifiedTaskStartTime <= 0f)
         {
             unifiedTaskStartTime = taskStartTime;
@@ -724,14 +740,9 @@ public class WebViewSessionManager : MonoBehaviour
         taskStartTime = 0f;
         taskEndTime = 0f;
         nextTelemetryRefreshTime = 0f;
-        autoReturnTime = -1f;
-        mainReminderShown = false;
+        currentStageStartTime = 0f;
         mainStage = T2MainStage.V2D;
-        d2vStageStartTime = -1f;
-        semiFreeStageStartTime = -1f;
-        v2dExpectedTimeExceeded = false;
-        d2vExpectedTimeExceeded = false;
-        requiredStageFailureTriggered = false;
+        awaitingPostTaskReset = false;
         resultWritten = false;
         selectedCandidate = string.Empty;
         pendingResult = string.Empty;
@@ -750,10 +761,10 @@ public class WebViewSessionManager : MonoBehaviour
         candidateRemoveCount = 0;
         v2dCompletionTime = -1f;
         d2vCompletionTime = -1f;
+        v2dTargetDetailOpened = false;
         d2vTargetDetailOpened = false;
         practiceCandidatesReset = false;
         practiceCompletionLogged = false;
-        practiceTimeoutLogged = false;
         displaySwitchCount = 0;
         clutchCount = 0;
         controllerMovementAmount = 0f;
@@ -761,7 +772,7 @@ public class WebViewSessionManager : MonoBehaviour
         lastInputDisplayId = string.Empty;
         hasControllerSample = false;
         trainingStep = currentPhase == WebViewSessionPhase.Training
-            ? T2TrainingStep.PlayYouTube
+            ? T2TrainingStep.PauseYouTube
             : T2TrainingStep.Completed;
     }
 
@@ -826,12 +837,6 @@ public class WebViewSessionManager : MonoBehaviour
 
     private void UpdateTaskTiming()
     {
-        if (autoReturnTime >= 0f && Time.time >= autoReturnTime)
-        {
-            ReturnToConditionSelection();
-            return;
-        }
-
         if (!IsSessionRunning || unifiedTaskStartTime <= 0f)
         {
             return;
@@ -841,143 +846,51 @@ public class WebViewSessionManager : MonoBehaviour
         float totalElapsed = Time.time - unifiedTaskStartTime;
         if (totalTaskDurationSeconds > 0f && totalElapsed >= totalTaskDurationSeconds)
         {
-            pendingResult = "timeout";
-            resultNote = "No candidates were confirmed before the unified T2 time limit.";
-            taskEndTime = Time.time;
-            WriteT2Event("timeout", secondaryDisplayId, totalElapsed.ToString("0.000", CultureInfo.InvariantCulture), resultNote);
-            ReturnToConditionSelection();
+            EndForTimeout(
+                "timeout",
+                "session",
+                totalElapsed,
+                $"overall_limit={totalTaskDurationSeconds:0.000}");
             return;
         }
 
-        if (currentPhase == WebViewSessionPhase.Training)
+        if (currentPhase == WebViewSessionPhase.MainTask && taskStartTime > 0f)
         {
-            UpdateTrainingWindow(Time.time - taskStartTime);
-            return;
+            UpdateMainStage();
         }
 
-        if (currentPhase != WebViewSessionPhase.MainTask || taskStartTime <= 0f)
+        float stageTimeout = GetCurrentStageTimeoutSeconds();
+        float stageElapsed = Mathf.Max(0f, Time.time - currentStageStartTime);
+        if (stageTimeout > 0f && currentStageStartTime > 0f && stageElapsed >= stageTimeout)
         {
-            return;
+            EndForTimeout(
+                "stage_timeout",
+                GetCurrentStageLabel(),
+                stageElapsed,
+                $"stage_limit={stageTimeout:0.000}");
         }
-
-        UpdateMainStage(Time.time - taskStartTime);
     }
 
-    private void UpdateTrainingWindow(float trainingElapsed)
+    private void UpdateMainStage()
     {
-        if (trainingDurationSeconds <= 0f)
-        {
-            if (trainingStep == T2TrainingStep.Completed)
-            {
-                ContinueFromPracticeToMain("training_completed_without_fixed_window");
-            }
-            return;
-        }
-
-        if (trainingElapsed < trainingDurationSeconds)
-        {
-            return;
-        }
-
-        if (trainingStep != T2TrainingStep.Completed && !practiceTimeoutLogged)
-        {
-            practiceTimeoutLogged = true;
-            WriteT2Event("practice_timeout", secondaryDisplayId, trainingStep.ToString(),
-                trainingElapsed.ToString("0.000", CultureInfo.InvariantCulture));
-            logger?.LogEvent("T2Web_PracticeTimeout", activeCondition, secondaryDisplayId, Vector2.zero);
-        }
-
-        ContinueFromPracticeToMain(
-            trainingStep == T2TrainingStep.Completed
-                ? "fixed_training_window_elapsed"
-                : $"training_timeout_at_step={trainingStep}");
-    }
-
-    private void UpdateMainStage(float mainElapsed)
-    {
-        if (requiredStageFailureTriggered)
-        {
-            return;
-        }
-
-        if (mainFinalizeStartSeconds > 0f && mainElapsed >= mainFinalizeStartSeconds)
-        {
-            SetMainStage(T2MainStage.Finalize, mainElapsed);
-            return;
-        }
-
         switch (mainStage)
         {
             case T2MainStage.V2D:
-                UpdateV2DStage(mainElapsed);
+                if (v2dCompletionTime >= 0f)
+                {
+                    SetMainStage(T2MainStage.D2V);
+                }
                 return;
             case T2MainStage.D2V:
-                UpdateD2VStage(mainElapsed);
+                if (d2vCompletionTime >= 0f)
+                {
+                    SetMainStage(T2MainStage.SemiFree);
+                }
                 return;
         }
     }
 
-    private void UpdateV2DStage(float mainElapsed)
-    {
-        if (v2dCompletionTime < 0f)
-        {
-            if (!v2dExpectedTimeExceeded && mainD2VStartSeconds > 0f && mainElapsed >= mainD2VStartSeconds)
-            {
-                v2dExpectedTimeExceeded = true;
-                WriteT2Event("v2d_expected_time_exceeded", secondaryDisplayId,
-                    mainElapsed.ToString("0.000", CultureInfo.InvariantCulture),
-                    $"expected={FormatLogSeconds(mainD2VStartSeconds)};timeout={FormatLogSeconds(mainRequiredStageTimeoutSeconds)}");
-            }
-
-            if (mainRequiredStageTimeoutSeconds > 0f && mainElapsed >= mainRequiredStageTimeoutSeconds)
-            {
-                FailMainRequiredStage("v2d_timeout", secondaryDisplayId, mainElapsed,
-                    $"target={GetV2DTargetItemId()};timeout={FormatLogSeconds(mainRequiredStageTimeoutSeconds)}");
-            }
-
-            return;
-        }
-
-        if (mainD2VStartSeconds <= 0f || mainElapsed >= mainD2VStartSeconds)
-        {
-            d2vStageStartTime = mainElapsed;
-            SetMainStage(T2MainStage.D2V, mainElapsed);
-        }
-    }
-
-    private void UpdateD2VStage(float mainElapsed)
-    {
-        float stageStart = d2vStageStartTime >= 0f ? d2vStageStartTime : mainD2VStartSeconds;
-        float stageElapsed = Mathf.Max(0f, mainElapsed - stageStart);
-        float expectedDuration = Mathf.Max(0f, mainSemiFreeStartSeconds - mainD2VStartSeconds);
-
-        if (d2vCompletionTime < 0f)
-        {
-            if (!d2vExpectedTimeExceeded && expectedDuration > 0f && stageElapsed >= expectedDuration)
-            {
-                d2vExpectedTimeExceeded = true;
-                WriteT2Event("d2v_expected_time_exceeded", targetDisplayId,
-                    mainElapsed.ToString("0.000", CultureInfo.InvariantCulture),
-                    $"stageElapsed={FormatLogSeconds(stageElapsed)};expected={FormatLogSeconds(expectedDuration)};timeout={FormatLogSeconds(mainRequiredStageTimeoutSeconds)}");
-            }
-
-            if (mainRequiredStageTimeoutSeconds > 0f && stageElapsed >= mainRequiredStageTimeoutSeconds)
-            {
-                FailMainRequiredStage("d2v_timeout", targetDisplayId, mainElapsed,
-                    $"target={GetD2VTargetItemId()};stageElapsed={FormatLogSeconds(stageElapsed)};timeout={FormatLogSeconds(mainRequiredStageTimeoutSeconds)}");
-            }
-
-            return;
-        }
-
-        if (expectedDuration <= 0f || stageElapsed >= expectedDuration)
-        {
-            semiFreeStageStartTime = mainElapsed;
-            SetMainStage(T2MainStage.SemiFree, mainElapsed);
-        }
-    }
-
-    private void SetMainStage(T2MainStage nextStage, float mainElapsed)
+    private void SetMainStage(T2MainStage nextStage)
     {
         if (nextStage == mainStage)
         {
@@ -985,29 +898,49 @@ public class WebViewSessionManager : MonoBehaviour
         }
 
         mainStage = nextStage;
-        mainReminderShown = mainStage == T2MainStage.Finalize;
+        currentStageStartTime = Time.time;
+        float mainElapsed = Mathf.Max(0f, Time.time - taskStartTime);
         WriteT2Event("main_stage", secondaryDisplayId, mainStage.ToString(), mainElapsed.ToString("0.000", CultureInfo.InvariantCulture));
         ApplyCurrentPageInstruction();
     }
 
-    private void FailMainRequiredStage(string eventType, string displayId, float mainElapsed, string note)
+    private float GetCurrentStageTimeoutSeconds()
     {
-        if (requiredStageFailureTriggered)
+        if (currentPhase == WebViewSessionPhase.Training)
         {
-            return;
+            return practiceStageTimeoutSeconds;
         }
 
-        requiredStageFailureTriggered = true;
-        pendingResult = "fail";
-        resultNote = note;
-        taskEndTime = Time.time;
-        WriteT2Event(eventType, displayId, mainElapsed.ToString("0.000", CultureInfo.InvariantCulture), note);
-        ReturnToConditionSelection();
+        switch (mainStage)
+        {
+            case T2MainStage.V2D:
+                return v2dStageTimeoutSeconds;
+            case T2MainStage.D2V:
+                return d2vStageTimeoutSeconds;
+            case T2MainStage.SemiFree:
+                return semiFreeStageTimeoutSeconds;
+            case T2MainStage.Finalize:
+                return finalizeStageTimeoutSeconds;
+            default:
+                return 0f;
+        }
     }
 
-    private static string FormatLogSeconds(float seconds)
+    private string GetCurrentStageLabel()
     {
-        return seconds.ToString("0.000", CultureInfo.InvariantCulture);
+        return currentPhase == WebViewSessionPhase.Training
+            ? "Practice"
+            : mainStage.ToString();
+    }
+
+    private void EndForTimeout(string eventType, string stageLabel, float elapsed, string details)
+    {
+        pendingResult = "timeout";
+        resultNote = $"stage={stageLabel};elapsed={elapsed:0.000};{details}";
+        taskEndTime = Time.time;
+        WriteT2Event(eventType, secondaryDisplayId,
+            elapsed.ToString("0.000", CultureInfo.InvariantCulture), resultNote);
+        ReturnToConditionSelection();
     }
 
     private void RefreshWebTelemetryIfNeeded()
@@ -1105,6 +1038,13 @@ public class WebViewSessionManager : MonoBehaviour
 
     private void ResolveCurrentInstruction(out string message, out string state)
     {
+        if (awaitingPostTaskReset)
+        {
+            message = "選んだ商品を手前Webに表示しています。終了後アンケートに回答し、回答後に「候補リストを削除してホームに戻る」を押してください。";
+            state = "complete";
+            return;
+        }
+
         if (currentPhase == WebViewSessionPhase.Training)
         {
             message = GetTrainingInstruction();
@@ -1116,22 +1056,22 @@ public class WebViewSessionManager : MonoBehaviour
         {
             case T2MainStage.V2D:
                 message = selectedContentSet == T2ContentSet.ACampGear2024
-                    ? "V2D　奥の動画の8分48秒〜9分35秒付近で紹介されている道具を確認してください。見つけたら、手前Webで同じ商品の詳細ページを開き、価格を確認してください。"
-                    : "V2D　奥の動画の5分55秒〜6分45秒付近で紹介されている道具を確認してください。見つけたら、手前Webで同じ商品の詳細ページを開き、重量を確認してください。";
+                    ? "V2D　奥の動画の4分44秒〜6分20秒付近で紹介されている道具を確認してください。手前Webで同じ商品の詳細ページを開き、候補に追加してください。"
+                    : "V2D　奥の動画の8分46秒〜10分30秒付近で紹介されている道具を確認してください。手前Webで同じ商品の詳細ページを開き、候補に追加してください。";
                 state = "main";
                 return;
             case T2MainStage.D2V:
                 message = selectedContentSet == T2ContentSet.ACampGear2024
-                    ? "D2V　手前Webの「収納・ゴミ箱」カテゴリを開き、上から3番目の商品詳細を確認してください。その商品が奥の動画内で紹介されている場面を探し、一時停止してください。"
-                    : "D2V　手前Webの「収納・ゴミ箱」カテゴリを開き、上から5番目の商品詳細を確認してください。その商品が奥の動画内で紹介されている場面を探し、一時停止してください。";
+                    ? "D2V　手前Webの「居住・寝具」カテゴリを開き、2番目の商品詳細を確認してください。奥の動画内で紹介場面を探し、一時停止してください。"
+                    : "D2V　手前Webの「火器・調理用品」カテゴリを開き、4番目の商品詳細を確認してください。奥の動画内で紹介場面を探し、一時停止してください。";
                 state = "main";
                 return;
             case T2MainStage.Finalize:
-                message = "候補リストを確認し、良いと思うキャンプギアを1つ選んで候補を確定してください。";
+                message = "候補リストを確認し、今回のキャンプをより快適にするために最も良さそうな商品を1つ選んで、候補を確定してください。";
                 state = "reminder";
                 return;
             default:
-                message = "動画とWebの情報を確認しながら、良いと思うキャンプギアを候補に追加してください。";
+                message = "動画とWebを見比べ、追加・買い替えの候補として良さそうなキャンプ道具をもう1つ候補に追加してください。追加すると最終候補の確定へ進みます。";
                 state = "main";
                 return;
         }
@@ -1182,7 +1122,7 @@ public class WebViewSessionManager : MonoBehaviour
         }
 
         string header = $"{phaseLabel}  |  {GetMethodLabel()}";
-        if (unifiedTaskStartTime <= 0f || totalTaskDurationSeconds <= 0f)
+        if (awaitingPostTaskReset || unifiedTaskStartTime <= 0f || totalTaskDurationSeconds <= 0f)
         {
             return header;
         }
@@ -1200,7 +1140,7 @@ public class WebViewSessionManager : MonoBehaviour
 
         string state = currentPhase == WebViewSessionPhase.Training
             ? (trainingStep == T2TrainingStep.Completed ? "complete" : "practice")
-            : mainReminderShown
+            : mainStage == T2MainStage.Finalize
                 ? "reminder"
                 : "main";
         instructionPanelPhaseText.text = GetInstructionHeaderLabel(state);
@@ -1393,14 +1333,14 @@ public class WebViewSessionManager : MonoBehaviour
     {
         switch (trainingStep)
         {
-            case T2TrainingStep.PlayYouTube:
-                return "P01　奥のYouTube動画を再生してください。";
             case T2TrainingStep.PauseYouTube:
-                return "P02　奥のYouTube動画を一時停止してください。";
+                return "P01　奥のYouTube動画を一時停止してください。";
+            case T2TrainingStep.PlayYouTube:
+                return "P02　奥のYouTube動画を再生してください。";
             case T2TrainingStep.SkipForwardTenSeconds:
                 return "P03　奥のYouTube動画を10秒スキップしてください。";
             case T2TrainingStep.SeekYouTube:
-                return "P04　奥のYouTube動画をシークバー操作で少し戻してください。";
+                return "P04　奥のYouTube動画を少し戻してください。";
             case T2TrainingStep.ScrollComparisonPage:
                 return "P05　手前のWebページを少し下にスクロールしてください。";
             case T2TrainingStep.OpenProductDetail:
@@ -1410,7 +1350,7 @@ public class WebViewSessionManager : MonoBehaviour
             case T2TrainingStep.RemoveCandidate:
                 return "P08　候補リストから商品を1つ削除してください。";
             default:
-                return "操作確認は完了です。本番開始まで、画面を閉じずにそのままお待ちください。";
+                return "操作確認は完了です。そのまま本番タスクへ進みます。";
         }
     }
 
@@ -1600,12 +1540,11 @@ public class WebViewSessionManager : MonoBehaviour
 
             if (currentPhase == WebViewSessionPhase.MainTask)
             {
-                float elapsed = Mathf.Max(0f, Time.time - taskStartTime);
-                if (v2dCompletionTime < 0f && itemId == GetV2DTargetItemId())
+                if (itemId == GetV2DTargetItemId())
                 {
-                    v2dCompletionTime = elapsed;
-                    WriteT2Event("v2d_complete", secondaryDisplayId,
-                        v2dCompletionTime.ToString("0.000", CultureInfo.InvariantCulture), itemId);
+                    v2dTargetDetailOpened = true;
+                    WriteT2Event("v2d_target_open", secondaryDisplayId, itemId,
+                        mainStage.ToString());
                 }
 
                 if (itemId == GetD2VTargetItemId())
@@ -1620,10 +1559,28 @@ public class WebViewSessionManager : MonoBehaviour
         if (normalized.StartsWith("add_candidate:", StringComparison.Ordinal))
         {
             candidateAddCount++;
+            string itemId = normalized.Substring("add_candidate:".Length).Trim();
             if (currentPhase == WebViewSessionPhase.Training
                 && trainingStep == T2TrainingStep.AddCandidate)
             {
                 AdvanceTrainingStep();
+            }
+            else if (currentPhase == WebViewSessionPhase.MainTask
+                && mainStage == T2MainStage.V2D
+                && v2dCompletionTime < 0f
+                && v2dTargetDetailOpened
+                && itemId == GetV2DTargetItemId())
+            {
+                v2dCompletionTime = Mathf.Max(0f, Time.time - taskStartTime);
+                WriteT2Event("v2d_complete", secondaryDisplayId,
+                    v2dCompletionTime.ToString("0.000", CultureInfo.InvariantCulture), itemId);
+            }
+            else if (currentPhase == WebViewSessionPhase.MainTask
+                && mainStage == T2MainStage.SemiFree)
+            {
+                WriteT2Event("semi_free_complete", secondaryDisplayId, itemId,
+                    "candidate_added_during_semi_free");
+                SetMainStage(T2MainStage.Finalize);
             }
             return;
         }
@@ -1641,12 +1598,12 @@ public class WebViewSessionManager : MonoBehaviour
 
     private string GetV2DTargetItemId()
     {
-        return selectedContentSet == T2ContentSet.ACampGear2024 ? "A06" : "B03";
+        return selectedContentSet == T2ContentSet.ACampGear2024 ? "A03" : "B05";
     }
 
     private string GetD2VTargetItemId()
     {
-        return selectedContentSet == T2ContentSet.ACampGear2024 ? "A05" : "B02";
+        return selectedContentSet == T2ContentSet.ACampGear2024 ? "A08" : "B09";
     }
 
     private void AdvanceTrainingStep()
@@ -1678,9 +1635,9 @@ public class WebViewSessionManager : MonoBehaviour
         }
 
         practiceCompletionLogged = true;
-        WriteT2Event("practice_complete", secondaryDisplayId, string.Empty, "waiting_for_fixed_main_start");
+        WriteT2Event("practice_complete", secondaryDisplayId, string.Empty, "continue_on_task_completion");
         logger?.LogEvent("T2Web_PracticeCompleted", activeCondition, secondaryDisplayId, Vector2.zero);
-        ApplyCurrentPageInstruction();
+        ContinueFromPracticeToMain("practice_tasks_completed");
     }
 
     private void ContinueFromPracticeToMain(string note)
@@ -1688,6 +1645,7 @@ public class WebViewSessionManager : MonoBehaviour
         currentPhase = WebViewSessionPhase.MainTask;
         ResetSessionMetrics();
         taskStartTime = Time.time;
+        currentStageStartTime = taskStartTime;
         taskActive = true;
         activeSecondaryWebViewBridge?.TryEvaluateJavaScript(
             "window.t2ResetCandidates&&window.t2ResetCandidates();");
@@ -1708,7 +1666,7 @@ public class WebViewSessionManager : MonoBehaviour
         if (mainStage != T2MainStage.Finalize)
         {
             WriteT2Event("candidate_blocked", secondaryDisplayId, candidate, "finalize_stage_required");
-            RejectCandidate("候補の確定は、最後の候補確認時間になってから行ってください。");
+            RejectCandidate("V2D、D2V、半自由比較の各タスクを完了してから候補を確定してください。");
             return;
         }
 
@@ -1739,19 +1697,14 @@ public class WebViewSessionManager : MonoBehaviour
         taskEndTime = Time.time;
         WriteT2Event("candidate_selected", secondaryDisplayId, selectedCandidate, string.Empty);
         EmitEndSyncMarkerIfNeeded("candidate_selected");
+        FinalizeSessionResult(currentPhase, pendingResult);
+        taskActive = false;
+        awaitingPostTaskReset = true;
+        ApplyCurrentPageInstruction();
         activeSecondaryWebViewBridge?.TryEvaluateJavaScript(
             "window.t2ConfirmCandidate&&window.t2ConfirmCandidate('"
             + EscapeJavaScriptString(selectedCandidate) + "');");
         logger?.LogEvent("T2Web_Completed", activeCondition, secondaryDisplayId, Vector2.zero);
-
-        if (returnDelayAfterCompletionSeconds <= 0f)
-        {
-            ReturnToConditionSelection();
-        }
-        else
-        {
-            autoReturnTime = Time.time + returnDelayAfterCompletionSeconds;
-        }
     }
 
     private void RejectCandidate(string message)
