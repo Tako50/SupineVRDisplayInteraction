@@ -38,8 +38,6 @@ public class RaycastPointer : MonoBehaviour
     [Min(0.0001f)]
     [SerializeField] private float rayEndWidth = 0.001f;
     [SerializeField] private Color rayColor = new Color(0.4f, 0.8f, 1f, 0.55f);
-    [Tooltip("Draw the visible Ray over display surfaces so screenshots do not make it look hidden by the hit plane.")]
-    [SerializeField] private bool drawRayVisualOnTop = true;
     [Tooltip("Keep the Ray endpoint slightly in front of the first hit surface to avoid z-fighting in screenshots.")]
     [Min(0f)]
     [SerializeField] private float rayHitSurfaceOffsetMeters = 0.01f;
@@ -179,36 +177,17 @@ public class RaycastPointer : MonoBehaviour
         rayLine.endWidth = rayEndWidth;
         if (rayLine.sharedMaterial == null)
         {
-            rayLine.material = CreateRayLineMaterial();
+            // Use a depth-tested world-space material. An overlay/NoZTest material makes
+            // the controller Ray visible through displays from the participant's viewpoint.
+            rayLine.material = new Material(Shader.Find("Sprites/Default"))
+            {
+                name = "RaycastPointer_Visual"
+            };
         }
 
-        rayLine.sortingOrder = drawRayVisualOnTop ? 100 : 0;
+        rayLine.sortingOrder = 0;
         rayLine.startColor = rayColor;
         rayLine.endColor = rayColor;
-    }
-
-    private Material CreateRayLineMaterial()
-    {
-        Shader shader = drawRayVisualOnTop
-            ? Shader.Find("UI/NoZTest")
-            : null;
-
-        if (shader == null)
-        {
-            shader = Shader.Find("Sprites/Default");
-        }
-
-        Material material = new Material(shader);
-        material.name = drawRayVisualOnTop
-            ? "RaycastPointer_Visual_Overlay"
-            : "RaycastPointer_Visual";
-        material.color = Color.white;
-        if (drawRayVisualOnTop)
-        {
-            material.renderQueue = 5000;
-        }
-
-        return material;
     }
 
     private void UpdateRayLine(Vector3 start, Vector3 end)

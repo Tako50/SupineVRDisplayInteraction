@@ -102,6 +102,7 @@ Controller-Ray feedback is also fixed by method:
 
 - `RaycastBaseline`: display the `Long` controller Ray (`4.0m` by default).
 - `ExplicitDisplayFocus`: hide the controller Ray.
+- The controller Ray uses normal world-space depth testing, so a display visually occludes any Ray segment located behind it from the participant's viewpoint.
 
 The task menu therefore contains only task, interaction method, T1 layout/T2 content set, and session-start controls. Its status card shows the fixed highlight and Ray behavior for the selected method.
 
