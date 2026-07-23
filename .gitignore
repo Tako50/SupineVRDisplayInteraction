@@ -40,4 +40,8 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# T2 local-only product images. Keep originals local; do not publish rights-sensitive assets.
+public/images/*
+!public/images/.gitkeep
+
 sysinfo.txt
