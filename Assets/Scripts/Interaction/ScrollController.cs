@@ -20,6 +20,7 @@ public class ScrollController : MonoBehaviour
     [SerializeField] private float stickScrollDeadzone = 0.05f;
 
     private float lastScrollLogTime;
+    private bool gazeRayScrollActive;
 
     public float LastScrollAmount { get; private set; }
     public string LastScrollDisplayId { get; private set; } = "None";
@@ -38,7 +39,10 @@ public class ScrollController : MonoBehaviour
             return;
         }
 
-        if (inputManager.CurrentCondition == InteractionCondition.RaycastBaseline)
+        UpdateGazeRayScrollEvents();
+
+        if (inputManager.CurrentCondition == InteractionCondition.RaycastBaseline
+            || inputManager.CurrentCondition == InteractionCondition.GazeRay)
         {
             ScrollRaycastBaseline();
             return;
@@ -139,6 +143,25 @@ public class ScrollController : MonoBehaviour
                 Debug.Log($"[ScrollController] condition={inputManager.CurrentCondition}, displayId={hit.DisplayId}, normalized={Format(hit.Normalized)}, scrollAmount={appliedScroll:0.000}");
             }
         }
+    }
+
+    private void UpdateGazeRayScrollEvents()
+    {
+        bool shouldBeActive = inputManager.CurrentCondition == InteractionCondition.GazeRay
+            && displayManager.HasCurrentRaycastHit
+            && Mathf.Abs(inputManager.Stick.y) >= stickScrollDeadzone;
+        if (shouldBeActive == gazeRayScrollActive)
+        {
+            return;
+        }
+
+        gazeRayScrollActive = shouldBeActive;
+        DisplayHit hit = displayManager.HasCurrentRaycastHit ? displayManager.CurrentRaycastHit : default;
+        logger?.LogEvent(
+            gazeRayScrollActive ? "scroll_start" : "scroll_end",
+            InteractionCondition.GazeRay,
+            hit.Display != null ? hit.DisplayId : LastScrollDisplayId,
+            hit.Display != null ? hit.Normalized : Vector2.zero);
     }
 
     private void ScrollExplicitFocus()

@@ -497,7 +497,7 @@ enum InteractionCondition
 - 2枚のディスプレイを切り替えながら、指定ターゲットをクリックする性能を測る。
 - Display error と Target error を分けて測る。
 - Task A（左右）、Task B（前後・入力遮蔽なし）、Task C（前後・入力遮蔽あり）を比較する。
-- 各操作手法・各タスクのブロックは48試行とし、T1本番全体を288試行とする。
+- 割り当てられた操作手法で各タスクのブロックを96試行（2 displays x 6 positions x 2 sizes x 4 cycles）実施し、T1本番全体を288試行とする。
 - 各Displayの候補位置は `x=0.10/0.50/0.90`、`y=0.20/0.80`、サイズは1.5度/3度とする。
 - Task Cの奥側下段3点のみを `inputOccluded` として分析する。
 
@@ -523,6 +523,8 @@ enum InteractionCondition
 
 - task duration
 - selected candidate
+- timeout時は12分でtask durationとresultを固定し、確定操作だけを継続
+- timeout後に確定した商品と確定時刻
 - YouTube play / pause / seek count
 - Web scroll / click amount
 - display switch count

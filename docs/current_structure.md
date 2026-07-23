@@ -185,7 +185,7 @@ Unityテンプレート由来のSceneです。現在の研究プロトタイプ�
 |---|---|
 | `Experiment/ExperimentManager.cs` | 現在条件、現在レイアウト、フレームサンプルを束ねる軽量管理役 |
 | `Tasks/FocusPointingTaskManager.cs` | T1の3タスク選択、Training/Main、ターゲット表示、動作量集計、結果CSVを担当 |
-| `Tasks/T1TrialSequenceGenerator.cs` | 2 Display × 6位置 × 2サイズ × 2周の48試行を制約付きランダム化 |
+| `Tasks/T1TrialSequenceGenerator.cs` | 2 Display × 6位置 × 2サイズ × 4周の96試行を制約付きランダム化 |
 | `WebView/WebViewSessionManager.cs` | T2のYouTube + 比較Web統合セッション、操作確認からMainへの連続移行、完了条件、T2 CSVを担当 |
 | `Tasks/ErrorEvaluator.cs` | T1クリックをCorrect、DisplayError、TargetError、Missに分類 |
 | `Tasks/T1RayOcclusionGeometry.cs` | 手・目・2枚Displayの幾何モデルからRay遮蔽率を計算 |

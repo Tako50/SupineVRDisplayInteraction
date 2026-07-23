@@ -10,6 +10,7 @@ using UnityEngine.UI;
 public class VRTaskMenuManager : MonoBehaviour
 {
     private const string RaycastingMethodLabel = "Raycasting";
+    private const string GazeRayMethodLabel = "Gaze + Ray";
     private const string GazeJoystickMethodLabel = "Gaze + Joystick";
 
     private enum PrototypeTask
@@ -22,9 +23,8 @@ public class VRTaskMenuManager : MonoBehaviour
     {
         SelectT1FocusPointing,
         SelectT2WebBrowsing,
-        SelectT2ContentSetA,
-        SelectT2ContentSetB,
         SelectRaycastBaseline,
+        SelectGazeRay,
         SelectExplicitDisplayFocus,
         SelectUpDownDepth,
         SelectLeftRight,
@@ -63,8 +63,9 @@ public class VRTaskMenuManager : MonoBehaviour
     {
         new MenuButtonSpec(MenuAction.SelectT1FocusPointing, "T1 Target Selection", new Rect(0.06f, 0.650f, 0.42f, 0.085f)),
         new MenuButtonSpec(MenuAction.SelectT2WebBrowsing, "T2 Web Browsing", new Rect(0.52f, 0.650f, 0.42f, 0.085f)),
-        new MenuButtonSpec(MenuAction.SelectRaycastBaseline, RaycastingMethodLabel, new Rect(0.06f, 0.455f, 0.42f, 0.085f)),
-        new MenuButtonSpec(MenuAction.SelectExplicitDisplayFocus, GazeJoystickMethodLabel, new Rect(0.52f, 0.455f, 0.42f, 0.085f))
+        new MenuButtonSpec(MenuAction.SelectRaycastBaseline, RaycastingMethodLabel, new Rect(0.06f, 0.455f, 0.27f, 0.085f)),
+        new MenuButtonSpec(MenuAction.SelectGazeRay, GazeRayMethodLabel, new Rect(0.365f, 0.455f, 0.27f, 0.085f)),
+        new MenuButtonSpec(MenuAction.SelectExplicitDisplayFocus, GazeJoystickMethodLabel, new Rect(0.67f, 0.455f, 0.27f, 0.085f))
     };
 
     private static readonly MenuButtonSpec[] LayoutButtonSpecs =
@@ -72,12 +73,6 @@ public class VRTaskMenuManager : MonoBehaviour
         new MenuButtonSpec(MenuAction.SelectUpDownDepth, "A  Left / Right", new Rect(0.06f, 0.270f, 0.28f, 0.060f)),
         new MenuButtonSpec(MenuAction.SelectLeftRight, "B  Up / Down", new Rect(0.36f, 0.270f, 0.28f, 0.060f)),
         new MenuButtonSpec(MenuAction.SelectUpDown, "C  Up / Down + Depth", new Rect(0.66f, 0.270f, 0.28f, 0.060f))
-    };
-
-    private static readonly MenuButtonSpec[] T2ContentSetButtonSpecs =
-    {
-        new MenuButtonSpec(MenuAction.SelectT2ContentSetA, "Content A", new Rect(0.06f, 0.270f, 0.42f, 0.060f)),
-        new MenuButtonSpec(MenuAction.SelectT2ContentSetB, "Content B", new Rect(0.52f, 0.270f, 0.42f, 0.060f))
     };
 
     private static readonly MenuButtonSpec[] TaskControlButtonSpecs =
@@ -229,16 +224,12 @@ public class VRTaskMenuManager : MonoBehaviour
             case MenuAction.SelectT2WebBrowsing:
                 selectedTask = PrototypeTask.T2WebBrowsing;
                 break;
-            case MenuAction.SelectT2ContentSetA:
-                selectedT2ContentSet = T2ContentSet.ACampGear2024;
-                ApplySelectionsToManagers();
-                break;
-            case MenuAction.SelectT2ContentSetB:
-                selectedT2ContentSet = T2ContentSet.BCampGear2025;
-                ApplySelectionsToManagers();
-                break;
             case MenuAction.SelectRaycastBaseline:
                 selectedCondition = InteractionCondition.RaycastBaseline;
+                ApplySelectionsToManagers();
+                break;
+            case MenuAction.SelectGazeRay:
+                selectedCondition = InteractionCondition.GazeRay;
                 ApplySelectionsToManagers();
                 break;
             case MenuAction.SelectExplicitDisplayFocus:
@@ -258,6 +249,10 @@ public class VRTaskMenuManager : MonoBehaviour
                 ApplySelectionsToManagers();
                 break;
             case MenuAction.BeginTraining:
+                if (!CanStartSelectedCondition())
+                {
+                    break;
+                }
                 ApplySelectionsToManagers();
                 if (selectedTask == PrototypeTask.T2WebBrowsing)
                 {
@@ -269,6 +264,10 @@ public class VRTaskMenuManager : MonoBehaviour
                 }
                 break;
             case MenuAction.BeginMain:
+                if (!CanStartSelectedCondition())
+                {
+                    break;
+                }
                 ApplySelectionsToManagers();
                 if (selectedTask == PrototypeTask.T2WebBrowsing)
                 {
@@ -280,6 +279,12 @@ public class VRTaskMenuManager : MonoBehaviour
                 }
                 break;
             case MenuAction.EndTraining:
+                if (focusPointingTaskManager != null
+                    && focusPointingTaskManager.CurrentPhase == FocusPointingTaskPhase.Training
+                    && !focusPointingTaskManager.CanEndTraining)
+                {
+                    break;
+                }
                 ReturnActiveTaskToSelection();
                 break;
             case MenuAction.AbortMainTask:
@@ -304,9 +309,10 @@ public class VRTaskMenuManager : MonoBehaviour
 
         if (webViewSessionManager != null)
         {
+            selectedT2ContentSet = T2ContentSet.ACampGear2024;
             webViewSessionManager.SetSelectedCondition(selectedCondition);
             webViewSessionManager.SetSelectedLayout(DisplayLayoutPreset.UpDownDepth);
-            webViewSessionManager.SetSelectedContentSet(selectedT2ContentSet);
+            webViewSessionManager.SetSelectedContentSet(T2ContentSet.ACampGear2024);
         }
 
         if (inputManager != null && !inputManager.IsConditionLocked)
@@ -323,7 +329,8 @@ public class VRTaskMenuManager : MonoBehaviour
         {
             gazeDisplayFocusManager?.SetHighlightEnabled(true);
             raycastPointer?.SetRayVisualSettings(
-                selectedCondition == InteractionCondition.RaycastBaseline,
+                selectedCondition == InteractionCondition.RaycastBaseline
+                    || selectedCondition == InteractionCondition.GazeRay,
                 RayVisualLengthLevel.Long);
         }
 
@@ -349,10 +356,7 @@ public class VRTaskMenuManager : MonoBehaviour
                 : experimentManager.CurrentLayout;
         }
 
-        if (webViewSessionManager != null)
-        {
-            selectedT2ContentSet = webViewSessionManager.SelectedContentSet;
-        }
+        selectedT2ContentSet = T2ContentSet.ACampGear2024;
     }
 
     private void SyncConditionFromInput()
@@ -491,8 +495,6 @@ public class VRTaskMenuManager : MonoBehaviour
         {
             AddButtonSpecs(LayoutButtonSpecs, createObjects);
         }
-
-        AddButtonSpecs(T2ContentSetButtonSpecs, createObjects);
 
         AddButtonSpecs(TaskControlButtonSpecs, createObjects);
     }
@@ -635,14 +637,12 @@ public class VRTaskMenuManager : MonoBehaviour
         {
             case MenuAction.SelectT1FocusPointing:
             case MenuAction.SelectT2WebBrowsing:
+            case MenuAction.SelectGazeRay:
             case MenuAction.SelectExplicitDisplayFocus:
                 return 19;
             case MenuAction.SelectUpDownDepth:
             case MenuAction.SelectLeftRight:
             case MenuAction.SelectUpDown:
-            case MenuAction.SelectT2ContentSetA:
-            case MenuAction.SelectT2ContentSetB:
-                return 14;
             default:
                 return 21;
         }
@@ -807,14 +807,14 @@ public class VRTaskMenuManager : MonoBehaviour
         if (layoutSection != null)
         {
             layoutSection.SetActive(selectionVisible
-                && (selectedTask == PrototypeTask.T2WebBrowsing || showLayoutButtons));
+                && selectedTask == PrototypeTask.T1FocusPointing
+                && showLayoutButtons
+                && !(focusPointingTaskManager?.UsesFixedMainTaskSequence ?? false));
         }
 
         if (layoutSectionText != null)
         {
-            layoutSectionText.text = selectedTask == PrototypeTask.T2WebBrowsing
-                ? "T2 CONTENT SET"
-                : "T1 TASK";
+            layoutSectionText.text = "T1 TASK";
         }
 
         if (statusText != null)
@@ -825,11 +825,15 @@ public class VRTaskMenuManager : MonoBehaviour
             DisplayLayoutPreset activeLayout = selectedTask == PrototypeTask.T2WebBrowsing
                 ? DisplayLayoutPreset.UpDownDepth
                 : selectedLayout;
+            string layoutLabel = selectedTask == PrototypeTask.T1FocusPointing
+                && (focusPointingTaskManager?.UsesFixedMainTaskSequence ?? false)
+                    ? "Task A → B → C"
+                    : GetLayoutDisplayName(activeLayout);
             statusText.text =
                 $"{GetTaskDisplayName(selectedTask)}  |  {GetConditionDisplayName(selectedCondition)}" +
-                $"{orderSummary}  |  {GetLayoutDisplayName(activeLayout)}\n" +
+                $"{orderSummary}  |  {layoutLabel}\n" +
                 $"Visual feedback: Highlight ON  |  Controller Ray " +
-                $"{(selectedCondition == InteractionCondition.RaycastBaseline ? "Long" : "OFF")}";
+                $"{(selectedCondition == InteractionCondition.ExplicitDisplayFocus ? "OFF" : "Long")}";
         }
 
         if (menuPanel != null)
@@ -847,16 +851,20 @@ public class VRTaskMenuManager : MonoBehaviour
 
     private static string GetConditionDisplayName(InteractionCondition condition)
     {
-        return condition == InteractionCondition.ExplicitDisplayFocus
-            ? GazeJoystickMethodLabel
-            : RaycastingMethodLabel;
+        switch (condition)
+        {
+            case InteractionCondition.GazeRay:
+                return GazeRayMethodLabel;
+            case InteractionCondition.ExplicitDisplayFocus:
+                return GazeJoystickMethodLabel;
+            default:
+                return RaycastingMethodLabel;
+        }
     }
 
     private static string GetT2ContentSetDisplayName(T2ContentSet contentSet)
     {
-        return contentSet == T2ContentSet.ACampGear2024
-            ? "Content A"
-            : "Content B";
+        return "2024 Content";
     }
 
     private static void SetButtonRect(ref MenuButton button, Rect normalizedRect)
@@ -887,7 +895,14 @@ public class VRTaskMenuManager : MonoBehaviour
     {
         if (IsTrainingVisible())
         {
-            return action == MenuAction.EndTraining;
+            if (action != MenuAction.EndTraining)
+            {
+                return false;
+            }
+
+            return focusPointingTaskManager == null
+                || focusPointingTaskManager.CurrentPhase != FocusPointingTaskPhase.Training
+                || focusPointingTaskManager.CanEndTraining;
         }
 
         if (IsMainTaskVisible())
@@ -902,11 +917,6 @@ public class VRTaskMenuManager : MonoBehaviour
                 return false;
             }
 
-            if (action == MenuAction.SelectT2ContentSetA || action == MenuAction.SelectT2ContentSetB)
-            {
-                return selectedTask == PrototypeTask.T2WebBrowsing;
-            }
-
             if (action == MenuAction.BeginTraining && selectedTask == PrototypeTask.T2WebBrowsing)
             {
                 return false;
@@ -916,7 +926,9 @@ public class VRTaskMenuManager : MonoBehaviour
                 || action == MenuAction.SelectLeftRight
                 || action == MenuAction.SelectUpDown)
             {
-                return selectedTask == PrototypeTask.T1FocusPointing && showLayoutButtons;
+                return selectedTask == PrototypeTask.T1FocusPointing
+                    && showLayoutButtons
+                    && !(focusPointingTaskManager?.UsesFixedMainTaskSequence ?? false);
             }
 
             return true;
@@ -973,13 +985,35 @@ public class VRTaskMenuManager : MonoBehaviour
     {
         return (action == MenuAction.SelectT1FocusPointing && selectedTask == PrototypeTask.T1FocusPointing)
             || (action == MenuAction.SelectT2WebBrowsing && selectedTask == PrototypeTask.T2WebBrowsing)
-            || (action == MenuAction.SelectT2ContentSetA && selectedT2ContentSet == T2ContentSet.ACampGear2024)
-            || (action == MenuAction.SelectT2ContentSetB && selectedT2ContentSet == T2ContentSet.BCampGear2025)
             || (action == MenuAction.SelectRaycastBaseline && selectedCondition == InteractionCondition.RaycastBaseline)
+            || (action == MenuAction.SelectGazeRay && selectedCondition == InteractionCondition.GazeRay)
             || (action == MenuAction.SelectExplicitDisplayFocus && selectedCondition == InteractionCondition.ExplicitDisplayFocus)
             || (action == MenuAction.SelectUpDownDepth && selectedLayout == DisplayLayoutPreset.LeftRight)
             || (action == MenuAction.SelectLeftRight && selectedLayout == DisplayLayoutPreset.UpDown)
             || (action == MenuAction.SelectUpDown && selectedLayout == DisplayLayoutPreset.UpDownDepth);
+    }
+
+    private bool CanStartSelectedCondition()
+    {
+        if (selectedCondition != InteractionCondition.GazeRay)
+        {
+            return true;
+        }
+
+        if (gazeProvider == null)
+        {
+            Debug.LogError("[VRTaskMenu] GazeRay cannot start because GazeProvider is missing.");
+            return false;
+        }
+
+        if (gazeProvider.ConfiguredGazeSource != GazeSource.EyeTracking
+            || gazeProvider.IsEyeTrackingAvailable())
+        {
+            return true;
+        }
+
+        Debug.LogError("[VRTaskMenu] GazeRay experiment cannot start because Eye Tracking is unavailable. Select a development gaze source only for Editor debugging.");
+        return false;
     }
 
     private DisplaySurface FindMenuDisplay()

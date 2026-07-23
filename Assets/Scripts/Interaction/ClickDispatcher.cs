@@ -121,15 +121,15 @@ public class ClickDispatcher : MonoBehaviour
             return;
         }
 
-        if (raycastPointer != null
-            && displayManager.TryGetForemostHit(raycastPointer.CurrentRay, out DisplayHit taskControlHit)
+        if (TryGetTaskControlPointerHit(out DisplayHit taskControlHit)
             && TryHandleTaskControlClick(taskControlHit.DisplayId, taskControlHit.Normalized))
         {
             LastClickResult = $"{taskControlHit.DisplayId} taskControl=True";
             return;
         }
 
-        if (inputManager.CurrentCondition == InteractionCondition.RaycastBaseline)
+        if (inputManager.CurrentCondition == InteractionCondition.RaycastBaseline
+            || inputManager.CurrentCondition == InteractionCondition.GazeRay)
         {
             DispatchRaycastBaselineClick();
             return;
@@ -198,6 +198,13 @@ public class ClickDispatcher : MonoBehaviour
         }
 
         if (inputManager.CurrentCondition == InteractionCondition.RaycastBaseline
+            && inputManager.TriggerPressed
+            && TryLatchDirectWebViewDrag(WebViewPointerActivation.Trigger))
+        {
+            return true;
+        }
+
+        if (inputManager.CurrentCondition == InteractionCondition.GazeRay
             && inputManager.TriggerPressed
             && TryLatchDirectWebViewDrag(WebViewPointerActivation.Trigger))
         {
@@ -475,7 +482,8 @@ public class ClickDispatcher : MonoBehaviour
             return false;
         }
 
-        if (inputManager.CurrentCondition == InteractionCondition.RaycastBaseline)
+        if (inputManager.CurrentCondition == InteractionCondition.RaycastBaseline
+            || inputManager.CurrentCondition == InteractionCondition.GazeRay)
         {
             return true;
         }
@@ -635,15 +643,16 @@ public class ClickDispatcher : MonoBehaviour
             return fallbackNormalized;
         }
 
-        if (condition == InteractionCondition.RaycastBaseline
+        if ((condition == InteractionCondition.RaycastBaseline || condition == InteractionCondition.GazeRay)
             && lockedDisplay != null
             && raycastPointer != null)
         {
             Ray ray = raycastPointer.CurrentRay;
             if (ray.direction != Vector3.zero
-                && lockedDisplay.TryRayToClampedNormalized(ray, out Vector2 clampedNormalized))
+                && displayManager != null
+                && displayManager.TryGetHitOnDisplay(lockedDisplay, ray, out DisplayHit lockedHit))
             {
-                return clampedNormalized;
+                return lockedHit.Normalized;
             }
         }
 
@@ -655,18 +664,20 @@ public class ClickDispatcher : MonoBehaviour
         display = null;
         normalized = Vector2.zero;
 
-        if (inputManager.CurrentCondition == InteractionCondition.RaycastBaseline)
+        if (inputManager.CurrentCondition == InteractionCondition.RaycastBaseline
+            || inputManager.CurrentCondition == InteractionCondition.GazeRay)
         {
             if (raycastPointer == null || displayManager == null)
             {
                 return false;
             }
 
-            if (!displayManager.TryGetForemostHit(raycastPointer.CurrentRay, out DisplayHit hit) || hit.Display == null)
+            if (!displayManager.HasCurrentRaycastHit)
             {
                 return false;
             }
 
+            DisplayHit hit = displayManager.CurrentRaycastHit;
             display = hit.Display;
             normalized = hit.Normalized;
             return HasInputConsumingWebView(display);
@@ -713,8 +724,17 @@ public class ClickDispatcher : MonoBehaviour
             return false;
         }
 
-        return condition != InteractionCondition.ExplicitDisplayFocus
-            || (displayManager != null && displayManager.FocusedDisplay == display);
+        if (condition == InteractionCondition.ExplicitDisplayFocus)
+        {
+            return displayManager != null && displayManager.FocusedDisplay == display;
+        }
+
+        if (condition == InteractionCondition.GazeRay)
+        {
+            return raycastPointer != null && raycastPointer.GazeSelectedDisplay == display;
+        }
+
+        return true;
     }
 
     private string GetActiveWebViewDragDisplayId()
@@ -928,6 +948,28 @@ public class ClickDispatcher : MonoBehaviour
                 && webViewSessionManager.TryHandleTaskControlClick(displayId, normalizedPosition));
     }
 
+    private bool TryGetTaskControlPointerHit(out DisplayHit hit)
+    {
+        hit = default;
+        if (displayManager == null || raycastPointer == null)
+        {
+            return false;
+        }
+
+        if (inputManager != null && inputManager.CurrentCondition == InteractionCondition.GazeRay)
+        {
+            if (!displayManager.HasCurrentRaycastHit)
+            {
+                return false;
+            }
+
+            hit = displayManager.CurrentRaycastHit;
+            return hit.Display != null;
+        }
+
+        return displayManager.TryGetForemostHit(raycastPointer.CurrentRay, out hit);
+    }
+
     private bool TryHandleWebViewClick(DisplaySurface display, Vector2 normalizedPosition)
     {
         if (display == null)
@@ -990,7 +1032,17 @@ public class ClickDispatcher : MonoBehaviour
             return false;
         }
 
-        if (!displayManager.TryGetForemostHit(raycastPointer.CurrentRay, out DisplayHit menuHit))
+        DisplayHit menuHit;
+        if (inputManager != null && inputManager.CurrentCondition == InteractionCondition.GazeRay)
+        {
+            if (!displayManager.HasCurrentRaycastHit)
+            {
+                return false;
+            }
+
+            menuHit = displayManager.CurrentRaycastHit;
+        }
+        else if (!displayManager.TryGetForemostHit(raycastPointer.CurrentRay, out menuHit))
         {
             return false;
         }

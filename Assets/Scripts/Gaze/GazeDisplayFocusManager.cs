@@ -19,6 +19,7 @@ public class GazeDisplayFocusManager : MonoBehaviour
     [Tooltip("現在、ポインティングハイライトを表示している対象。入力フォーカスとは独立した状態。")]
     [SerializeField] private DisplaySurface currentFocusedTarget;
     [SerializeField] private InteractionCondition currentInteractionMethod = InteractionCondition.RaycastBaseline;
+    [SerializeField] private RaycastPointer raycastPointer;
 
     private bool appliedHighlightEnabled;
     private bool initialized;
@@ -115,6 +116,10 @@ public class GazeDisplayFocusManager : MonoBehaviour
                 ? displayManager.CurrentRaycastHit.Display
                 : null;
         }
+        else if (currentInteractionMethod == InteractionCondition.GazeRay)
+        {
+            target = raycastPointer != null ? raycastPointer.GazeSelectedDisplay : null;
+        }
         else if (gazeProvider != null)
         {
             Ray gazeRay = gazeProvider.GetGazeRay();
@@ -190,6 +195,11 @@ public class GazeDisplayFocusManager : MonoBehaviour
         if (gazeProvider == null)
         {
             gazeProvider = FindObjectOfType<GazeProvider>();
+        }
+
+        if (raycastPointer == null)
+        {
+            raycastPointer = FindObjectOfType<RaycastPointer>();
         }
 
         if (displayManager == null)

@@ -1275,6 +1275,7 @@ GameObject:
   - component: {fileID: 1045802461}
   - component: {fileID: 1045802462}
   - component: {fileID: 1045802463}
+  - component: {fileID: 1045802464}
   m_Layer: 0
   m_Name: Prototype_Managers
   m_TagString: Untagged
@@ -1433,6 +1434,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   inputManager: {fileID: 1045802450}
   displayManager: {fileID: 1045802448}
+  gazeProvider: {fileID: 0}
+  logger: {fileID: 0}
   rightControllerTransform: {fileID: 2098682404}
   rayLine: {fileID: 0}
   showRayLine: 1
@@ -1442,8 +1445,11 @@ MonoBehaviour:
   longRayLength: 4
   rayStartWidth: 0.007
   rayEndWidth: 0.002
-  rayColor: {r: 0.4, g: 0.8, b: 1, a: 0.55}
+  rayColor: {r: 0.4, g: 0.8, b: 1, a: 1}
+  rayHitSurfaceOffsetMeters: 0.01
   logRayVisualSettingChanges: 1
+  gazeInvalidPolicy: 0
+  gazeDisplaySwitchDwellSeconds: 0
 --- !u!114 &1045802446
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1594,6 +1600,8 @@ MonoBehaviour:
   layoutManager: {fileID: 1045802447}
   raycastPointer: {fileID: 1045802445}
   focusManager: {fileID: 1045802446}
+  virtualCursorController: {fileID: 1045802444}
+  scrollController: {fileID: 0}
   gazeDisplayFocusManager: {fileID: 1045802461}
   debugInputProvider: {fileID: 1045802454}
   logger: {fileID: 1045802441}
@@ -1712,6 +1720,8 @@ MonoBehaviour:
   selectedLayout: 1
   taskOrder: 0
   methodOrder: 0
+  runFixedMainTaskSequence: 1
+  mainBlockStartLockSeconds: 30
   conditionOrder: 0
   conditionAName: ConditionA
   conditionBName: ConditionB
@@ -1877,6 +1887,7 @@ MonoBehaviour:
   logStateChanges: 1
   currentFocusedTarget: {fileID: 0}
   currentInteractionMethod: 0
+  raycastPointer: {fileID: 0}
 --- !u!114 &1045802462
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1905,7 +1916,7 @@ MonoBehaviour:
   initialUrl: https://www.youtube.com
   enableSecondaryWebView: 1
   secondaryDisplayId: Display_A_Front
-  secondaryInitialUrl: http://133.87.151.95:5173/
+  secondaryInitialUrl: http://133.87.151.83:5173/
   autoAddTLabBridgeToSecondaryDisplay: 1
   disableOtherWebViewsOnStart: 1
   disableWebViewOnReturn: 1
@@ -1923,7 +1934,9 @@ MonoBehaviour:
   d2vPauseRangeSetBSeconds: {x: 948, y: 1011}
   comparisonPageResourceSetA: 
   comparisonPageResourceSetB: 
-  totalTaskDurationSeconds: 600
+  practiceInstructionRounds: 2
+  totalTaskDurationSeconds: 720
+  candidateConfirmationUnlockSeconds: 690
   practiceStageTimeoutSeconds: 0
   v2dStageTimeoutSeconds: 0
   d2vStageTimeoutSeconds: 0
@@ -1939,16 +1952,21 @@ MonoBehaviour:
   startGateButtonColor: {r: 0.5019608, g: 0.8117647, b: 1, a: 1}
   startGateCountdownColor: {r: 0.1254902, g: 0.1254902, b: 0.1254902, a: 1}
   showInstructionPanelAboveBackDisplay: 1
-  instructionPanelSizePixels: {x: 1300, y: 300}
+  instructionPanelSizePixels: {x: 1600, y: 180}
   instructionPanelScale: 0.0009
-  instructionPanelPhaseFontSize: 32
-  instructionPanelMessageFontSize: 44
-  instructionPanelVerticalGapMeters: 0.08
+  instructionPanelPhaseFontSize: 30
+  instructionPanelMessageFontSize: 42
+  instructionPanelVerticalGapMeters: 0.01
   instructionPanelDepthOffsetMeters: 0
   instructionPanelSortingOrder: 70
   instructionPanelColor: {r: 0.035, g: 0.075, b: 0.13, a: 0.96}
   instructionReminderColor: {r: 0.34, g: 0.16, b: 0.025, a: 0.98}
   instructionCompleteColor: {r: 0.035, g: 0.24, b: 0.13, a: 0.98}
+  emphasizeInstructionChanges: 1
+  instructionChangeAttentionSeconds: 3
+  instructionChangePulseFrequency: 2.5
+  instructionChangeScaleMultiplier: 1.04
+  instructionChangeAttentionColor: {r: 0.08, g: 0.52, b: 0.92, a: 0.99}
 --- !u!114 &1045802463
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1978,6 +1996,27 @@ MonoBehaviour:
   panelColor: {r: 0.08, g: 0.025, b: 0.035, a: 0.97}
   panelHoverColor: {r: 0.24, g: 0.055, b: 0.065, a: 0.99}
   progressColor: {r: 0.96, g: 0.28, b: 0.18, a: 1}
+--- !u!114 &1045802464
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1045802439}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f7a8b9c0d1e24f56a7b8c9d0e1f2a3b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  hmdCamera: {fileID: 2098682403}
+  rightControllerTransform: {fileID: 2098682404}
+  inputManager: {fileID: 1045802450}
+  experimentManager: {fileID: 1045802451}
+  gazeProvider: {fileID: 1045802449}
+  displayManager: {fileID: 1045802448}
+  virtualCursorController: {fileID: 1045802444}
+  focusPointingTaskManager: {fileID: 1045802456}
+  webViewSessionManager: {fileID: 1045802462}
 --- !u!1 &1172880932
 GameObject:
   m_ObjectHideFlags: 0

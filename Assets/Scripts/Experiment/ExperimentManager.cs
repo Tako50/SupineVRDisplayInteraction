@@ -14,6 +14,8 @@ public class ExperimentManager : MonoBehaviour
     [SerializeField] private DisplayLayoutManager layoutManager;
     [SerializeField] private RaycastPointer raycastPointer;
     [SerializeField] private FocusManager focusManager;
+    [SerializeField] private VirtualCursorController virtualCursorController;
+    [SerializeField] private ScrollController scrollController;
     [SerializeField] private GazeDisplayFocusManager gazeDisplayFocusManager;
     [SerializeField] private EditorDebugInputProvider debugInputProvider;
     [SerializeField] private Logger logger;
@@ -121,7 +123,8 @@ public class ExperimentManager : MonoBehaviour
 
     public void ApplyRayVisualForCurrentCondition()
     {
-        bool showBaselineLongRay = CurrentCondition == InteractionCondition.RaycastBaseline;
+        bool showBaselineLongRay = CurrentCondition == InteractionCondition.RaycastBaseline
+            || CurrentCondition == InteractionCondition.GazeRay;
         ApplyRayVisualSettings(showBaselineLongRay, RayVisualLengthLevel.Long);
         lastRayVisualCondition = CurrentCondition;
         hasAppliedRayVisualCondition = true;
@@ -198,16 +201,66 @@ public class ExperimentManager : MonoBehaviour
             return;
         }
 
-        DisplayHit gazeHit = default;
-        bool hasGazeHit = false;
-
         bool hasRayHit = displayManager.HasCurrentRaycastHit;
         DisplayHit rayHit = hasRayHit ? displayManager.CurrentRaycastHit : default;
         Ray controllerRay = raycastPointer != null ? raycastPointer.CurrentRay : default;
 
         if (logger != null && logger.ShouldSample())
         {
-            logger.LogFrame(inputManager.CurrentCondition, currentLayout, gazeProvider.CurrentGazeSource, rayHit, hasRayHit, gazeHit, hasGazeHit, displayManager.FocusedDisplay, controllerRay.origin, controllerRay.direction);
+            Ray gazeRay = gazeProvider.GetGazeRay();
+            bool hasGazeHit = displayManager.TryGetForemostHit(gazeRay, out DisplayHit gazeHit);
+
+            bool hasCursor = false;
+            string cursorDisplayId = "None";
+            Vector2 cursorNormalized = Vector2.zero;
+            if ((inputManager.CurrentCondition == InteractionCondition.RaycastBaseline
+                    || inputManager.CurrentCondition == InteractionCondition.GazeRay)
+                && hasRayHit)
+            {
+                hasCursor = true;
+                cursorDisplayId = rayHit.DisplayId;
+                cursorNormalized = rayHit.Normalized;
+            }
+            else if (inputManager.CurrentCondition == InteractionCondition.ExplicitDisplayFocus
+                && displayManager.FocusedDisplay != null
+                && virtualCursorController != null)
+            {
+                hasCursor = true;
+                cursorDisplayId = displayManager.FocusedDisplay.name;
+                cursorNormalized = virtualCursorController.NormalizedPosition;
+            }
+
+            logger.LogFrame(
+                inputManager.CurrentCondition,
+                currentLayout,
+                rayHit,
+                hasRayHit,
+                gazeHit,
+                hasGazeHit,
+                displayManager.FocusedDisplay,
+                cursorDisplayId,
+                cursorNormalized,
+                hasCursor,
+                controllerRay.origin,
+                controllerRay.direction);
+
+            if (inputManager.CurrentCondition == InteractionCondition.GazeRay && raycastPointer != null)
+            {
+                logger.LogGazeRayFrame(
+                    raycastPointer.GazeValid,
+                    raycastPointer.GazeHitDisplayId,
+                    raycastPointer.GazeSelectedDisplay != null ? raycastPointer.GazeSelectedDisplay.name : "None",
+                    rayHit,
+                    hasRayHit,
+                    controllerRay.origin,
+                    controllerRay.direction,
+                    raycastPointer.PenetratedDisplayIds,
+                    raycastPointer.GazeDisplaySwitchCount,
+                    raycastPointer.TriggerPressCount,
+                    scrollController != null ? scrollController.LastScrollDisplayId : "None",
+                    raycastPointer.InvalidGazePolicy,
+                    raycastPointer.GazeDisplaySwitchDwellSeconds);
+            }
         }
 
         if (Time.time >= nextDebugLogTime)
@@ -251,6 +304,16 @@ public class ExperimentManager : MonoBehaviour
         if (focusManager == null)
         {
             focusManager = FindObjectOfType<FocusManager>();
+        }
+
+        if (virtualCursorController == null)
+        {
+            virtualCursorController = FindObjectOfType<VirtualCursorController>();
+        }
+
+        if (scrollController == null)
+        {
+            scrollController = FindObjectOfType<ScrollController>();
         }
 
         if (gazeDisplayFocusManager == null)

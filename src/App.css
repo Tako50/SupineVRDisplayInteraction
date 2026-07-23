@@ -477,6 +477,16 @@ h1 {
   font-weight: 800;
 }
 
+.confirmation-lock-notice {
+  margin: 18px 0 0;
+  padding: 14px 18px;
+  border: 2px solid #d7a54b;
+  border-radius: 12px;
+  background: #44351d;
+  color: #ffe3a8;
+  font-weight: 800;
+}
+
 .confirm-button {
   width: 100%;
   margin-top: 34px;

@@ -120,9 +120,18 @@ public class PrototypeInputManager : MonoBehaviour
 
     private void ToggleCondition()
     {
-        SetCondition(currentCondition == InteractionCondition.RaycastBaseline
-            ? InteractionCondition.ExplicitDisplayFocus
-            : InteractionCondition.RaycastBaseline);
+        switch (currentCondition)
+        {
+            case InteractionCondition.RaycastBaseline:
+                SetCondition(InteractionCondition.GazeRay);
+                break;
+            case InteractionCondition.GazeRay:
+                SetCondition(InteractionCondition.ExplicitDisplayFocus);
+                break;
+            default:
+                SetCondition(InteractionCondition.RaycastBaseline);
+                break;
+        }
     }
 
     private void ReadInputs()

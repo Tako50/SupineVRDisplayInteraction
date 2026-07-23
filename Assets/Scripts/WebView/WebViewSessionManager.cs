@@ -91,23 +91,25 @@ public class WebViewSessionManager : MonoBehaviour
 
     [Header("T2 Content")]
     [SerializeField] private string youtubeUrlSetA = "https://www.youtube.com/watch?v=oCKnZl-XT1Y";
-    [SerializeField] private string youtubeUrlSetB = "https://www.youtube.com/watch?v=wIHPxl6OPOc";
     [Tooltip("Forces YouTube's HTML video element to unmute when T2 telemetry attaches or playback starts.")]
     [SerializeField] private bool forceYoutubeUnmuted = true;
     [Range(0f, 1f)]
     [SerializeField] private float youtubeForcedVolume = 1f;
     [Tooltip("Strict D2V completion range for Content A. The task completes only when the D2V target detail has been opened and YouTube is paused within this range during the D2V stage.")]
     [SerializeField] private Vector2 d2vPauseRangeSetASeconds = new Vector2(688f, 743f);
-    [Tooltip("Strict D2V completion range for Content B. The task completes only when the D2V target detail has been opened and YouTube is paused within this range during the D2V stage.")]
-    [SerializeField] private Vector2 d2vPauseRangeSetBSeconds = new Vector2(948f, 1011f);
     [Tooltip("Optional TextAsset Resources path for a packaged T2 page. Leave empty to use Secondary Initial Url.")]
     [SerializeField] private string comparisonPageResourceSetA = "";
-    [Tooltip("Optional TextAsset Resources path for a packaged T2 page. Leave empty to use Secondary Initial Url.")]
-    [SerializeField] private string comparisonPageResourceSetB = "";
 
     [Header("T2 Procedure")]
+    [Tooltip("Number of complete P01-P08 instruction rounds presented during practice.")]
+    [Min(1)]
+    [SerializeField] private int practiceInstructionRounds = 2;
+    [Tooltip("Main-task duration, measured from the practice-to-Main transition.")]
     [Min(10f)]
-    [SerializeField] private float totalTaskDurationSeconds = 600f;
+    [SerializeField] private float totalTaskDurationSeconds = 720f;
+    [Tooltip("Minimum elapsed time from Main start before the final candidate can be confirmed.")]
+    [Min(0f)]
+    [SerializeField] private float candidateConfirmationUnlockSeconds = 690f;
     [Tooltip("Practice stage timeout in seconds. Set to 0 until the experiment value is decided.")]
     [Min(0f)]
     [SerializeField] private float practiceStageTimeoutSeconds;
@@ -141,20 +143,29 @@ public class WebViewSessionManager : MonoBehaviour
     [Tooltip("Shows the current T2 instruction above Display_B_Back.")]
     [FormerlySerializedAs("showInstructionPanelBetweenDisplays")]
     [SerializeField] private bool showInstructionPanelAboveBackDisplay = true;
-    [SerializeField] private Vector2 instructionPanelSizePixels = new Vector2(1300f, 300f);
+    [SerializeField] private Vector2 instructionPanelSizePixels = new Vector2(1600f, 180f);
     [SerializeField] private float instructionPanelScale = 0.0009f;
     [Min(8)]
-    [SerializeField] private int instructionPanelPhaseFontSize = 32;
+    [SerializeField] private int instructionPanelPhaseFontSize = 30;
     [Min(8)]
-    [SerializeField] private int instructionPanelMessageFontSize = 44;
+    [SerializeField] private int instructionPanelMessageFontSize = 42;
     [Tooltip("Space between the upper edge of Display_B_Back and the lower edge of the instruction panel.")]
-    [SerializeField] private float instructionPanelVerticalGapMeters = 0.08f;
+    [SerializeField] private float instructionPanelVerticalGapMeters = 0.01f;
     [Tooltip("Moves the panel along Display_B_Back's forward axis. Keep this near zero unless z-fighting appears.")]
     [SerializeField] private float instructionPanelDepthOffsetMeters;
     [SerializeField] private int instructionPanelSortingOrder = 70;
     [SerializeField] private Color instructionPanelColor = new Color(0.035f, 0.075f, 0.13f, 0.96f);
     [SerializeField] private Color instructionReminderColor = new Color(0.34f, 0.16f, 0.025f, 0.98f);
     [SerializeField] private Color instructionCompleteColor = new Color(0.035f, 0.24f, 0.13f, 0.98f);
+    [Tooltip("Briefly pulses the instruction panel when the displayed instruction changes. The first instruction is not emphasized.")]
+    [SerializeField] private bool emphasizeInstructionChanges = true;
+    [Min(0.1f)]
+    [SerializeField] private float instructionChangeAttentionSeconds = 3f;
+    [Min(0.25f)]
+    [SerializeField] private float instructionChangePulseFrequency = 2.5f;
+    [Range(1f, 1.2f)]
+    [SerializeField] private float instructionChangeScaleMultiplier = 1.04f;
+    [SerializeField] private Color instructionChangeAttentionColor = new Color(0.08f, 0.52f, 0.92f, 0.99f);
 
     private InteractionCondition selectedCondition = InteractionCondition.RaycastBaseline;
     private DisplayLayoutPreset selectedLayout = DisplayLayoutPreset.UpDownDepth;
@@ -173,9 +184,12 @@ public class WebViewSessionManager : MonoBehaviour
     private float nextTelemetryRefreshTime;
     private float currentStageStartTime;
     private T2MainStage mainStage;
+    private bool awaitingPostTimeoutSelection;
     private bool awaitingPostTaskReset;
     private bool resultWritten;
     private string selectedCandidate = string.Empty;
+    private string postTimeoutFinalSelection = string.Empty;
+    private float postTimeoutSelectionTime = -1f;
     private string pendingResult = string.Empty;
     private string resultNote = string.Empty;
     private int youtubeOperationCount;
@@ -186,6 +200,7 @@ public class WebViewSessionManager : MonoBehaviour
     private float youtubePauseStartedAt = -1f;
     private float webScrollAmount;
     private float practiceStepScrollAmount;
+    private int completedPracticeRounds;
     private int webClickCount;
     private int detailPageOpenCount;
     private int candidateAddCount;
@@ -196,6 +211,8 @@ public class WebViewSessionManager : MonoBehaviour
     private bool d2vTargetDetailOpened;
     private bool practiceCandidatesReset;
     private bool practiceCompletionLogged;
+    private bool candidateConfirmationUnlockLogged;
+    private bool candidateListOpenedAtUnlock;
     private int displaySwitchCount;
     private int clutchCount;
     private float controllerMovementAmount;
@@ -216,12 +233,17 @@ public class WebViewSessionManager : MonoBehaviour
     private Quaternion lastInstructionDisplayARotation;
     private Vector3 lastInstructionDisplayBPosition;
     private Quaternion lastInstructionDisplayBRotation;
+    private string lastInstructionSignature = string.Empty;
+    private float instructionChangeAttentionStartedAt = -1f;
+    private Color instructionPanelBaseColor;
     private SyncMarkerController syncMarkerController;
     private bool startSyncMarkerLogged;
     private bool endSyncMarkerLogged;
 
     public WebViewSessionPhase CurrentPhase => currentPhase;
     public bool IsSessionRunning => currentPhase != WebViewSessionPhase.ConditionSelection;
+    public string ParticipantId => participantId;
+    public string SessionId => sessionId;
     public string InitialUrl => initialUrl;
     public string SecondaryInitialUrl => secondaryInitialUrl;
     public WebViewInputMode InputMode => inputMode;
@@ -254,6 +276,11 @@ public class WebViewSessionManager : MonoBehaviour
                 UpdateTaskTiming();
             }
         }
+        else if (awaitingPostTimeoutSelection)
+        {
+            RefreshWebTelemetryIfNeeded();
+            TryOpenCandidateListAtUnlock();
+        }
 
         if (!IsSessionRunning || inputManager == null || !inputManager.SecondaryButtonPressed)
         {
@@ -275,12 +302,14 @@ public class WebViewSessionManager : MonoBehaviour
         if (IsSessionRunning && instructionPanelRoot != null && instructionPanelRoot.gameObject.activeSelf)
         {
             UpdateInstructionPanelPoseIfNeeded();
+            UpdateInstructionChangeAttention();
         }
     }
 
     private void OnDisable()
     {
         HideStartGate();
+        StopInstructionChangeAttention();
         SetInstructionPanelVisible(false);
         if (disableWebViewOnReturn)
         {
@@ -310,7 +339,7 @@ public class WebViewSessionManager : MonoBehaviour
     {
         if (!IsSessionRunning)
         {
-            selectedContentSet = contentSet;
+            selectedContentSet = T2ContentSet.ACampGear2024;
         }
     }
 
@@ -371,7 +400,7 @@ public class WebViewSessionManager : MonoBehaviour
         }
 
         WebViewSessionPhase endedPhase = currentPhase;
-        if (taskActive)
+        if (taskActive || awaitingPostTimeoutSelection)
         {
             taskEndTime = taskEndTime > 0f ? taskEndTime : Time.time;
             taskStartTime = taskStartTime > 0f ? taskStartTime : taskEndTime;
@@ -384,9 +413,12 @@ public class WebViewSessionManager : MonoBehaviour
         }
 
         taskActive = false;
+        awaitingPostTimeoutSelection = false;
         awaitingPostTaskReset = false;
         currentPhase = WebViewSessionPhase.ConditionSelection;
         HideStartGate();
+        StopInstructionChangeAttention();
+        lastInstructionSignature = string.Empty;
         SetInstructionPanelVisible(false);
 
         if (disableWebViewOnReturn)
@@ -458,6 +490,16 @@ public class WebViewSessionManager : MonoBehaviour
             return;
         }
 
+        if (awaitingPostTimeoutSelection)
+        {
+            if (string.Equals(role, "web", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(eventType, "candidate", StringComparison.OrdinalIgnoreCase))
+            {
+                HandleCandidateSelection(value);
+            }
+            return;
+        }
+
         if (!taskActive)
         {
             return;
@@ -502,6 +544,8 @@ public class WebViewSessionManager : MonoBehaviour
         activeCondition = selectedCondition;
         currentPhase = phase;
         taskActive = false;
+        StopInstructionChangeAttention();
+        lastInstructionSignature = string.Empty;
         startSyncMarkerLogged = false;
         endSyncMarkerLogged = false;
         syncMarkerController = SyncMarkerController.GetOrCreate();
@@ -680,17 +724,14 @@ public class WebViewSessionManager : MonoBehaviour
 
     private void PrepareSessionUrls()
     {
-        activeYoutubeUrl = selectedContentSet == T2ContentSet.ACampGear2024
-            ? youtubeUrlSetA
-            : youtubeUrlSetB;
+        selectedContentSet = T2ContentSet.ACampGear2024;
+        activeYoutubeUrl = youtubeUrlSetA;
         if (string.IsNullOrWhiteSpace(activeYoutubeUrl))
         {
             activeYoutubeUrl = initialUrl;
         }
 
-        string resourcePath = selectedContentSet == T2ContentSet.ACampGear2024
-            ? comparisonPageResourceSetA
-            : comparisonPageResourceSetB;
+        string resourcePath = comparisonPageResourceSetA;
         activeComparisonPageUrl = BuildLocalComparisonPageUrl(resourcePath);
         if (string.IsNullOrWhiteSpace(activeComparisonPageUrl))
         {
@@ -716,9 +757,7 @@ public class WebViewSessionManager : MonoBehaviour
         {
             string directory = Path.Combine(Application.persistentDataPath, "T2WebContent");
             Directory.CreateDirectory(directory);
-            string fileName = selectedContentSet == T2ContentSet.ACampGear2024
-                ? "t2_content_a.html"
-                : "t2_content_b.html";
+            const string fileName = "t2_content_2024.html";
             string path = Path.Combine(directory, fileName);
             File.WriteAllText(path, page.text);
             return new Uri(path).AbsoluteUri;
@@ -735,6 +774,8 @@ public class WebViewSessionManager : MonoBehaviour
         if (currentPhase == WebViewSessionPhase.Training)
         {
             unifiedTaskStartTime = 0f;
+            candidateConfirmationUnlockLogged = false;
+            candidateListOpenedAtUnlock = false;
         }
 
         taskStartTime = 0f;
@@ -742,9 +783,12 @@ public class WebViewSessionManager : MonoBehaviour
         nextTelemetryRefreshTime = 0f;
         currentStageStartTime = 0f;
         mainStage = T2MainStage.V2D;
+        awaitingPostTimeoutSelection = false;
         awaitingPostTaskReset = false;
         resultWritten = false;
         selectedCandidate = string.Empty;
+        postTimeoutFinalSelection = string.Empty;
+        postTimeoutSelectionTime = -1f;
         pendingResult = string.Empty;
         resultNote = string.Empty;
         youtubeOperationCount = 0;
@@ -755,6 +799,10 @@ public class WebViewSessionManager : MonoBehaviour
         youtubePauseStartedAt = -1f;
         webScrollAmount = 0f;
         practiceStepScrollAmount = 0f;
+        if (currentPhase == WebViewSessionPhase.Training)
+        {
+            completedPracticeRounds = 0;
+        }
         webClickCount = 0;
         detailPageOpenCount = 0;
         candidateAddCount = 0;
@@ -843,15 +891,39 @@ public class WebViewSessionManager : MonoBehaviour
         }
 
         UpdateInstructionCountdown();
-        float totalElapsed = Time.time - unifiedTaskStartTime;
-        if (totalTaskDurationSeconds > 0f && totalElapsed >= totalTaskDurationSeconds)
+        if (currentPhase == WebViewSessionPhase.Training)
         {
-            EndForTimeout(
-                "timeout",
-                "session",
-                totalElapsed,
-                $"overall_limit={totalTaskDurationSeconds:0.000}");
+            CheckCurrentStageTimeout();
             return;
+        }
+
+        float mainElapsed = Mathf.Max(0f, Time.time - taskStartTime);
+        if (totalTaskDurationSeconds > 0f && mainElapsed >= totalTaskDurationSeconds)
+        {
+            BeginPostTimeoutSelection(
+                "timeout",
+                "main",
+                mainElapsed,
+                $"main_limit={totalTaskDurationSeconds:0.000}");
+            return;
+        }
+
+        if (!candidateConfirmationUnlockLogged
+            && mainElapsed >= Mathf.Max(0f, candidateConfirmationUnlockSeconds))
+        {
+            candidateConfirmationUnlockLogged = true;
+            SetMainStage(T2MainStage.Finalize);
+            WriteT2Event(
+                "candidate_confirmation_unlocked",
+                secondaryDisplayId,
+                mainElapsed.ToString("0.000", CultureInfo.InvariantCulture),
+                $"unlock_at={candidateConfirmationUnlockSeconds:0.000}");
+            ApplyCurrentPageInstruction();
+        }
+
+        if (mainElapsed >= Mathf.Max(0f, candidateConfirmationUnlockSeconds))
+        {
+            TryOpenCandidateListAtUnlock();
         }
 
         if (currentPhase == WebViewSessionPhase.MainTask && taskStartTime > 0f)
@@ -859,6 +931,34 @@ public class WebViewSessionManager : MonoBehaviour
             UpdateMainStage();
         }
 
+        CheckCurrentStageTimeout();
+    }
+
+    private void BeginPostTimeoutSelection(string eventType, string stageLabel, float elapsed, string details)
+    {
+        if (awaitingPostTimeoutSelection)
+        {
+            return;
+        }
+
+        pendingResult = "timeout";
+        resultNote = $"stage={stageLabel};elapsed={elapsed:0.000};{details}";
+        taskEndTime = Time.time;
+        EndYouTubePause(taskEndTime);
+        mainStage = T2MainStage.Finalize;
+        currentStageStartTime = 0f;
+        taskActive = false;
+        awaitingPostTimeoutSelection = true;
+        WriteT2Event(eventType, secondaryDisplayId,
+            elapsed.ToString("0.000", CultureInfo.InvariantCulture), resultNote);
+        EmitEndSyncMarkerIfNeeded("main_timeout");
+        TryOpenCandidateListAtUnlock();
+        ApplyCurrentPageInstruction();
+        logger?.LogEvent("T2Web_MainTimeout", activeCondition, secondaryDisplayId, Vector2.zero);
+    }
+
+    private void CheckCurrentStageTimeout()
+    {
         float stageTimeout = GetCurrentStageTimeoutSeconds();
         float stageElapsed = Mathf.Max(0f, Time.time - currentStageStartTime);
         if (stageTimeout > 0f && currentStageStartTime > 0f && stageElapsed >= stageTimeout)
@@ -1033,6 +1133,11 @@ public class WebViewSessionManager : MonoBehaviour
         string javaScript =
             "window.t2SetInstruction&&window.t2SetInstruction('"
             + EscapeJavaScriptString(message) + "','" + state + "');";
+        bool confirmationLocked = IsCandidateConfirmationLocked(out float unlockRemainingSeconds);
+        javaScript +=
+            "window.t2SetConfirmationLock&&window.t2SetConfirmationLock("
+            + (confirmationLocked ? "true" : "false") + ","
+            + Mathf.CeilToInt(unlockRemainingSeconds).ToString(CultureInfo.InvariantCulture) + ");";
         activeSecondaryWebViewBridge.TryEvaluateJavaScript(javaScript);
     }
 
@@ -1042,6 +1147,13 @@ public class WebViewSessionManager : MonoBehaviour
         {
             message = "選んだ商品を手前Webに表示しています。終了後アンケートに回答し、回答後に「候補リストを削除してホームに戻る」を押してください。";
             state = "complete";
+            return;
+        }
+
+        if (awaitingPostTimeoutSelection)
+        {
+            message = "候補リストを確認し、今回のキャンプをより快適にするために最も良さそうな商品を1つ選び、候補を確定してください。";
+            state = "reminder";
             return;
         }
 
@@ -1055,23 +1167,21 @@ public class WebViewSessionManager : MonoBehaviour
         switch (mainStage)
         {
             case T2MainStage.V2D:
-                message = selectedContentSet == T2ContentSet.ACampGear2024
-                    ? "V2D　奥の動画の4分44秒〜6分20秒付近で紹介されている道具を確認してください。手前Webで同じ商品の詳細ページを開き、候補に追加してください。"
-                    : "V2D　奥の動画の8分46秒〜10分30秒付近で紹介されている道具を確認してください。手前Webで同じ商品の詳細ページを開き、候補に追加してください。";
+                message = "奥の動画の4分44秒〜6分20秒付近で紹介されている道具を確認してください。手前Webで同じ商品の詳細ページを開き、候補に追加してください。";
                 state = "main";
                 return;
             case T2MainStage.D2V:
-                message = selectedContentSet == T2ContentSet.ACampGear2024
-                    ? "D2V　手前Webの「居住・寝具」カテゴリを開き、2番目の商品詳細を確認してください。奥の動画内で紹介場面を探し、一時停止してください。"
-                    : "D2V　手前Webの「火器・調理用品」カテゴリを開き、4番目の商品詳細を確認してください。奥の動画内で紹介場面を探し、一時停止してください。";
+                message = "手前Webの「居住・寝具」カテゴリを開き、2番目の商品詳細を確認してください。奥の動画内で紹介場面を探し、一時停止してください。";
                 state = "main";
                 return;
             case T2MainStage.Finalize:
-                message = "候補リストを確認し、今回のキャンプをより快適にするために最も良さそうな商品を1つ選んで、候補を確定してください。";
+                message = IsCandidateConfirmationLocked(out _)
+                    ? "候補リストを確認し、今回のキャンプをより快適にするために最も良さそうな商品を1つ選んでください。候補の確定は本番開始から11分30秒後に可能になります。"
+                    : "候補リストを確認し、今回のキャンプをより快適にするために最も良さそうな商品を1つ選び、候補を確定してください。";
                 state = "reminder";
                 return;
             default:
-                message = "動画とWebを見比べ、追加・買い替えの候補として良さそうなキャンプ道具をもう1つ候補に追加してください。追加すると最終候補の確定へ進みます。";
+                message = "動画とWebを自由に見比べ、追加・買い替えの候補として良さそうな動画内の商品を、候補リストに追加してください。候補の数に制限はありません。";
                 state = "main";
                 return;
         }
@@ -1093,13 +1203,60 @@ public class WebViewSessionManager : MonoBehaviour
 
         instructionPanelPhaseText.text = GetInstructionHeaderLabel(state);
         instructionPanelMessageText.text = message;
-        instructionPanelBackground.color = state == "reminder"
+        instructionPanelBaseColor = state == "reminder"
             ? instructionReminderColor
             : state == "complete"
                 ? instructionCompleteColor
                 : instructionPanelColor;
+        instructionPanelBackground.color = instructionPanelBaseColor;
+
+        string instructionSignature = state + "\n" + message;
+        bool instructionChanged = !string.IsNullOrEmpty(lastInstructionSignature)
+            && !string.Equals(lastInstructionSignature, instructionSignature, StringComparison.Ordinal);
+        lastInstructionSignature = instructionSignature;
+        if (instructionChanged && emphasizeInstructionChanges)
+        {
+            instructionChangeAttentionStartedAt = Time.unscaledTime;
+        }
+
         SetInstructionPanelVisible(true);
         UpdateInstructionPanelPoseIfNeeded(true);
+    }
+
+    private void UpdateInstructionChangeAttention()
+    {
+        if (instructionChangeAttentionStartedAt < 0f || instructionPanelBackground == null)
+        {
+            return;
+        }
+
+        float duration = Mathf.Max(0.1f, instructionChangeAttentionSeconds);
+        float elapsed = Time.unscaledTime - instructionChangeAttentionStartedAt;
+        if (elapsed >= duration)
+        {
+            StopInstructionChangeAttention();
+            return;
+        }
+
+        float frequency = Mathf.Max(0.25f, instructionChangePulseFrequency);
+        float pulse = 0.5f + 0.5f * Mathf.Cos(elapsed * frequency * Mathf.PI * 2f);
+        instructionPanelBackground.color = Color.Lerp(instructionPanelBaseColor, instructionChangeAttentionColor, pulse);
+        instructionPanelRoot.localScale = Vector3.one * instructionPanelScale
+            * Mathf.Lerp(1f, instructionChangeScaleMultiplier, pulse);
+    }
+
+    private void StopInstructionChangeAttention()
+    {
+        instructionChangeAttentionStartedAt = -1f;
+        if (instructionPanelBackground != null)
+        {
+            instructionPanelBackground.color = instructionPanelBaseColor;
+        }
+
+        if (instructionPanelRoot != null)
+        {
+            instructionPanelRoot.localScale = Vector3.one * instructionPanelScale;
+        }
     }
 
     private string GetInstructionHeaderLabel(string state)
@@ -1122,12 +1279,23 @@ public class WebViewSessionManager : MonoBehaviour
         }
 
         string header = $"{phaseLabel}  |  {GetMethodLabel()}";
-        if (awaitingPostTaskReset || unifiedTaskStartTime <= 0f || totalTaskDurationSeconds <= 0f)
+        if (awaitingPostTaskReset || awaitingPostTimeoutSelection || taskStartTime <= 0f)
         {
             return header;
         }
 
-        float remainingSeconds = Mathf.Max(0f, totalTaskDurationSeconds - (Time.time - unifiedTaskStartTime));
+        if (currentPhase == WebViewSessionPhase.Training)
+        {
+            return header;
+        }
+
+        float phaseDurationSeconds = totalTaskDurationSeconds;
+        if (phaseDurationSeconds <= 0f)
+        {
+            return header;
+        }
+
+        float remainingSeconds = Mathf.Max(0f, phaseDurationSeconds - (Time.time - taskStartTime));
         return $"{header}  |  {FormatCountdown(remainingSeconds)}";
     }
 
@@ -1331,26 +1499,29 @@ public class WebViewSessionManager : MonoBehaviour
 
     private string GetTrainingInstruction()
     {
+        int targetRounds = Mathf.Max(1, practiceInstructionRounds);
+        int currentRound = Mathf.Min(completedPracticeRounds + 1, targetRounds);
+        string roundPrefix = $"練習 {currentRound}/{targetRounds}周　";
         switch (trainingStep)
         {
             case T2TrainingStep.PauseYouTube:
-                return "P01　奥のYouTube動画を一時停止してください。";
+                return roundPrefix + "P01　奥のYouTube動画を一時停止してください。";
             case T2TrainingStep.PlayYouTube:
-                return "P02　奥のYouTube動画を再生してください。";
+                return roundPrefix + "P02　奥のYouTube動画を再生してください。";
             case T2TrainingStep.SkipForwardTenSeconds:
-                return "P03　奥のYouTube動画を10秒スキップしてください。";
+                return roundPrefix + "P03　奥のYouTube動画を10秒スキップしてください。";
             case T2TrainingStep.SeekYouTube:
-                return "P04　奥のYouTube動画を少し戻してください。";
+                return roundPrefix + "P04　奥のYouTube動画のシークバーを使用して戻してください。";
             case T2TrainingStep.ScrollComparisonPage:
-                return "P05　手前のWebページを少し下にスクロールしてください。";
+                return roundPrefix + "P05　手前のWebページを少し下にスクロールしてください。";
             case T2TrainingStep.OpenProductDetail:
-                return "P06　商品詳細ページを1つ開いてください。";
+                return roundPrefix + "P06　商品詳細ページを1つ開いてください。";
             case T2TrainingStep.AddCandidate:
-                return "P07　候補に追加ボタンを1回押してください。";
+                return roundPrefix + "P07　候補に追加ボタンを1回押してください。";
             case T2TrainingStep.RemoveCandidate:
-                return "P08　候補リストから商品を1つ削除してください。";
+                return roundPrefix + "P08　候補リストから商品を1つ削除してください。";
             default:
-                return "操作確認は完了です。そのまま本番タスクへ進みます。";
+                return $"操作指示を{Mathf.Max(1, practiceInstructionRounds)}周完了しました。本番へ移行します。";
         }
     }
 
@@ -1481,9 +1652,7 @@ public class WebViewSessionManager : MonoBehaviour
 
     private Vector2 GetD2VPauseRange()
     {
-        return selectedContentSet == T2ContentSet.ACampGear2024
-            ? d2vPauseRangeSetASeconds
-            : d2vPauseRangeSetBSeconds;
+        return d2vPauseRangeSetASeconds;
     }
 
     private string GetD2VPauseRangeText()
@@ -1578,9 +1747,8 @@ public class WebViewSessionManager : MonoBehaviour
             else if (currentPhase == WebViewSessionPhase.MainTask
                 && mainStage == T2MainStage.SemiFree)
             {
-                WriteT2Event("semi_free_complete", secondaryDisplayId, itemId,
-                    "candidate_added_during_semi_free");
-                SetMainStage(T2MainStage.Finalize);
+                WriteT2Event("semi_free_candidate_added", secondaryDisplayId, itemId,
+                    "continue_until_confirmation_unlock");
             }
             return;
         }
@@ -1598,12 +1766,12 @@ public class WebViewSessionManager : MonoBehaviour
 
     private string GetV2DTargetItemId()
     {
-        return selectedContentSet == T2ContentSet.ACampGear2024 ? "A03" : "B05";
+        return "A03";
     }
 
     private string GetD2VTargetItemId()
     {
-        return selectedContentSet == T2ContentSet.ACampGear2024 ? "A08" : "B09";
+        return "A08";
     }
 
     private void AdvanceTrainingStep()
@@ -1619,12 +1787,31 @@ public class WebViewSessionManager : MonoBehaviour
             practiceStepScrollAmount = 0f;
         }
 
-        WriteT2Event("practice_step", string.Empty, trainingStep.ToString(), GetTrainingInstruction());
-        ApplyCurrentPageInstruction();
         if (trainingStep == T2TrainingStep.Completed)
         {
-            MarkPracticeCompleted();
+            completedPracticeRounds++;
+            WriteT2Event(
+                "practice_round_complete",
+                secondaryDisplayId,
+                completedPracticeRounds.ToString(CultureInfo.InvariantCulture),
+                $"target_rounds={Mathf.Max(1, practiceInstructionRounds)}");
+            if (completedPracticeRounds < Mathf.Max(1, practiceInstructionRounds))
+            {
+                trainingStep = T2TrainingStep.PauseYouTube;
+                practiceStepScrollAmount = 0f;
+                WriteT2Event("practice_step", string.Empty, trainingStep.ToString(), GetTrainingInstruction());
+            }
+            else
+            {
+                MarkPracticeCompleted();
+            }
         }
+        else
+        {
+            WriteT2Event("practice_step", string.Empty, trainingStep.ToString(), GetTrainingInstruction());
+        }
+
+        ApplyCurrentPageInstruction();
     }
 
     private void MarkPracticeCompleted()
@@ -1635,9 +1822,16 @@ public class WebViewSessionManager : MonoBehaviour
         }
 
         practiceCompletionLogged = true;
-        WriteT2Event("practice_complete", secondaryDisplayId, string.Empty, "continue_on_task_completion");
+        float practiceDuration = taskStartTime > 0f
+            ? Mathf.Max(0f, Time.time - taskStartTime)
+            : 0f;
+        WriteT2Event(
+            "practice_complete",
+            secondaryDisplayId,
+            practiceDuration.ToString("0.000", CultureInfo.InvariantCulture),
+            "duration_seconds;continue_immediately");
         logger?.LogEvent("T2Web_PracticeCompleted", activeCondition, secondaryDisplayId, Vector2.zero);
-        ContinueFromPracticeToMain("practice_tasks_completed");
+        ContinueFromPracticeToMain("practice_rounds_completed");
     }
 
     private void ContinueFromPracticeToMain(string note)
@@ -1670,6 +1864,20 @@ public class WebViewSessionManager : MonoBehaviour
             return;
         }
 
+        if (IsCandidateConfirmationLocked(out float unlockRemainingSeconds))
+        {
+            int remainingSeconds = Mathf.CeilToInt(unlockRemainingSeconds);
+            WriteT2Event(
+                "candidate_blocked",
+                secondaryDisplayId,
+                candidate,
+                $"minimum_elapsed_time;remaining={remainingSeconds}");
+            RejectCandidate(
+                $"候補の確定は本番開始から11分30秒後に可能です。あと{FormatCountdown(unlockRemainingSeconds)}お待ちください。");
+            ApplyCurrentPageInstruction();
+            return;
+        }
+
         if (!string.IsNullOrEmpty(selectedCandidate))
         {
             RejectCandidate("候補はすでに確定されています。");
@@ -1692,11 +1900,27 @@ public class WebViewSessionManager : MonoBehaviour
             return;
         }
 
+        bool selectedAfterTimeout = awaitingPostTimeoutSelection;
         selectedCandidate = normalizedCandidate;
-        pendingResult = "completed";
-        taskEndTime = Time.time;
-        WriteT2Event("candidate_selected", secondaryDisplayId, selectedCandidate, string.Empty);
-        EmitEndSyncMarkerIfNeeded("candidate_selected");
+        if (selectedAfterTimeout)
+        {
+            postTimeoutFinalSelection = normalizedCandidate;
+            postTimeoutSelectionTime = Time.time;
+            WriteT2Event(
+                "post_timeout_candidate_selected",
+                secondaryDisplayId,
+                postTimeoutFinalSelection,
+                $"selection_time={postTimeoutSelectionTime:0.000};delay={Mathf.Max(0f, postTimeoutSelectionTime - taskEndTime):0.000}");
+            awaitingPostTimeoutSelection = false;
+        }
+        else
+        {
+            pendingResult = "completed";
+            taskEndTime = Time.time;
+            WriteT2Event("candidate_selected", secondaryDisplayId, selectedCandidate, string.Empty);
+            EmitEndSyncMarkerIfNeeded("candidate_selected");
+        }
+
         FinalizeSessionResult(currentPhase, pendingResult);
         taskActive = false;
         awaitingPostTaskReset = true;
@@ -1704,7 +1928,46 @@ public class WebViewSessionManager : MonoBehaviour
         activeSecondaryWebViewBridge?.TryEvaluateJavaScript(
             "window.t2ConfirmCandidate&&window.t2ConfirmCandidate('"
             + EscapeJavaScriptString(selectedCandidate) + "');");
-        logger?.LogEvent("T2Web_Completed", activeCondition, secondaryDisplayId, Vector2.zero);
+        logger?.LogEvent(
+            selectedAfterTimeout ? "T2Web_PostTimeoutSelectionCompleted" : "T2Web_Completed",
+            activeCondition,
+            secondaryDisplayId,
+            Vector2.zero);
+    }
+
+    private bool IsCandidateConfirmationLocked(out float remainingSeconds)
+    {
+        float unlockSeconds = Mathf.Max(0f, candidateConfirmationUnlockSeconds);
+        float elapsed = currentPhase == WebViewSessionPhase.MainTask && taskStartTime > 0f
+            ? Mathf.Max(0f, Time.time - taskStartTime)
+            : 0f;
+        remainingSeconds = Mathf.Max(0f, unlockSeconds - elapsed);
+        return unlockSeconds > 0f && (currentPhase != WebViewSessionPhase.MainTask || taskStartTime <= 0f || remainingSeconds > 0f);
+    }
+
+    private void TryOpenCandidateListAtUnlock()
+    {
+        if (candidateListOpenedAtUnlock
+            || activeSecondaryWebViewBridge == null
+            || !activeSecondaryWebViewBridge.IsReady)
+        {
+            return;
+        }
+
+        const string script =
+            "window.__t2OpenCandidateListRequested=true;"
+            + "window.t2OpenCandidateList&&window.t2OpenCandidateList();";
+        if (!activeSecondaryWebViewBridge.TryEvaluateJavaScript(script))
+        {
+            return;
+        }
+
+        candidateListOpenedAtUnlock = true;
+        WriteT2Event(
+            "candidate_list_auto_open",
+            secondaryDisplayId,
+            Mathf.Max(0f, Time.time - taskStartTime).ToString("0.000", CultureInfo.InvariantCulture),
+            "confirmation_unlock");
     }
 
     private void RejectCandidate(string message)
@@ -1734,7 +1997,10 @@ public class WebViewSessionManager : MonoBehaviour
 
         EndYouTubePause(taskEndTime);
         EnsureT2LogWriters();
-        float duration = Mathf.Max(0f, taskEndTime - (unifiedTaskStartTime > 0f ? unifiedTaskStartTime : taskStartTime));
+        float measurementStartTime = endedPhase == WebViewSessionPhase.Training && unifiedTaskStartTime > 0f
+            ? unifiedTaskStartTime
+            : taskStartTime;
+        float duration = Mathf.Max(0f, taskEndTime - measurementStartTime);
         t2ResultWriter?.WriteLine(string.Join(",",
             Csv(participantId),
             Csv(sessionId),
@@ -1742,10 +2008,12 @@ public class WebViewSessionManager : MonoBehaviour
             Csv(GetMethodLabel()),
             Csv(GetContentSetLabel()),
             Csv(endedPhase == WebViewSessionPhase.Training ? "practice" : "main"),
-            (unifiedTaskStartTime > 0f ? unifiedTaskStartTime : taskStartTime).ToString("0.000", CultureInfo.InvariantCulture),
+            measurementStartTime.ToString("0.000", CultureInfo.InvariantCulture),
             taskEndTime.ToString("0.000", CultureInfo.InvariantCulture),
             duration.ToString("0.000", CultureInfo.InvariantCulture),
-            Csv(selectedCandidate),
+            Csv(string.Equals(result, "timeout", StringComparison.Ordinal) ? string.Empty : selectedCandidate),
+            Csv(postTimeoutFinalSelection),
+            postTimeoutSelectionTime.ToString("0.000", CultureInfo.InvariantCulture),
             youtubeOperationCount.ToString(CultureInfo.InvariantCulture),
             youtubePauseCount.ToString(CultureInfo.InvariantCulture),
             youtubePlayCount.ToString(CultureInfo.InvariantCulture),
@@ -1766,7 +2034,11 @@ public class WebViewSessionManager : MonoBehaviour
             Csv(resultNote)));
         t2ResultWriter?.Flush();
         resultWritten = true;
-        WriteT2Event("task_end", string.Empty, result, $"duration={duration:0.000};candidate={selectedCandidate}");
+        WriteT2Event(
+            "task_end",
+            string.Empty,
+            result,
+            $"duration={duration:0.000};candidate={selectedCandidate};post_timeout_candidate={postTimeoutFinalSelection}");
         EmitEndSyncMarkerIfNeeded($"finalize_result={result}");
         CloseT2LogWriters();
     }
@@ -1831,6 +2103,7 @@ public class WebViewSessionManager : MonoBehaviour
         t2ResultWriter = new StreamWriter(Path.Combine(directory, $"t2_results_{participant}_{session}_{stamp}.csv"));
         t2ResultWriter.WriteLine(
             "participant_id,session_id,condition_order,method,content_set,task_phase,task_start_time,task_end_time,duration,selected_candidates," +
+            "post_timeout_final_selection,post_timeout_selection_time," +
             "youtube_operation_count,youtube_pause_count,youtube_play_count,youtube_seek_count,youtube_total_pause_time," +
             "web_scroll_amount,web_click_count,detail_page_open_count,candidate_add_count,candidate_remove_count,v2d_completion_time,d2v_completion_time," +
             "display_switch_count,controller_movement_amount,controller_rotation_amount,clutch_count,result,note");
@@ -1871,12 +2144,20 @@ public class WebViewSessionManager : MonoBehaviour
 
     private string GetMethodLabel()
     {
-        return activeCondition == InteractionCondition.ExplicitDisplayFocus ? "Proposed" : "Ray";
+        switch (activeCondition)
+        {
+            case InteractionCondition.GazeRay:
+                return "GazeRay";
+            case InteractionCondition.ExplicitDisplayFocus:
+                return "Proposed";
+            default:
+                return "Ray";
+        }
     }
 
     private string GetContentSetLabel()
     {
-        return selectedContentSet == T2ContentSet.ACampGear2024 ? "A" : "B";
+        return "A";
     }
 
     private static string NormalizeId(string value, string fallback)

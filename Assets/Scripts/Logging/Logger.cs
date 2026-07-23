@@ -14,6 +14,7 @@ public class Logger : MonoBehaviour
     [SerializeField] private float sampleIntervalSeconds = 0.25f;
 
     private StreamWriter writer;
+    private StreamWriter gazeRayWriter;
     private float nextSampleTime;
 
     public bool IsOpen => writer != null;
@@ -42,12 +43,14 @@ public class Logger : MonoBehaviour
     public void LogFrame(
         InteractionCondition condition,
         DisplayLayoutPreset layoutPreset,
-        GazeSource gazeSource,
         DisplayHit raycastHit,
         bool hasRaycastHit,
         DisplayHit gazeHit,
         bool hasGazeHit,
         DisplaySurface focusedDisplay,
+        string cursorDisplayId,
+        Vector2 cursorNormalized,
+        bool hasCursor,
         Vector3 controllerRayOrigin,
         Vector3 controllerRayDirection)
     {
@@ -61,12 +64,14 @@ public class Logger : MonoBehaviour
             "Frame",
             condition,
             layoutPreset,
-            gazeSource,
+            string.Empty,
             FormatDisplay(hasRaycastHit, raycastHit),
             FormatVector(hasRaycastHit ? raycastHit.Normalized : Vector2.zero),
             FormatDisplay(hasGazeHit, gazeHit),
             FormatVector(hasGazeHit ? gazeHit.Normalized : Vector2.zero),
             focusedDisplay != null ? focusedDisplay.name : "None",
+            hasCursor ? cursorDisplayId : "None",
+            hasCursor ? FormatVector(cursorNormalized) : string.Empty,
             "0.000",
             FormatVector3(controllerRayOrigin),
             FormatVector3(controllerRayDirection),
@@ -87,6 +92,8 @@ public class Logger : MonoBehaviour
                 string.Empty,
                 displayId,
                 FormatVector(normalized),
+                string.Empty,
+                string.Empty,
                 string.Empty,
                 string.Empty,
                 string.Empty,
@@ -117,6 +124,8 @@ public class Logger : MonoBehaviour
                 string.Empty,
                 string.Empty,
                 string.Empty,
+                string.Empty,
+                string.Empty,
                 "0.000",
                 string.Empty,
                 string.Empty,
@@ -136,7 +145,7 @@ public class Logger : MonoBehaviour
 
     public void LogRaycastClick(InteractionCondition condition, string displayId, Vector2 normalized, Vector3 rayOrigin, Vector3 rayDirection)
     {
-        WriteBaselineEvent("Click", condition, displayId, normalized, string.Empty, 0f, rayOrigin, rayDirection);
+        WriteBaselineEvent(condition == InteractionCondition.GazeRay ? "click" : "Click", condition, displayId, normalized, string.Empty, 0f, rayOrigin, rayDirection);
     }
 
     public void LogRaycastScroll(InteractionCondition condition, string displayId, Vector2 normalized, float scrollAmount, Vector3 rayOrigin, Vector3 rayDirection)
@@ -225,6 +234,8 @@ public class Logger : MonoBehaviour
                 string.Empty,
                 string.Empty,
                 string.Empty,
+                result.ClickedDisplayId,
+                FormatVector(result.ClickedNormalizedPosition),
                 "0.000",
                 string.Empty,
                 string.Empty,
@@ -254,6 +265,54 @@ public class Logger : MonoBehaviour
         Debug.Log($"[Logger] trialResult participant={result.ParticipantId}, session={result.SessionId}, trial={result.TrialIndex}, trialSetId={result.TrialSetId}, task={result.Task}, taskOrder={result.TaskOrder}, methodOrder={result.MethodOrder}, condition={result.Condition}, layout={result.LayoutPreset}, occlusion={(result.InputOccluded ? "inputOccluded" : "none")}, targetDisplay={result.TargetDisplayId}, target={FormatVector(result.TargetNormalizedPosition)}, size={result.TargetSizeNormalized:0.000}, clickedDisplay={result.ClickedDisplayId}, clicked={FormatVector(result.ClickedNormalizedPosition)}, result={result.ResultType}, correct={result.IsCorrect}, displayError={result.IsDisplayError}, targetError={result.IsTargetError}, completion={result.CompletionTime:0.000}, controllerMovementMeters={result.ControllerMovementMeters:0.000000}, controllerRotationDegrees={result.ControllerRotationDegrees:0.000}");
     }
 
+    public void LogGazeRayFrame(
+        bool gazeValid,
+        string gazeHitDisplayId,
+        string gazeSelectedDisplayId,
+        DisplayHit controllerHit,
+        bool pointerValid,
+        Vector3 controllerRayOrigin,
+        Vector3 controllerRayDirection,
+        string penetratedDisplayIds,
+        int displaySwitchCount,
+        int triggerPressCount,
+        string scrollTargetDisplayId,
+        GazeInvalidPolicy invalidPolicy,
+        float switchDwellSeconds)
+    {
+        if (!writeCsv || gazeRayWriter == null)
+        {
+            return;
+        }
+
+        Vector3 intersection = pointerValid ? controllerHit.WorldPosition : Vector3.zero;
+        Vector2 normalized = pointerValid ? controllerHit.Normalized : Vector2.zero;
+        int penetratedCount = string.IsNullOrEmpty(penetratedDisplayIds) || penetratedDisplayIds == "None"
+            ? 0
+            : penetratedDisplayIds.Split('|').Length;
+        gazeRayWriter.WriteLine(string.Join(",",
+            Time.time.ToString("0.000", CultureInfo.InvariantCulture),
+            "GazeRay",
+            gazeValid,
+            Escape(gazeHitDisplayId),
+            Escape(gazeSelectedDisplayId),
+            FormatVector3(controllerRayOrigin),
+            FormatVector3(controllerRayDirection),
+            pointerValid ? Escape(controllerHit.DisplayId) : "None",
+            pointerValid ? FormatVector3(intersection) : string.Empty,
+            pointerValid ? normalized.x.ToString("0.000", CultureInfo.InvariantCulture) : string.Empty,
+            pointerValid ? normalized.y.ToString("0.000", CultureInfo.InvariantCulture) : string.Empty,
+            pointerValid,
+            displaySwitchCount,
+            displaySwitchCount,
+            triggerPressCount,
+            Escape(scrollTargetDisplayId),
+            Escape(penetratedDisplayIds),
+            penetratedCount,
+            invalidPolicy,
+            switchDwellSeconds.ToString("0.000", CultureInfo.InvariantCulture)));
+    }
+
     private void Open()
     {
         if (!writeCsv || writer != null)
@@ -267,8 +326,12 @@ public class Logger : MonoBehaviour
         string timestamp = System.DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
         string path = Path.Combine(directory, $"{filePrefix}_{timestamp}.csv");
         writer = new StreamWriter(path);
-        writer.WriteLine("time,rowType,condition,layoutPresetOrEvent,gazeSourceOrDetails,displayId,normalized,gazeDisplay,gazeNormalized,focusedDisplay,scrollAmount,rayOrigin,rayDirection,candidateDisplayIds,focusState,gazeOnDifferentDisplay,participantId,sessionId,trialIndex,trialSetId,trialIndexInSet,occlusion_type,targetDisplayId,targetNormalized,targetSize,clickedDisplayId,clickedNormalized,resultType,isCorrect,displayError,targetError,trialStartTime,clickTime,completionTime");
+        writer.WriteLine("time,rowType,condition,layoutPresetOrEvent,details,displayId,normalized,gazeDisplay,gazeNormalized,focusedDisplay,cursorDisplay,cursorNormalized,scrollAmount,rayOrigin,rayDirection,candidateDisplayIds,focusState,gazeOnDifferentDisplay,participantId,sessionId,trialIndex,trialSetId,trialIndexInSet,occlusion_type,targetDisplayId,targetNormalized,targetSize,clickedDisplayId,clickedNormalized,resultType,isCorrect,displayError,targetError,trialStartTime,clickTime,completionTime");
         Debug.Log($"[Logger] CSV logging to {path}");
+
+        string gazeRayPath = Path.Combine(directory, $"gazeray_{timestamp}.csv");
+        gazeRayWriter = new StreamWriter(gazeRayPath);
+        gazeRayWriter.WriteLine("timestamp,method,gazeValid,gazeHitDisplayId,gazeSelectedDisplayId,controllerRayOrigin,controllerRayDirection,controllerRayTargetDisplayId,controllerRayIntersectionPosition,controllerRayIntersectionNormalizedX,controllerRayIntersectionNormalizedY,pointerValid,displaySwitchCount,gazeDisplaySwitchCount,triggerPressCount,scrollTargetDisplayId,penetratedDisplayId,penetratedDisplayCount,gazeInvalidPolicy,gazeDisplaySwitchDwellSeconds");
     }
 
     private void Close()
@@ -281,6 +344,9 @@ public class Logger : MonoBehaviour
         writer.Flush();
         writer.Dispose();
         writer = null;
+        gazeRayWriter?.Flush();
+        gazeRayWriter?.Dispose();
+        gazeRayWriter = null;
     }
 
     private static string FormatDisplay(bool hasHit, DisplayHit hit)
@@ -308,6 +374,8 @@ public class Logger : MonoBehaviour
                 string.Empty,
                 string.Empty,
                 string.Empty,
+                displayId,
+                FormatVector(normalized),
                 scrollAmount.ToString("0.000", CultureInfo.InvariantCulture),
                 FormatVector3(rayOrigin),
                 FormatVector3(rayDirection),
@@ -341,12 +409,14 @@ public class Logger : MonoBehaviour
                 "Event",
                 condition,
                 eventName,
-                $"{gazeSource};{Escape(details)}",
+                Escape(details),
                 displayId,
                 FormatVector(normalized),
                 string.Empty,
                 string.Empty,
                 focusedDisplayId,
+                eventName == "GazeCandidates" ? "None" : displayId,
+                eventName == "GazeCandidates" ? string.Empty : FormatVector(normalized),
                 scrollAmount.ToString("0.000", CultureInfo.InvariantCulture),
                 FormatVector3(gazeRayOrigin),
                 FormatVector3(gazeRayDirection),

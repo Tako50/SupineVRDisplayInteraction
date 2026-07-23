@@ -7,6 +7,12 @@ public enum RayVisualLengthLevel
     Long
 }
 
+public enum GazeInvalidPolicy
+{
+    KeepLastSelectedDisplay,
+    ClearSelectedDisplay
+}
+
 [DisallowMultipleComponent]
 /// <summary>
 /// RaycastBaseline用の右コントローラRay。
@@ -17,6 +23,8 @@ public class RaycastPointer : MonoBehaviour
     [Header("References")]
     [SerializeField] private PrototypeInputManager inputManager;
     [SerializeField] private DisplayManager displayManager;
+    [SerializeField] private GazeProvider gazeProvider;
+    [SerializeField] private Logger logger;
     [SerializeField] private Transform rightControllerTransform;
     [SerializeField] private LineRenderer rayLine;
 
@@ -37,17 +45,43 @@ public class RaycastPointer : MonoBehaviour
     [SerializeField] private float rayStartWidth = 0.0035f;
     [Min(0.0001f)]
     [SerializeField] private float rayEndWidth = 0.001f;
-    [SerializeField] private Color rayColor = new Color(0.4f, 0.8f, 1f, 0.55f);
+    [SerializeField] private Color rayColor = new Color(0.4f, 0.8f, 1f, 1f);
     [Tooltip("Keep the Ray endpoint slightly in front of the first hit surface to avoid z-fighting in screenshots.")]
     [Min(0f)]
     [SerializeField] private float rayHitSurfaceOffsetMeters = 0.01f;
     [SerializeField] private bool logRayVisualSettingChanges = true;
+
+    [Header("GazeRay")]
+    [SerializeField] private GazeInvalidPolicy gazeInvalidPolicy = GazeInvalidPolicy.KeepLastSelectedDisplay;
+    [Min(0f)]
+    [SerializeField] private float gazeDisplaySwitchDwellSeconds = 0f;
+
+    private DisplaySurface gazeSelectedDisplay;
+    private DisplaySurface pendingGazeDisplay;
+    private float pendingGazeDisplaySince;
+    private bool previousGazeValid;
+    private bool hasPreviousGazeValidity;
+    private string penetratedDisplayIds = "None";
+    private int gazeDisplaySwitchCount;
+    private int triggerPressCount;
+    private string gazeHitDisplayId = "None";
+    private string previousIntersectionSignature = string.Empty;
+    private string previousPenetratedDisplayIds = "None";
 
     public Ray CurrentRay { get; private set; }
     public Transform RightControllerTransform => rightControllerTransform;
     public bool RayVisualEnabled => showRayLine;
     public RayVisualLengthLevel RayLengthLevel => rayLengthLevel;
     public float VisibleRayLengthMeters => ResolveVisibleRayLengthMeters(rayLengthLevel);
+    public DisplaySurface GazeSelectedDisplay => gazeSelectedDisplay;
+    public bool GazeValid { get; private set; }
+    public bool PointerValid => displayManager != null && displayManager.HasCurrentRaycastHit;
+    public string PenetratedDisplayIds => penetratedDisplayIds;
+    public int GazeDisplaySwitchCount => gazeDisplaySwitchCount;
+    public int TriggerPressCount => triggerPressCount;
+    public string GazeHitDisplayId => gazeHitDisplayId;
+    public GazeInvalidPolicy InvalidGazePolicy => gazeInvalidPolicy;
+    public float GazeDisplaySwitchDwellSeconds => gazeDisplaySwitchDwellSeconds;
 
     private void Awake()
     {
@@ -79,6 +113,12 @@ public class RaycastPointer : MonoBehaviour
         Ray pointerRay = GetPointerRay();
         CurrentRay = pointerRay;
         float visibleLength = ResolveVisibleRayLengthMeters(rayLengthLevel);
+
+        if (inputManager.CurrentCondition == InteractionCondition.GazeRay)
+        {
+            UpdateGazeRay(pointerRay, visibleLength);
+            return;
+        }
 
         if (inputManager.CurrentCondition != InteractionCondition.RaycastBaseline)
         {
@@ -116,6 +156,123 @@ public class RaycastPointer : MonoBehaviour
         UpdateRayLine(pointerRay.origin, lineEnd);
     }
 
+    private void UpdateGazeRay(Ray controllerRay, float visibleLength)
+    {
+        if (inputManager.TriggerPressed)
+        {
+            triggerPressCount++;
+        }
+
+        UpdateGazeSelectedDisplay();
+        Vector3 lineEnd = controllerRay.origin + controllerRay.direction * visibleLength;
+        penetratedDisplayIds = "None";
+
+        if (gazeSelectedDisplay != null
+            && displayManager.TryGetHitOnDisplay(gazeSelectedDisplay, controllerRay, out DisplayHit targetHit))
+        {
+            displayManager.SetCurrentRaycastHit(targetHit);
+            displayManager.SetOnlyCursorsVisible(targetHit.Display, null);
+            displayManager.SetCursorNormalized(targetHit.Display, targetHit.Normalized, true);
+            penetratedDisplayIds = FindPenetratedDisplayIds(controllerRay, targetHit);
+            string intersectionSignature = targetHit.DisplayId + ":" + targetHit.Normalized.x.ToString("0.000") + ":" + targetHit.Normalized.y.ToString("0.000");
+            if (intersectionSignature != previousIntersectionSignature)
+            {
+                previousIntersectionSignature = intersectionSignature;
+                logger?.LogEvent("controller_ray_intersection_changed", InteractionCondition.GazeRay, targetHit.DisplayId, targetHit.Normalized);
+            }
+
+            if (penetratedDisplayIds != "None" && penetratedDisplayIds != previousPenetratedDisplayIds)
+            {
+                logger?.LogEvent("display_penetrated", InteractionCondition.GazeRay, penetratedDisplayIds, targetHit.Normalized);
+            }
+            previousPenetratedDisplayIds = penetratedDisplayIds;
+            // GazeRay visualizes the complete path to the selected display even when it
+            // extends beyond the ordinary visual-length preset.
+            lineEnd = GetVisibleHitLineEnd(controllerRay, targetHit.WorldPosition);
+        }
+        else
+        {
+            displayManager.ClearCurrentRaycastHit();
+            displayManager.SetOnlyCursorsVisible(null, null);
+            previousIntersectionSignature = string.Empty;
+            previousPenetratedDisplayIds = "None";
+        }
+
+        UpdateRayLine(controllerRay.origin, lineEnd);
+    }
+
+    private void UpdateGazeSelectedDisplay()
+    {
+        Ray gazeRay = default;
+        GazeValid = gazeProvider != null && gazeProvider.TryGetValidGazeRay(out gazeRay);
+        if (!hasPreviousGazeValidity || previousGazeValid != GazeValid)
+        {
+            hasPreviousGazeValidity = true;
+            previousGazeValid = GazeValid;
+            logger?.LogEvent("gaze_valid_changed", InteractionCondition.GazeRay, gazeSelectedDisplay != null ? gazeSelectedDisplay.name : "None", Vector2.zero);
+        }
+
+        if (!GazeValid)
+        {
+            gazeHitDisplayId = "None";
+            pendingGazeDisplay = null;
+            if (gazeInvalidPolicy == GazeInvalidPolicy.ClearSelectedDisplay)
+            {
+                gazeSelectedDisplay = null;
+            }
+            return;
+        }
+
+        if (!displayManager.TryGetForemostHit(gazeRay, out DisplayHit gazeHit) || gazeHit.Display == null)
+        {
+            gazeHitDisplayId = "None";
+            pendingGazeDisplay = null;
+            return;
+        }
+
+        gazeHitDisplayId = gazeHit.DisplayId;
+
+        if (gazeHit.Display == gazeSelectedDisplay)
+        {
+            pendingGazeDisplay = null;
+            return;
+        }
+
+        if (pendingGazeDisplay != gazeHit.Display)
+        {
+            pendingGazeDisplay = gazeHit.Display;
+            pendingGazeDisplaySince = Time.unscaledTime;
+        }
+
+        if (Time.unscaledTime - pendingGazeDisplaySince < gazeDisplaySwitchDwellSeconds)
+        {
+            return;
+        }
+
+        string eventName = gazeSelectedDisplay == null ? "gaze_display_selected" : "gaze_display_changed";
+        gazeSelectedDisplay = gazeHit.Display;
+        pendingGazeDisplay = null;
+        gazeDisplaySwitchCount++;
+        logger?.LogEvent(eventName, InteractionCondition.GazeRay, gazeSelectedDisplay.name, gazeHit.Normalized);
+    }
+
+    private string FindPenetratedDisplayIds(Ray controllerRay, DisplayHit targetHit)
+    {
+        DisplayHit[] hits = displayManager.GetDisplayHitsAll(controllerRay);
+        string result = string.Empty;
+        for (int i = 0; i < hits.Length; i++)
+        {
+            if (hits[i].Display == null || hits[i].Display == targetHit.Display || hits[i].Distance >= targetHit.Distance)
+            {
+                continue;
+            }
+
+            result = string.IsNullOrEmpty(result) ? hits[i].DisplayId : result + "|" + hits[i].DisplayId;
+        }
+
+        return string.IsNullOrEmpty(result) ? "None" : result;
+    }
+
     private void ResolveReferences()
     {
         if (inputManager == null)
@@ -130,6 +287,16 @@ public class RaycastPointer : MonoBehaviour
             displayManager = DisplayManager.Instance != null
                 ? DisplayManager.Instance
                 : FindObjectOfType<DisplayManager>();
+        }
+
+        if (gazeProvider == null)
+        {
+            gazeProvider = FindObjectOfType<GazeProvider>();
+        }
+
+        if (logger == null)
+        {
+            logger = FindObjectOfType<Logger>();
         }
     }
 

@@ -59,6 +59,7 @@ public static class DevPrototypeSceneBuilder
         VRTaskMenuManager vrTaskMenuManager = GetOrAdd<VRTaskMenuManager>(managers);
         ExitPanelController exitPanelController = GetOrAdd<ExitPanelController>(managers);
         Logger logger = GetOrAdd<Logger>(managers);
+        TrajectoryLogger trajectoryLogger = GetOrAdd<TrajectoryLogger>(managers);
         PrototypeDebugVisualizer debugVisualizer = GetOrAdd<PrototypeDebugVisualizer>(managers);
 
         SetObject(layoutManager, "hmdCamera", hmdCamera);
@@ -112,12 +113,23 @@ public static class DevPrototypeSceneBuilder
         SetObject(inputManager, "debugInputProvider", debugInputProvider);
         SetBool(inputManager, "allowConditionToggle", true);
 
+        SetObject(trajectoryLogger, "hmdCamera", hmdCamera);
+        SetObject(trajectoryLogger, "rightControllerTransform", controllerRaySource);
+        SetObject(trajectoryLogger, "inputManager", inputManager);
+        SetObject(trajectoryLogger, "experimentManager", experimentManager);
+        SetObject(trajectoryLogger, "gazeProvider", gazeProvider);
+        SetObject(trajectoryLogger, "displayManager", displayManager);
+        SetObject(trajectoryLogger, "virtualCursorController", cursorController);
+        SetObject(trajectoryLogger, "focusPointingTaskManager", focusPointingTaskManager);
+        SetObject(trajectoryLogger, "webViewSessionManager", webViewSessionManager);
+
         SetObject(experimentManager, "inputManager", inputManager);
         SetObject(experimentManager, "gazeProvider", gazeProvider);
         SetObject(experimentManager, "displayManager", displayManager);
         SetObject(experimentManager, "layoutManager", layoutManager);
         SetObject(experimentManager, "raycastPointer", raycastPointer);
         SetObject(experimentManager, "focusManager", focusManager);
+        SetObject(experimentManager, "virtualCursorController", cursorController);
         SetObject(experimentManager, "gazeDisplayFocusManager", gazeDisplayFocusManager);
         SetObject(experimentManager, "debugInputProvider", debugInputProvider);
         SetObject(experimentManager, "logger", logger);
@@ -145,6 +157,7 @@ public static class DevPrototypeSceneBuilder
         SetFloat(raycastPointer, "shortRayLength", 1.5f);
         SetFloat(raycastPointer, "mediumRayLength", 2.5f);
         SetFloat(raycastPointer, "longRayLength", 4f);
+        SetColor(raycastPointer, "rayColor", new Color(0.4f, 0.8f, 1f, 1f));
 
         SetObject(cursorController, "inputManager", inputManager);
         SetObject(cursorController, "displayManager", displayManager);
@@ -192,6 +205,8 @@ public static class DevPrototypeSceneBuilder
         SetEnum(focusPointingTaskManager, "selectedLayout", DisplayLayoutPreset.LeftRight);
         SetEnum(focusPointingTaskManager, "taskOrder", T1TaskOrder.ABC);
         SetEnum(focusPointingTaskManager, "methodOrder", T1MethodOrder.RayFirst);
+        SetBool(focusPointingTaskManager, "runFixedMainTaskSequence", true);
+        SetFloat(focusPointingTaskManager, "mainBlockStartLockSeconds", 30f);
         SetBool(focusPointingTaskManager, "useLatest48TrialDesign", true);
         SetFloat(focusPointingTaskManager, "smallTargetSizeDegrees", 1.5f);
         SetFloat(focusPointingTaskManager, "largeTargetSizeDegrees", 3f);
@@ -215,7 +230,7 @@ public static class DevPrototypeSceneBuilder
         SetString(webViewSessionManager, "initialUrl", "https://www.youtube.com");
         SetBool(webViewSessionManager, "enableSecondaryWebView", true);
         SetString(webViewSessionManager, "secondaryDisplayId", "Display_A_Front");
-        SetString(webViewSessionManager, "secondaryInitialUrl", "http://133.87.151.95:5173/");
+        SetString(webViewSessionManager, "secondaryInitialUrl", "http://133.87.151.83:5173/");
         SetEnum(webViewSessionManager, "selectedContentSet", T2ContentSet.ACampGear2024);
         SetString(webViewSessionManager, "youtubeUrlSetA", "https://www.youtube.com/watch?v=oCKnZl-XT1Y");
         SetString(webViewSessionManager, "youtubeUrlSetB", "https://www.youtube.com/watch?v=wIHPxl6OPOc");
@@ -225,7 +240,9 @@ public static class DevPrototypeSceneBuilder
         SetVector2(webViewSessionManager, "d2vPauseRangeSetBSeconds", new Vector2(948f, 1011f));
         SetString(webViewSessionManager, "comparisonPageResourceSetA", "");
         SetString(webViewSessionManager, "comparisonPageResourceSetB", "");
-        SetFloat(webViewSessionManager, "totalTaskDurationSeconds", 600f);
+        SetInt(webViewSessionManager, "practiceInstructionRounds", 2);
+        SetFloat(webViewSessionManager, "totalTaskDurationSeconds", 720f);
+        SetFloat(webViewSessionManager, "candidateConfirmationUnlockSeconds", 690f);
         SetFloat(webViewSessionManager, "practiceStageTimeoutSeconds", 0f);
         SetFloat(webViewSessionManager, "v2dStageTimeoutSeconds", 0f);
         SetFloat(webViewSessionManager, "d2vStageTimeoutSeconds", 0f);
@@ -238,11 +255,11 @@ public static class DevPrototypeSceneBuilder
         SetBool(webViewSessionManager, "requireStartButtonBeforeSession", true);
         SetFloat(webViewSessionManager, "startCountdownSeconds", 3f);
         SetBool(webViewSessionManager, "showInstructionPanelAboveBackDisplay", true);
-        SetVector2(webViewSessionManager, "instructionPanelSizePixels", new Vector2(1300f, 300f));
+        SetVector2(webViewSessionManager, "instructionPanelSizePixels", new Vector2(1600f, 180f));
         SetFloat(webViewSessionManager, "instructionPanelScale", 0.0009f);
-        SetInt(webViewSessionManager, "instructionPanelPhaseFontSize", 32);
-        SetInt(webViewSessionManager, "instructionPanelMessageFontSize", 44);
-        SetFloat(webViewSessionManager, "instructionPanelVerticalGapMeters", 0.08f);
+        SetInt(webViewSessionManager, "instructionPanelPhaseFontSize", 30);
+        SetInt(webViewSessionManager, "instructionPanelMessageFontSize", 42);
+        SetFloat(webViewSessionManager, "instructionPanelVerticalGapMeters", 0.01f);
 
         SetObject(rayOcclusionLayoutProbe, "hmdCamera", hmdCamera);
         SetObject(rayOcclusionLayoutProbe, "d1BackDisplay", displayB);
@@ -669,6 +686,22 @@ public static class DevPrototypeSceneBuilder
         if (property != null)
         {
             property.intValue = value;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+        }
+    }
+
+    private static void SetColor(Object target, string propertyName, Color value)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        SerializedObject serializedObject = new SerializedObject(target);
+        SerializedProperty property = serializedObject.FindProperty(propertyName);
+        if (property != null)
+        {
+            property.colorValue = value;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
         }
     }

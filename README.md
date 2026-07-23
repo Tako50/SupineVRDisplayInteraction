@@ -12,6 +12,7 @@ The first working prototype is implemented in `Assets/Scenes/Dev_Prototype.unity
 It is being built in phases from `Docs/prototype_spec.md`:
 
 - `RaycastBaseline`: standard controller raycasting. The foremost display hit by the controller ray is the active operation target.
+- `GazeRay`: gaze selects only the operation display; the controller Ray intersection on that selected display supplies the pointer position and ignores intervening display colliders.
 - `ExplicitDisplayFocus`: gaze candidate selection, grip-confirmed display focus, cursor warp, stick cursor movement, and trigger+stick scrolling.
 
 The scene contains:
@@ -53,7 +54,7 @@ Useful development controls:
 - `3`: apply Layout 3 `UpDown`
 - `WASD` or arrow keys: stick fallback for cursor movement
 - Release `Space`: A-button submit/click fallback
-- `Tab`: switch between `RaycastBaseline` and `ExplicitDisplayFocus`
+- `Tab`: cycle `RaycastBaseline` → `GazeRay` → `ExplicitDisplayFocus` outside a running WebView session
 - `G`: grip fallback for focus confirmation
 - `Left Shift`: trigger fallback; trigger alone never clicks, and in a WebView session hold it with `W` / `S` for Explicit scroll or `A` / `D` for Explicit Web UI drag
 - `X`: simulate aiming at the left-side exit panel and holding the left trigger
@@ -69,6 +70,22 @@ Useful development controls:
 - in the default T2 WebView mode, A is a standalone click, vertical stick scrolls, and trigger hold + Ray movement sends Web UI drag
 - right stick vertical / `W` / `S` scrolls only the currently hit display
 - `UpDownDepth` preserves the existing T1 front/back ray-occlusion geometry
+
+## GazeRay condition
+
+`GazeRay` is the third, intermediate interaction condition available in the T1/T2 task menu:
+
+- a valid gaze hit immediately selects the operation display; the experiment default dwell is `0s`
+- gaze never supplies the pointer coordinate, warps a cursor, invokes explicit focus, or requires Grip
+- the pointer coordinate comes from a direct `BoxCollider.Raycast` against only the gaze-selected display
+- a nearer display may be crossed without becoming the input target; the visible controller Ray ends at the selected display intersection
+- if the controller Ray misses the selected display bounds, the pointer is invalid and is not clamped to an edge
+- moving the controller moves the pointer; moving gaze within the same selected display does not move it
+- A clicks, vertical Stick scrolls, and Trigger + controller-Ray movement performs the existing Web UI drag on the selected display
+- when Eye Tracking becomes invalid, the default `KeepLastSelectedDisplay` policy keeps the selected display but records `gazeValid=false`; it never falls back to ordinary Ray targeting
+- `HmdForward` and `DebugCameraForward` remain Editor/development modes. When `EyeTracking` is configured but unavailable, the task menu refuses to start a `GazeRay` experiment
+
+The policy and optional dwell are Inspector fields on `RaycastPointer`. The debug overlay reports gaze validity, gaze-selected display, pointer validity, and penetrated display IDs. Dedicated `Logs/gazeray_*.csv` samples include controller-Ray origin/direction/intersection, normalized pointer coordinates, switch/trigger counts, scroll target, penetration, and gaze-invalid policy without changing existing CSV columns.
 
 ## Phase 3 ExplicitDisplayFocus MVP
 
@@ -94,6 +111,7 @@ The debug overlay shows the current condition, focus state, focused display, and
 `GazeDisplayFocusManager` highlights the current pointing target as visual feedback only:
 
 - `RaycastBaseline`: the first display hit by the controller Ray
+- `GazeRay`: the display selected by valid gaze (the controller Ray only determines its in-display coordinate)
 - `ExplicitDisplayFocus`: the foremost display under the gaze ray
 
 It does not change the input target, explicit input focus, cursor, click, or scroll destination. Highlight is fixed ON for both methods and is no longer selectable in the task menu.
@@ -101,10 +119,11 @@ It does not change the input target, explicit input focus, cursor, click, or scr
 Controller-Ray feedback is also fixed by method:
 
 - `RaycastBaseline`: display the `Long` controller Ray (`4.0m` by default).
+- `GazeRay`: display the `Long` controller Ray through intervening displays to the selected-display intersection.
 - `ExplicitDisplayFocus`: hide the controller Ray.
-- The controller Ray uses normal world-space depth testing, so a display visually occludes any Ray segment located behind it from the participant's viewpoint.
+- The controller Ray uses normal world-space depth testing, so a display visually occludes any Ray segment located behind it from the participant's viewpoint. Visible Ray segments remain fully opaque to preserve depth cues against display content.
 
-The task menu therefore contains only task, interaction method, T1 layout/T2 content set, and session-start controls. Its status card shows the fixed highlight and Ray behavior for the selected method.
+The task menu contains task, interaction method, and session-start controls. T2 content is fixed to the 2024 set and has no content selector. Its status card shows the fixed highlight and Ray behavior for the selected method.
 
 ## T2 YouTube + Comparison Web Task
 
@@ -122,6 +141,7 @@ When `Consume Experiment Input` is enabled, the current experiment input path is
 - `WebViewSessionManager > Input Mode = Direct Scroll And Seek` is the default trial mode.
 - A is the only click/selection input in both conditions and in both T1 and T2. A is not combined with stick movement, and right trigger alone does not click.
 - `RaycastBaseline`: vertical stick scrolls the WebView under the ray; trigger hold + Ray movement sends Web UI drag.
+- `GazeRay`: vertical stick scrolls the gaze-selected WebView; trigger hold + controller-Ray movement sends Web UI drag on that same display even when another display is in front.
 - `ExplicitDisplayFocus`: trigger + vertical stick scrolls the focused WebView; trigger + horizontal stick starts Web UI drag from the virtual cursor, stick movement drags it, and trigger release ends it.
 - Web UI drag starts pointer down only after movement exceeds a small threshold, then sends pointer move / up to the WebView. This prevents a stationary trigger press from becoming a Web click while allowing YouTube's seek bar to be manipulated through the page UI.
 - Scroll directly updates the WebView page's relative scroll position. Web UI drag depends on the active page element under the pointer.
@@ -136,17 +156,16 @@ This keeps WebView browsing independent from the interaction method. TLab is pul
 In `Dev_Prototype`, the T2 menu launches only the current YouTube + comparison task. To try it:
 
 1. Select `T2 Web Browsing` in the VR task menu.
-2. Select `Content A` or `Content B`.
-3. Select `Raycast Baseline` or `Explicit Display Focus`. Highlight/Ray feedback is applied automatically, and T2 always uses `UpDownDepth` regardless of the T1 layout selection.
-4. Press `START T2 TASK`.
-5. Press the in-display `START` gate and wait for the countdown.
-6. `Display_B_Back` opens the selected content's YouTube URL. `Display_A_Front` opens the common 20-product comparison Web through `WebViewSessionManager.Secondary Initial Url`.
+2. Select `Raycast Baseline` or `Explicit Display Focus`. Highlight/Ray feedback is applied automatically, and T2 always uses `UpDownDepth` regardless of the T1 layout selection.
+3. Press `START T2 TASK`.
+4. Press the in-display `START` gate and wait for the countdown.
+5. `Display_B_Back` opens the fixed 2024 YouTube URL. `Display_A_Front` opens the comparison Web through `WebViewSessionManager.Secondary Initial Url`.
 
-T2 also shows a passive world-space instruction panel above `Display_B_Back`. It mirrors the current training step, main-task instruction, completion state, and late-task reminder without adding a collider or receiving controller input. The panel uses the back display's transform, so it stays fixed with the experiment displays and does not follow head direction. Panel size, scale, and phase/message font sizes are adjustable on `WebViewSessionManager`. T2 is currently fixed to `UpDownDepth`; the other layout presets remain available only for T1.
+T2 also shows a passive world-space instruction panel immediately above `Display_B_Back`. It uses a wide, low-profile shape so the instruction stays close to the display without shifting the two-display layout upward. It mirrors the current training step, main-task instruction, completion state, and late-task reminder without adding a collider or receiving controller input. When an instruction actually changes, the panel briefly pulses in color and size for three seconds so the participant notices the next step; periodic WebView refreshes do not retrigger the effect, and the first instruction is not emphasized. The panel uses the back display's transform, so it stays fixed with the experiment displays and does not follow head direction. Panel size, scale, phase/message font sizes, and the change-emphasis duration, frequency, scale, and color are adjustable on `WebViewSessionManager`. T2 is currently fixed to `UpDownDepth`; the other layout presets remain available only for T1.
 
-T2 runs as one continuous, task-completion-driven session with a 10-minute overall limit. Practice follows eight checks in the current Notion order: YouTube pause, play, skip forward by 10 seconds, seek backward, Web scroll, product-detail open, candidate add, and candidate remove. Completing P08 immediately starts Main; no fixed waiting window is used after completion. Practice candidates are cleared at the transition, while the pages remain loaded. The instruction panel shows the interaction condition and the overall countdown.
+T2 keeps the WebViews open across Practice and a 12-minute Main. Practice follows eight checks in the current Notion order: YouTube pause, play, skip forward by 10 seconds, seek backward, Web scroll, product-detail open, candidate add, and candidate remove. Practice has no time limit. Completing two P01-P08 rounds starts Main immediately, and the actual Practice duration is retained in the event log. Practice candidates are cleared at the transition, while the pages remain loaded. The instruction panel shows the interaction condition without a Practice countdown, then switches to the independent 12-minute Main countdown.
 
-Main advances immediately when each task is achieved. V2D completes when the designated item detail is opened and that item is added to the candidate list: Content A uses 4:44–6:20 and `A03`; Content B uses 8:46–10:30 and `B05`. D2V completes when the specified Web detail has been opened and YouTube is paused within its appearance range: Content A uses the second item in `居住・寝具` and `A08` (11:28–12:23); Content B uses the fourth item in `火器・調理用品` and `B09` (15:48–16:51). Semi-free comparison completes when the participant adds one additional candidate after D2V. The participant then confirms one final candidate. That click immediately fixes the T2 end time and writes the result CSV, while the comparison Web remains visible on a task-complete screen showing the selected product image, name, brand, price, size, and weight for the post-task questionnaire. After the questionnaire, `候補リストを削除してホームに戻る` clears persisted candidates, restores the Web home state, and returns Unity to condition selection for the next condition. The 10-minute and stage timers no longer run while this post-task review screen is open. Practice, V2D, D2V, semi-free, and finalization each have a separate inspector-configurable stage timeout; these values remain `0` (disabled) until the experiment values are confirmed. Elapsed time is still recorded for analysis, and at least one Main-phase YouTube play, pause, or seek is required before confirmation.
+Main retains the V2D and D2V stage-specific instructions and advances when each target is achieved. With the fixed 2024 content, V2D uses 4:44–6:20 and `A03`. D2V uses the second item in `居住・寝具`, `A08` (11:28–12:23). After D2V, the instruction changes to unrestricted comparison: `動画とWebを自由に見比べ、追加・買い替えの候補として良さそうな動画内の商品を、候補リストに追加してください。候補の数に制限はありません。` Candidate additions do not end this stage. At 11:30 from Main start, Unity changes to the final instruction, unlocks confirmation, and automatically opens the candidate-list screen: `候補リストを確認し、今回のキャンプをより快適にするために最も良さそうな商品を1つ選び、候補を確定してください。` This leaves 30 seconds before the 12-minute Main limit. A valid confirmation immediately fixes the T2 end time and writes the result CSV, while the comparison Web remains visible on a task-complete screen showing the selected product image, name, brand, price, size, and weight for the post-task questionnaire. If no item has been confirmed at 12:00, Unity freezes the Main metrics and records `timeout`, but keeps the candidate list operable until one item is confirmed. The timeout result remains unchanged; the later item and confirmation time are stored in `post_timeout_final_selection` and `post_timeout_selection_time`. After the questionnaire, `候補リストを削除してホームに戻る` clears persisted candidates, restores the Web home state, and returns Unity to condition selection for the next condition. Phase and stage timers no longer run while this post-task review screen is open. Practice, V2D, D2V, semi-free, and finalization each retain a separate inspector-configurable stage timeout; these values remain `0` (disabled) until explicitly configured. Elapsed time is still recorded for analysis, and at least one Main-phase YouTube play, pause, or seek is required before confirmation.
 
 T2 writes separate `Logs/T2/t2_events_*.csv` and `t2_results_*.csv` files under `Application.persistentDataPath`. The summary includes participant/session/counterbalance identifiers, method, content set, duration, selected candidates, V2D/D2V completion times, candidate add/remove and detail counts, YouTube operation counts and pause time, Web scroll/click amount, display switches, controller movement/rotation, clutch count, and result.
 
@@ -192,16 +211,17 @@ For editor validation:
 - `FocusPointingTaskManager` manages the target-selection trial list.
 - `Display A` and `Display B` are assignable from the Inspector.
 - T1 currently maps its three task selections back to the established layouts: Task A = `LeftRight`, Task B = `UpDown`, and Task C = `UpDownDepth`. The temporary `FrontBackClear` / `FrontBackOccluded` layout presets were removed after the supplied specification was identified as an older version.
-- Each main block contains 48 trials: 2 displays x 6 positions x 2 sizes x 2 cycles.
+- Each main block contains 96 trials: 2 displays x 6 positions x 2 sizes x 4 cycles.
 - Each 24-trial cycle contains every display/position/size combination exactly once.
 - Target positions use `x = 0.10 / 0.50 / 0.90` and `y = 0.20 / 0.80`.
 - Target sizes `Small` and `Large` are rendered at approximately 1.5 and 3 degrees based on the current head-to-display-center distance.
 - `T1TrialSequenceGenerator` uses a logged deterministic seed to choose a constrained random order. D1→D2 and D2→D1 counts are balanced, long same-display/size runs are penalized, and Task C input-occluded trials are spread through the block.
-- Task C marks the three Display 2 positions at `y = 0.80` as `inputOccluded`, giving 12 input-occluded trials and 36 `none` trials per block. Tasks A/B log all 48 trials as `none`.
-- Training is Inspector-configurable from 6 to 12 trials and may loop until the experimenter ends it.
-- Task order is recorded as one of `ABC / BCA / CAB / ACB / CBA / BAC`; method order is recorded as `RayFirst` or `ExplicitFirst`.
-- Starting a task runs only the selected task/method block. After its 48-trial main block finishes, the task returns to condition selection.
-- The old `Assets/Resources/T1/target_orders_ABCDEFG.csv` path remains as an optional compatibility mode when `Use Latest 48 Trial Design` is disabled.
+- Task C marks the three Display 2 positions at `y = 0.80` as `inputOccluded`, giving 24 input-occluded trials and 72 `none` trials per block. Tasks A/B log all 96 trials as `none`.
+- Training runs 12 trials each in `LeftRight → UpDown → UpDownDepth` order. After the required first 36 trials, the same 12-trial layout cycle continues until the participant reports being accustomed to the method and the experimenter presses `End Training`. Main then starts again from Task A `LeftRight`.
+- Main uses the fixed `Task A LeftRight → Task B UpDown → Task C UpDownDepth` order, so no layout selection is required before `START MAIN TASK`. The three 96-trial blocks run as one 288-trial session with the selected interaction method and share the same CSV files.
+- After Task A or Task B finishes, the next layout is applied automatically. Task B and Task C show their START button immediately, but it remains disabled with a visible countdown for 30 seconds. Once unlocked, pressing START runs the normal 3-second countdown and begins the next block. After Task C finishes, T1 returns to condition selection.
+- Method order is still recorded as `RayFirst` or `ExplicitFirst`; the fixed task order is recorded as `ABC`.
+- The old `Assets/Resources/T1/target_orders_ABCDEFG.csv` path remains as an optional compatibility mode when `Use Generated Trial Design` is disabled.
 - `ConditionA` maps to `RaycastBaseline` by default, and `ConditionB` maps to `ExplicitDisplayFocus` by default.
 - A visible `FocusPointingTarget` is generated on the active target display.
 - Starting Training or Main Task first shows a centered `START` button on `Display_B_Back`; pressing it starts a 3-second countdown before the first target appears.
@@ -261,6 +281,9 @@ To use real Quest Pro gaze:
 If the OpenXR eye-gaze device is not available or not tracked, `GazeProvider` logs a warning and falls back to `HmdForward` for development only.
 
 CSV logs are written under `Application.persistentDataPath/Logs` with a `prototype_*.csv` filename.
+The common frame log samples the controller-Ray hit, eye-gaze hit, focused display, and active cursor display/normalized position every `0.25s`. The experiment uses Eye Tracking, so the per-frame gaze-source column is omitted; development fallback state remains visible in Unity diagnostics.
+
+While T1 or T2 is running, `TrajectoryLogger` writes `Logs/Trajectory/trajectory_*.csv` at a fixed 60 Hz. It records the HMD and right-controller world poses, valid Eye Tracking ray and display hit, active cursor position, trigger/grip state, and right-stick value together with participant, session, condition, phase, and T1 trial identifiers. Gaze fields are left empty when Eye Tracking is unavailable so development HMD-forward fallback samples are not analyzed as eye gaze. Rows are buffered and flushed once per second to avoid per-frame storage flushes on Quest.
 
 ## Pulling Quest Logs To Mac
 

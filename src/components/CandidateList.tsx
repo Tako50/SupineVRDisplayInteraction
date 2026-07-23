@@ -4,6 +4,8 @@ interface CandidateListProps {
   candidates: Item[]
   pendingConfirmationId: string | null
   confirmationError: string
+  confirmationLocked: boolean
+  confirmationUnlockRemainingSeconds: number
   onRemove: (item: Item) => void
   onConfirm: (item: Item) => void
   onBack: () => void
@@ -13,6 +15,8 @@ export default function CandidateList({
   candidates,
   pendingConfirmationId,
   confirmationError,
+  confirmationLocked,
+  confirmationUnlockRemainingSeconds,
   onRemove,
   onConfirm,
   onBack,
@@ -24,6 +28,11 @@ export default function CandidateList({
         <p className="eyebrow">CANDIDATES</p>
         <h1 id="candidates-title">候補リスト</h1>
         <p>追加した商品から、最終候補を1つ選んで確定してください。</p>
+        {confirmationLocked && (
+          <p className="confirmation-lock-notice" aria-live="polite">
+            最終候補は本番開始から11分30秒後に確定できます（あと{formatRemainingTime(confirmationUnlockRemainingSeconds)}）
+          </p>
+        )}
       </div>
 
       {candidates.length > 0 ? (
@@ -38,9 +47,13 @@ export default function CandidateList({
                 className="final-button"
                 data-t2-candidate={item.item_id}
                 onClick={() => onConfirm(item)}
-                disabled={pendingConfirmationId !== null}
+                disabled={confirmationLocked || pendingConfirmationId !== null}
               >
-                {pendingConfirmationId === item.item_id ? '確定処理中…' : 'この商品に決定'}
+                {confirmationLocked
+                  ? `決定まで ${formatRemainingTime(confirmationUnlockRemainingSeconds)}`
+                  : pendingConfirmationId === item.item_id
+                    ? '確定処理中…'
+                    : 'この商品に決定'}
               </button>
               <button
                 className="danger-button"
@@ -68,4 +81,10 @@ export default function CandidateList({
       )}
     </main>
   )
+}
+
+function formatRemainingTime(totalSeconds: number) {
+  const seconds = Math.max(0, Math.ceil(totalSeconds))
+  const minutes = Math.floor(seconds / 60)
+  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`
 }

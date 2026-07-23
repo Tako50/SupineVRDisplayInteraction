@@ -605,6 +605,9 @@ public class PrototypeDebugVisualizer : MonoBehaviour
         string controllerRayVisual = raycastPointer != null
             ? $"{(raycastPointer.RayVisualEnabled ? "ON" : "OFF")} {raycastPointer.RayLengthLevel} {raycastPointer.VisibleRayLengthMeters:0.00}m"
             : "No RaycastPointer";
+        string gazeRayState = raycastPointer != null
+            ? $"selected={(raycastPointer.GazeSelectedDisplay != null ? raycastPointer.GazeSelectedDisplay.name : "None")} valid={raycastPointer.GazeValid} pointerValid={raycastPointer.PointerValid} penetrated={raycastPointer.PenetratedDisplayIds}"
+            : "No RaycastPointer";
         string trial = focusPointingTaskManager != null && focusPointingTaskManager.IsRunning
             ? $"{focusPointingTaskManager.CurrentTrialIndex} target={focusPointingTaskManager.CurrentTargetDisplayId} {Format(focusPointingTaskManager.CurrentTargetNormalizedPosition)} size={focusPointingTaskManager.CurrentTargetSizeNormalized:0.000}"
             : "None";
@@ -614,6 +617,7 @@ public class PrototypeDebugVisualizer : MonoBehaviour
             $"Condition: {condition}\n" +
             $"Ray mode: {rayVisualizationMode}\n" +
             $"Controller ray visual: {controllerRayVisual}\n" +
+            $"GazeRay: {gazeRayState}\n" +
             $"Gaze source: configured={configuredGazeSource}, active={activeGazeSource}\n" +
             $"Eye tracking: {eyeTracking}\n" +
             $"Focus state: {focusState}\n" +

@@ -5,5 +5,6 @@
 public enum InteractionCondition
 {
     RaycastBaseline,
-    ExplicitDisplayFocus
+    ExplicitDisplayFocus,
+    GazeRay
 }

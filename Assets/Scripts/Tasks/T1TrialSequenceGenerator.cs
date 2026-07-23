@@ -10,7 +10,7 @@ public static class T1TrialSequenceGenerator
 {
     public const int PositionsPerDisplay = 6;
     public const int CombinationsPerCycle = 24;
-    public const int MainCycles = 2;
+    public const int MainCycles = 4;
     public const int MainTrialsPerBlock = CombinationsPerCycle * MainCycles;
 
     private static readonly float[] XPositions = { 0.10f, 0.50f, 0.90f };

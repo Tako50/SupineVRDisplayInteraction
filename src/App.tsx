@@ -45,6 +45,9 @@ declare global {
     t2ResetCandidates?: () => void
     t2ConfirmCandidate?: (itemId: string) => void
     t2RejectCandidate?: (message: string) => void
+    t2SetConfirmationLock?: (locked: boolean, remainingSeconds: number) => void
+    t2OpenCandidateList?: () => void
+    __t2OpenCandidateListRequested?: boolean
     __t2UnitySend?: (type: string, value: string) => void
   }
 }
@@ -65,6 +68,8 @@ export default function App() {
   const [candidateIds, setCandidateIds] = useState<string[]>(loadCandidateIds)
   const [pendingConfirmationId, setPendingConfirmationId] = useState<string | null>(null)
   const [confirmationError, setConfirmationError] = useState('')
+  const [confirmationLocked, setConfirmationLocked] = useState(false)
+  const [confirmationUnlockRemainingSeconds, setConfirmationUnlockRemainingSeconds] = useState(0)
 
   useEffect(() => {
     try {
@@ -107,10 +112,29 @@ export default function App() {
       setConfirmationError(message || '条件を確認して、もう一度選択してください。')
       setView({ name: 'candidates' })
     }
+    window.t2SetConfirmationLock = (locked, remainingSeconds) => {
+      setConfirmationLocked(Boolean(locked))
+      setConfirmationUnlockRemainingSeconds(Math.max(0, Math.ceil(Number(remainingSeconds) || 0)))
+      if (locked) {
+        setPendingConfirmationId(null)
+      }
+    }
+    window.t2OpenCandidateList = () => {
+      window.__t2OpenCandidateListRequested = false
+      setPendingConfirmationId(null)
+      setConfirmationError('')
+      setView({ name: 'candidates' })
+      logEvent('candidate_list_open', { from: 'confirmation_unlock' })
+    }
+    if (window.__t2OpenCandidateListRequested) {
+      window.t2OpenCandidateList()
+    }
     return () => {
       delete window.t2ResetCandidates
       delete window.t2ConfirmCandidate
       delete window.t2RejectCandidate
+      delete window.t2SetConfirmationLock
+      delete window.t2OpenCandidateList
     }
   }, [])
 
@@ -208,6 +232,8 @@ export default function App() {
           candidates={candidates}
           pendingConfirmationId={pendingConfirmationId}
           confirmationError={confirmationError}
+          confirmationLocked={confirmationLocked}
+          confirmationUnlockRemainingSeconds={confirmationUnlockRemainingSeconds}
           onRemove={(item) => {
             setCandidateIds((current) => current.filter((id) => id !== item.item_id))
             setPendingConfirmationId(null)
@@ -215,6 +241,7 @@ export default function App() {
             logEvent('remove_candidate', { item_id: item.item_id })
           }}
           onConfirm={(item) => {
+            if (confirmationLocked) return
             setPendingConfirmationId(item.item_id)
             setConfirmationError('')
             logEvent('confirm_candidates', { item_id: item.item_id, item_ids: [item.item_id] })

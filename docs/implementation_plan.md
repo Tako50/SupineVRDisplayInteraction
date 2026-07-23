@@ -174,7 +174,7 @@ Implement:
 - Exp_FocusPointing scene or task mode inside Dev_Prototype first
 - TaskManager for pointing trials
 - Task A: Left/Right, Task B: Front/Back Clear, Task C: Front/Back Input Occlusion
-- 48 main trials per task/method block (2 displays x 6 positions x 2 sizes x 2 cycles)
+- 96 main trials per task/method block (2 displays x 6 positions x 2 sizes x 4 cycles)
 - Constrained deterministic trial-order generation and counterbalance metadata
 - Target generation on Display_A_Front and Display_B_Back
 - Target size conditions
@@ -210,13 +210,16 @@ Implement:
 - T2 Web Browsing mode inside Dev_Prototype
 - Display_B_Back loads the YouTube page
 - Display_A_Front loads the fixed local comparison page
+- Fix T2 to the 2024 content and do not show a content-set selector
 - Unified practice steps: YouTube pause, play, skip forward by 10 seconds, seek backward with the seek bar, Web scroll, product detail, candidate add, candidate remove
 - Keep content-set, year, item ID, and video timestamps internal; do not render them on the comparison Web
 - Use the fixed category order from the current Notion T2 specification
 - Use the Notion-specified video time ranges for V2D and category positions for D2V
-- Continue from practice to Main without closing or reloading either WebView
-- Immediate task-completion-driven progression through V2D, D2V, semi-free comparison, and finalization, without fixed post-completion waits
-- Keep the 10-minute overall limit and countdown
+- Present P01-P08 for two Practice rounds without a time limit and continue immediately when both rounds complete, without closing or reloading either WebView
+- Immediate task-completion-driven progression through V2D and D2V; keep semi-free candidate exploration active until 11:30, then switch to finalization and open the candidate list
+- Keep the V2D and D2V stage-specific instructions; use the unrestricted candidate-list instruction for semi-free comparison and the final-selection instruction for finalization
+- Run Main for 12 minutes with its own countdown; unlock final confirmation at 11:30
+- If Main reaches 12 minutes without confirmation, freeze the Main metrics and record `timeout`, keep the candidate list operable until one item is confirmed, and store that item/time separately without changing the timeout result
 - Keep inspector-configurable timeouts for Practice, V2D, D2V, semi-free comparison, and finalization; confirm their values before enabling them
 - Completion when the participant confirms one final item after completing V2D, D2V, and semi-free candidate addition
 - Stop timing and write the result when the final item is confirmed, then keep its image and product information visible for the post-task questionnaire
@@ -279,6 +282,7 @@ Implement:
   - Calibration_Debug
   - Exp_FocusPointing
 - T2 remains in Dev_Prototype unless a later design explicitly creates a separate scene
+- T1 practice cycles LeftRight, UpDown, and UpDownDepth in 12-trial blocks; allow ending only after at least 36 trials
 - Participant ID input
 - Condition selection
 - Trial randomization or counterbalancing placeholder

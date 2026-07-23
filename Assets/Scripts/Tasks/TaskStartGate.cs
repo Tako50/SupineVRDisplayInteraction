@@ -18,9 +18,13 @@ public class TaskStartGate : MonoBehaviour
     private float countdownSeconds;
     private Color buttonColor;
     private Color countdownColor;
+    private Color lockedButtonColor;
+    private string readyButtonLabel = "START";
     private Action countdownCompleted;
     private string logPrefix = "[TaskStartGate]";
     private bool waitingForButton;
+    private bool buttonLocked;
+    private float buttonUnlockTime;
     private bool countdownRunning;
     private float countdownEndTime;
     private int lastCountdownNumber;
@@ -52,7 +56,9 @@ public class TaskStartGate : MonoBehaviour
         Color normalColor,
         Color activeCountdownColor,
         Action onCountdownCompleted,
-        string ownerLogPrefix)
+        string ownerLogPrefix,
+        float buttonLockSeconds = 0f,
+        string buttonLabel = "START")
     {
         display = targetDisplay;
         normalizedPosition = buttonPosition;
@@ -60,6 +66,8 @@ public class TaskStartGate : MonoBehaviour
         countdownSeconds = Mathf.Max(0f, durationSeconds);
         buttonColor = normalColor;
         countdownColor = activeCountdownColor;
+        lockedButtonColor = Color.Lerp(normalColor, Color.gray, 0.7f);
+        readyButtonLabel = string.IsNullOrWhiteSpace(buttonLabel) ? "START" : buttonLabel.Trim();
         countdownCompleted = onCountdownCompleted;
         logPrefix = string.IsNullOrWhiteSpace(ownerLogPrefix)
             ? "[TaskStartGate]"
@@ -68,12 +76,20 @@ public class TaskStartGate : MonoBehaviour
         EnsureVisuals();
         ApplyRect();
         waitingForButton = true;
+        buttonLocked = buttonLockSeconds > 0f;
+        buttonUnlockTime = Time.time + Mathf.Max(0f, buttonLockSeconds);
         countdownRunning = false;
         lastCountdownNumber = 0;
         gameObject.SetActive(true);
         gateRect.SetAsLastSibling();
-        gateImage.color = buttonColor;
-        gateText.text = "START";
+        if (buttonLocked)
+        {
+            UpdateButtonLockVisual();
+        }
+        else
+        {
+            ShowReadyButtonVisual();
+        }
         syncMarkerController = SyncMarkerController.GetOrCreate();
     }
 
@@ -89,6 +105,11 @@ public class TaskStartGate : MonoBehaviour
             return false;
         }
 
+        if (buttonLocked)
+        {
+            return true;
+        }
+
         countdownRunning = true;
         countdownEndTime = Time.time + countdownSeconds;
         lastCountdownNumber = 0;
@@ -101,6 +122,7 @@ public class TaskStartGate : MonoBehaviour
     public void Hide()
     {
         waitingForButton = false;
+        buttonLocked = false;
         countdownRunning = false;
         countdownCompleted = null;
         gameObject.SetActive(false);
@@ -108,6 +130,18 @@ public class TaskStartGate : MonoBehaviour
 
     private void Update()
     {
+        if (waitingForButton && buttonLocked)
+        {
+            if (Time.time < buttonUnlockTime)
+            {
+                UpdateButtonLockVisual();
+                return;
+            }
+
+            buttonLocked = false;
+            ShowReadyButtonVisual();
+        }
+
         if (!countdownRunning)
         {
             return;
@@ -122,6 +156,31 @@ public class TaskStartGate : MonoBehaviour
         Action completed = countdownCompleted;
         Hide();
         completed?.Invoke();
+    }
+
+    private void UpdateButtonLockVisual()
+    {
+        if (gateImage == null || gateText == null)
+        {
+            return;
+        }
+
+        int remainingSeconds = Mathf.Max(1, Mathf.CeilToInt(buttonUnlockTime - Time.time));
+        gateImage.color = lockedButtonColor;
+        gateText.text = $"{readyButtonLabel}\n{remainingSeconds}s";
+    }
+
+    private void ShowReadyButtonVisual()
+    {
+        if (gateImage != null)
+        {
+            gateImage.color = buttonColor;
+        }
+
+        if (gateText != null)
+        {
+            gateText.text = readyButtonLabel;
+        }
     }
 
     private void EnsureVisuals()

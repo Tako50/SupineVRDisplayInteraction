@@ -75,6 +75,24 @@ public class DisplayManager : MonoBehaviour
         return true;
     }
 
+    public bool TryGetHitOnDisplay(DisplaySurface display, Ray ray, out DisplayHit displayHit)
+    {
+        displayHit = default;
+        if (display == null || display.TransparentHitPlane == null || ray.direction == Vector3.zero)
+        {
+            return false;
+        }
+
+        if (!display.TransparentHitPlane.Raycast(ray, out RaycastHit physicsHit, maxRayDistance))
+        {
+            return false;
+        }
+
+        Vector2 normalized = GetNormalizedFromWorldPoint(display, physicsHit.point);
+        displayHit = new DisplayHit(display, physicsHit, normalized);
+        return true;
+    }
+
     public DisplayHit[] GetDisplayHitsAll(Ray ray)
     {
         // ExplicitDisplayFocusでは重なった表示候補を全部集めるためRaycastAllを使う。
