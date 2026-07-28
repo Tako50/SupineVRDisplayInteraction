@@ -471,7 +471,7 @@ MonoBehaviour:
   transparentHitPlane: {fileID: 1034436738}
   cursor: {fileID: 1401940731}
   scrollContent: {fileID: 1619621304}
-  physicalSizeMeters: {x: 0.72794044, y: 0.39782473}
+  physicalSizeMeters: {x: 0.43721014, y: 0.2792781}
   canvasPixelSize: {x: 800, y: 450}
   canvasScale: 0.001
   hitPlaneDepthMeters: 0.02
@@ -491,8 +491,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 528464812}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.10656217, y: 0.0001310623, z: -0.0008937034, w: 0.9943057}
-  m_LocalPosition: {x: 0.00007022934, y: 1.149529, z: 0.97728896}
+  m_LocalRotation: {x: 0.11480152, y: 0.00012364882, z: -0.000894759, w: 0.99338806}
+  m_LocalPosition: {x: 0.000030234602, y: 1.190376, z: 0.7302309}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -514,7 +514,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   displaySurface: {fileID: 0}
   enableOnStart: 0
-  initialUrl: https://www.youtube.com
+  initialUrl: about:blank
   autoCreateTLabPrefab: 1
   consumeExperimentInput: 1
   viewSize: {x: 960, y: 540}
@@ -540,6 +540,8 @@ MonoBehaviour:
   scrollPixelsPerSecond: 900
   invertScrollDirection: 1
   seekSecondsPerSecond: 30
+  enablePointerHover: 1
+  pointerHoverUpdatesPerSecond: 30
   logInputEvents: 0
   loadBlankPageOnDisable: 1
   blankPageUrl: about:blank
@@ -1134,7 +1136,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.72794044, y: 0.39782473, z: 0.02}
+  m_Size: {x: 0.43721014, y: 0.2792781, z: 0.02}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1035063436
 GameObject:
@@ -1171,7 +1173,7 @@ MonoBehaviour:
   transparentHitPlane: {fileID: 1302094133}
   cursor: {fileID: 2109210849}
   scrollContent: {fileID: 1172880933}
-  physicalSizeMeters: {x: 1.4558809, y: 0.79564947}
+  physicalSizeMeters: {x: 1.7499542, y: 0.9526573}
   canvasPixelSize: {x: 800, y: 450}
   canvasScale: 0.001
   hitPlaneDepthMeters: 0.02
@@ -1191,8 +1193,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1035063436}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.1068336, y: 0.00031770213, z: -0.0008455463, w: 0.9942765}
-  m_LocalPosition: {x: 0.001624933, y: 1.7863274, z: 1.9543458}
+  m_LocalRotation: {x: -0.102928266, y: 0.0003143792, z: -0.0008467874, w: 0.9946884}
+  m_LocalPosition: {x: 0.0017994716, y: 1.8221557, z: 2.2023256}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1240,6 +1242,8 @@ MonoBehaviour:
   scrollPixelsPerSecond: 900
   invertScrollDirection: 1
   seekSecondsPerSecond: 30
+  enablePointerHover: 1
+  pointerHoverUpdatesPerSecond: 30
   logInputEvents: 0
   loadBlankPageOnDisable: 1
   blankPageUrl: about:blank
@@ -1344,6 +1348,7 @@ MonoBehaviour:
   writeCsv: 1
   filePrefix: prototype
   sampleIntervalSeconds: 0.25
+  requireParticipantContextBeforeOpen: 1
 --- !u!114 &1045802442
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1412,7 +1417,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   inputManager: {fileID: 1045802450}
   displayManager: {fileID: 1045802448}
-  gazeProvider: {fileID: 0}
   webViewSessionManager: {fileID: 0}
   cursorSpeedPixelsPerSecond: 220
   deadzone: 0.08
@@ -1467,6 +1471,8 @@ MonoBehaviour:
   displayManager: {fileID: 1045802448}
   virtualCursorController: {fileID: 1045802444}
   logger: {fileID: 1045802441}
+  offDisplaySnapMaxAngleDegrees: 3
+  offDisplaySwitchHysteresisDegrees: 0.5
 --- !u!114 &1045802447
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1495,36 +1501,48 @@ MonoBehaviour:
   canvasPixelSize: {x: 800, y: 450}
   upDownDepth:
     displayA:
-      distanceMeters: 1
+      distanceMeters: 0.75
       horizontalAngleDegrees: 0
-      verticalAngleDegrees: -12.25
+      verticalAngleDegrees: -13.2
+      apparentWidthDegreesOverride: 37.5
+      apparentHeightDegreesOverride: 21.09375
       rotationOffsetDegrees: {x: 0, y: 0, z: 0}
     displayB:
-      distanceMeters: 2
+      distanceMeters: 2.25
       horizontalAngleDegrees: 0
-      verticalAngleDegrees: 12.25
+      verticalAngleDegrees: 11.8
+      apparentWidthDegreesOverride: 42.5
+      apparentHeightDegreesOverride: 23.90625
       rotationOffsetDegrees: {x: 0, y: 0, z: 0}
   leftRight:
     displayA:
       distanceMeters: 1.5
       horizontalAngleDegrees: -21
       verticalAngleDegrees: 0
+      apparentWidthDegreesOverride: 0
+      apparentHeightDegreesOverride: 0
       rotationOffsetDegrees: {x: 0, y: 0, z: 0}
     displayB:
       distanceMeters: 1.5
       horizontalAngleDegrees: 21
       verticalAngleDegrees: 0
+      apparentWidthDegreesOverride: 0
+      apparentHeightDegreesOverride: 0
       rotationOffsetDegrees: {x: 0, y: 0, z: 0}
   upDown:
     displayA:
       distanceMeters: 1.5
       horizontalAngleDegrees: 0
       verticalAngleDegrees: -12.25
+      apparentWidthDegreesOverride: 0
+      apparentHeightDegreesOverride: 0
       rotationOffsetDegrees: {x: 0, y: 0, z: 0}
     displayB:
       distanceMeters: 1.5
       horizontalAngleDegrees: 0
       verticalAngleDegrees: 12.25
+      apparentWidthDegreesOverride: 0
+      apparentHeightDegreesOverride: 0
       rotationOffsetDegrees: {x: 0, y: 0, z: 0}
 --- !u!114 &1045802448
 MonoBehaviour:
@@ -1712,8 +1730,8 @@ MonoBehaviour:
   displayB: {fileID: 1035063438}
   participantId: P000
   sessionId: S000
+  runId: Run
   autoStartOnPlay: 0
-  loopTrainingTrials: 1
   returnToConditionSelectionAfterMainTask: 1
   selectedCondition: 0
   selectedTask: 0
@@ -1739,8 +1757,7 @@ MonoBehaviour:
   largeTargetSizeDegrees: 3
   fallbackTargetSizeNormalized: 0.05
   trials: []
-  useLatest48TrialDesign: 1
-  trainingTrialCount: 12
+  useGeneratedTrialDesign: 1
   latestSequenceSeedBase: 3100
   targetOrderCsv: {fileID: 0}
   targetOrderResourcePath: T1/target_orders_ABCDEFG
@@ -1753,6 +1770,11 @@ MonoBehaviour:
   startCountdownSeconds: 3
   startGateButtonColor: {r: 0.5019608, g: 0.8117647, b: 1, a: 1}
   startGateCountdownColor: {r: 0.1254902, g: 0.1254902, b: 0.1254902, a: 1}
+  feedbackAudioSource: {fileID: 0}
+  correctFeedbackClip: {fileID: 0}
+  incorrectFeedbackClip: {fileID: 0}
+  feedbackVolume: 0.8
+  showMainSetProgress: 1
 --- !u!114 &1045802457
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1800,10 +1822,13 @@ MonoBehaviour:
   raycastPointer: {fileID: 1045802445}
   gazeProvider: {fileID: 1045802449}
   gazeDisplayFocusManager: {fileID: 1045802461}
+  logger: {fileID: 0}
   menuDisplayId: Display_B_Back
   showMenuInConditionSelection: 1
   showLayoutButtons: 1
   applySelectedLayout: 1
+  assignMethodFromParticipantNumber: 1
+  participantAllocationSeed: 20260725
   panelColor: {r: 0.025, g: 0.035, b: 0.055, a: 0.96}
   statusCardColor: {r: 0.06, g: 0.09, b: 0.14, a: 0.98}
   buttonColor: {r: 0.1, g: 0.14, b: 0.2, a: 0.98}
@@ -1883,6 +1908,7 @@ MonoBehaviour:
   inputManager: {fileID: 1045802450}
   gazeProvider: {fileID: 1045802449}
   displayManager: {fileID: 1045802448}
+  focusManager: {fileID: 0}
   highlightEnabled: 1
   logStateChanges: 1
   currentFocusedTarget: {fileID: 0}
@@ -1924,17 +1950,17 @@ MonoBehaviour:
   initialCursorNormalizedPosition: {x: 0.5, y: 0.5}
   participantId: P000
   sessionId: S000
+  runId: Run
   conditionOrder: G1
   selectedContentSet: 0
   youtubeUrlSetA: https://www.youtube.com/watch?v=oCKnZl-XT1Y
-  youtubeUrlSetB: https://www.youtube.com/watch?v=wIHPxl6OPOc
+  practiceYoutubeUrl: https://www.youtube.com/watch?v=HQRzNpPDk0k
+  practiceComparisonInitialUrl: http://133.87.151.83:5173/?mode=practice
   forceYoutubeUnmuted: 1
   youtubeForcedVolume: 1
   d2vPauseRangeSetASeconds: {x: 688, y: 743}
-  d2vPauseRangeSetBSeconds: {x: 948, y: 1011}
-  comparisonPageResourceSetA: 
-  comparisonPageResourceSetB: 
-  practiceInstructionRounds: 2
+  comparisonPageResourceSetA: T2/t2_content_2024
+  minimumPracticeRounds: 1
   totalTaskDurationSeconds: 720
   candidateConfirmationUnlockSeconds: 690
   practiceStageTimeoutSeconds: 0
@@ -2150,7 +2176,7 @@ RectTransform:
   m_GameObject: {fileID: 1222415396}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.00090992555, y: 0.000884055, z: 0.000884055}
+  m_LocalScale: {x: 0.00054651266, y: 0.000620618, z: 0.00054651266}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 856379150}
@@ -2278,7 +2304,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1.4558809, y: 0.79564947, z: 0.02}
+  m_Size: {x: 1.7499542, y: 0.9526573, z: 0.02}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1391092718
 GameObject:
@@ -2786,7 +2812,7 @@ RectTransform:
   m_GameObject: {fileID: 1846588272}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.0018198511, y: 0.00176811, z: 0.00176811}
+  m_LocalScale: {x: 0.0021874427, y: 0.0021170161, z: 0.0021170161}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 11759483}

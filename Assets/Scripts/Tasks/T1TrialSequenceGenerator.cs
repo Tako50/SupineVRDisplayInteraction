@@ -13,7 +13,7 @@ public static class T1TrialSequenceGenerator
     public const int MainCycles = 4;
     public const int MainTrialsPerBlock = CombinationsPerCycle * MainCycles;
 
-    private static readonly float[] XPositions = { 0.10f, 0.50f, 0.90f };
+    private static readonly float[] XPositions = { 0.20f, 0.50f, 0.80f };
     private static readonly float[] YPositions = { 0.20f, 0.80f };
     private static readonly T1TargetSize[] Sizes = { T1TargetSize.Small, T1TargetSize.Large };
 
@@ -56,11 +56,24 @@ public static class T1TrialSequenceGenerator
         for (int cycle = 1; cycle <= cycleCount; cycle++)
         {
             List<FocusPointingTrialConfig> pool = BuildCyclePool(task, condition, display1Id, display2Id, cycle, seed);
-            List<FocusPointingTrialConfig> ordered = FindBestOrder(pool, seed + cycle * 7919, previousDisplay);
+            List<FocusPointingTrialConfig> ordered = FindBestOrder(
+                pool,
+                seed + cycle * 7919,
+                previousDisplay,
+                previousPositionId);
 
             if (previousCycle != null && HasSameCombinationOrder(previousCycle, ordered))
             {
-                Rotate(ordered, 5);
+                List<FocusPointingTrialConfig> rotated =
+                    new List<FocusPointingTrialConfig>(ordered);
+                Rotate(rotated, 5);
+                if (!HasConsecutiveSameTargetPosition(
+                        rotated,
+                        previousDisplay,
+                        previousPositionId))
+                {
+                    ordered = rotated;
+                }
             }
 
             for (int i = 0; i < ordered.Count && result.Count < outputCount; i++)
@@ -86,6 +99,12 @@ public static class T1TrialSequenceGenerator
             }
 
             previousCycle = ordered;
+        }
+
+        if (HasConsecutiveSameTargetPosition(result, string.Empty, -1))
+        {
+            throw new InvalidOperationException(
+                "T1 trial generation produced consecutive trials at the same display position.");
         }
 
         for (int i = 0; i < result.Count; i++)
@@ -157,7 +176,8 @@ public static class T1TrialSequenceGenerator
     private static List<FocusPointingTrialConfig> FindBestOrder(
         List<FocusPointingTrialConfig> source,
         int seed,
-        string previousDisplay)
+        string previousDisplay,
+        int previousPositionId)
     {
         const int candidateCount = 1500;
         System.Random random = new System.Random(seed);
@@ -168,6 +188,14 @@ public static class T1TrialSequenceGenerator
         {
             List<FocusPointingTrialConfig> candidate = new List<FocusPointingTrialConfig>(source);
             Shuffle(candidate, random);
+            if (HasConsecutiveSameTargetPosition(
+                    candidate,
+                    previousDisplay,
+                    previousPositionId))
+            {
+                continue;
+            }
+
             int score = Score(candidate, previousDisplay);
             if (score < bestScore)
             {
@@ -180,7 +208,13 @@ public static class T1TrialSequenceGenerator
             }
         }
 
-        return best ?? new List<FocusPointingTrialConfig>(source);
+        if (best == null)
+        {
+            throw new InvalidOperationException(
+                $"Could not generate a T1 order without consecutive repeated target positions. seed={seed}");
+        }
+
+        return best;
     }
 
     private static int Score(List<FocusPointingTrialConfig> trials, string previousDisplay)
@@ -242,13 +276,6 @@ public static class T1TrialSequenceGenerator
                 sizeRunLength = 1;
             }
 
-            if (i > 0
-                && trials[i - 1].targetDisplayId == trial.targetDisplayId
-                && trials[i - 1].positionId == trial.positionId)
-            {
-                score += 10;
-            }
-
             if (trial.inputOccluded && i > 0 && trials[i - 1].inputOccluded)
             {
                 score += 14;
@@ -280,6 +307,31 @@ public static class T1TrialSequenceGenerator
         }
 
         return score;
+    }
+
+    private static bool HasConsecutiveSameTargetPosition(
+        IReadOnlyList<FocusPointingTrialConfig> trials,
+        string previousDisplay,
+        int previousPositionId)
+    {
+        string lastDisplay = previousDisplay;
+        int lastPositionId = previousPositionId;
+
+        for (int i = 0; i < trials.Count; i++)
+        {
+            FocusPointingTrialConfig trial = trials[i];
+            if (!string.IsNullOrEmpty(lastDisplay)
+                && lastDisplay == trial.targetDisplayId
+                && lastPositionId == trial.positionId)
+            {
+                return true;
+            }
+
+            lastDisplay = trial.targetDisplayId;
+            lastPositionId = trial.positionId;
+        }
+
+        return false;
     }
 
     private static void Shuffle<T>(List<T> list, System.Random random)

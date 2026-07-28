@@ -1,17 +1,18 @@
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 using UnityEngine.UI;
 
 [DisallowMultipleComponent]
 /// <summary>
-/// VR内の条件選択、T1のTraining/Main開始、T2統合タスク開始、End/Abortボタンを生成する。
+/// VR内の条件選択、T1/T2のTraining/Main開始、End/Abortボタンを生成する。
 /// 条件選択中はディスプレイ内メニュー、タスク中は誤操作しにくい外部ボタンとして扱う。
 /// </summary>
 public class VRTaskMenuManager : MonoBehaviour
 {
-    private const string RaycastingMethodLabel = "Raycasting";
-    private const string GazeRayMethodLabel = "Gaze + Ray";
-    private const string GazeJoystickMethodLabel = "Gaze + Joystick";
+    private const string RaycastingMethodLabel = "レイキャスティング";
+    private const string GazeRayMethodLabel = "視線＋レイキャスティング";
+    private const string GazeJoystickMethodLabel = "視線＋スティック";
 
     private enum PrototypeTask
     {
@@ -29,6 +30,18 @@ public class VRTaskMenuManager : MonoBehaviour
         SelectUpDownDepth,
         SelectLeftRight,
         SelectUpDown,
+        ParticipantDigit0,
+        ParticipantDigit1,
+        ParticipantDigit2,
+        ParticipantDigit3,
+        ParticipantDigit4,
+        ParticipantDigit5,
+        ParticipantDigit6,
+        ParticipantDigit7,
+        ParticipantDigit8,
+        ParticipantDigit9,
+        ParticipantBackspace,
+        ConfirmParticipant,
         BeginTraining,
         BeginMain,
         EndTraining,
@@ -61,8 +74,28 @@ public class VRTaskMenuManager : MonoBehaviour
 
     private static readonly MenuButtonSpec[] SelectionButtonSpecs =
     {
-        new MenuButtonSpec(MenuAction.SelectT1FocusPointing, "T1 Target Selection", new Rect(0.06f, 0.650f, 0.42f, 0.085f)),
-        new MenuButtonSpec(MenuAction.SelectT2WebBrowsing, "T2 Web Browsing", new Rect(0.52f, 0.650f, 0.42f, 0.085f)),
+        new MenuButtonSpec(MenuAction.SelectT1FocusPointing, "T1 ターゲット選択", new Rect(0.06f, 0.390f, 0.42f, 0.085f)),
+        new MenuButtonSpec(MenuAction.SelectT2WebBrowsing, "T2 動画・Web比較", new Rect(0.52f, 0.390f, 0.42f, 0.085f))
+    };
+
+    private static readonly MenuButtonSpec[] ParticipantButtonSpecs =
+    {
+        new MenuButtonSpec(MenuAction.ParticipantDigit1, "1", new Rect(0.06f, 0.620f, 0.055f, 0.075f)),
+        new MenuButtonSpec(MenuAction.ParticipantDigit2, "2", new Rect(0.122f, 0.620f, 0.055f, 0.075f)),
+        new MenuButtonSpec(MenuAction.ParticipantDigit3, "3", new Rect(0.184f, 0.620f, 0.055f, 0.075f)),
+        new MenuButtonSpec(MenuAction.ParticipantDigit4, "4", new Rect(0.246f, 0.620f, 0.055f, 0.075f)),
+        new MenuButtonSpec(MenuAction.ParticipantDigit5, "5", new Rect(0.308f, 0.620f, 0.055f, 0.075f)),
+        new MenuButtonSpec(MenuAction.ParticipantDigit6, "6", new Rect(0.370f, 0.620f, 0.055f, 0.075f)),
+        new MenuButtonSpec(MenuAction.ParticipantDigit7, "7", new Rect(0.432f, 0.620f, 0.055f, 0.075f)),
+        new MenuButtonSpec(MenuAction.ParticipantDigit8, "8", new Rect(0.494f, 0.620f, 0.055f, 0.075f)),
+        new MenuButtonSpec(MenuAction.ParticipantDigit9, "9", new Rect(0.556f, 0.620f, 0.055f, 0.075f)),
+        new MenuButtonSpec(MenuAction.ParticipantDigit0, "0", new Rect(0.618f, 0.620f, 0.055f, 0.075f)),
+        new MenuButtonSpec(MenuAction.ParticipantBackspace, "1字削除", new Rect(0.690f, 0.620f, 0.10f, 0.075f)),
+        new MenuButtonSpec(MenuAction.ConfirmParticipant, "番号を確定", new Rect(0.805f, 0.620f, 0.135f, 0.075f))
+    };
+
+    private static readonly MenuButtonSpec[] ManualMethodButtonSpecs =
+    {
         new MenuButtonSpec(MenuAction.SelectRaycastBaseline, RaycastingMethodLabel, new Rect(0.06f, 0.455f, 0.27f, 0.085f)),
         new MenuButtonSpec(MenuAction.SelectGazeRay, GazeRayMethodLabel, new Rect(0.365f, 0.455f, 0.27f, 0.085f)),
         new MenuButtonSpec(MenuAction.SelectExplicitDisplayFocus, GazeJoystickMethodLabel, new Rect(0.67f, 0.455f, 0.27f, 0.085f))
@@ -70,22 +103,21 @@ public class VRTaskMenuManager : MonoBehaviour
 
     private static readonly MenuButtonSpec[] LayoutButtonSpecs =
     {
-        new MenuButtonSpec(MenuAction.SelectUpDownDepth, "A  Left / Right", new Rect(0.06f, 0.270f, 0.28f, 0.060f)),
-        new MenuButtonSpec(MenuAction.SelectLeftRight, "B  Up / Down", new Rect(0.36f, 0.270f, 0.28f, 0.060f)),
-        new MenuButtonSpec(MenuAction.SelectUpDown, "C  Up / Down + Depth", new Rect(0.66f, 0.270f, 0.28f, 0.060f))
+        new MenuButtonSpec(MenuAction.SelectUpDownDepth, "A　左右", new Rect(0.06f, 0.270f, 0.28f, 0.060f)),
+        new MenuButtonSpec(MenuAction.SelectLeftRight, "B　上下", new Rect(0.36f, 0.270f, 0.28f, 0.060f)),
+        new MenuButtonSpec(MenuAction.SelectUpDown, "C　上下＋奥行き", new Rect(0.66f, 0.270f, 0.28f, 0.060f))
     };
 
     private static readonly MenuButtonSpec[] TaskControlButtonSpecs =
     {
-        new MenuButtonSpec(MenuAction.BeginTraining, "START TRAINING", new Rect(0.06f, 0.045f, 0.42f, 0.105f)),
-        new MenuButtonSpec(MenuAction.BeginMain, "START MAIN TASK", new Rect(0.52f, 0.045f, 0.42f, 0.105f)),
-        new MenuButtonSpec(MenuAction.EndTraining, "End Training", new Rect(0.68f, 1.34f, 0.28f, 0.09f)),
-        new MenuButtonSpec(MenuAction.AbortMainTask, "Abort Main", new Rect(0.72f, 1.34f, 0.24f, 0.08f))
+        new MenuButtonSpec(MenuAction.BeginTraining, "練習を開始", new Rect(0.06f, 0.045f, 0.42f, 0.105f)),
+        new MenuButtonSpec(MenuAction.BeginMain, "本番を開始", new Rect(0.52f, 0.045f, 0.42f, 0.105f)),
+        new MenuButtonSpec(MenuAction.EndTraining, "練習を終了", new Rect(0.68f, 1.34f, 0.28f, 0.09f)),
+        new MenuButtonSpec(MenuAction.AbortMainTask, "本番を中止", new Rect(0.72f, 1.34f, 0.24f, 0.08f))
     };
 
-    private static readonly Rect T1TrainingStartRect = new Rect(0.06f, 0.045f, 0.42f, 0.105f);
-    private static readonly Rect T1MainStartRect = new Rect(0.52f, 0.045f, 0.42f, 0.105f);
-    private static readonly Rect T2UnifiedStartRect = new Rect(0.06f, 0.045f, 0.88f, 0.105f);
+    private static readonly Rect TrainingStartRect = new Rect(0.06f, 0.045f, 0.42f, 0.105f);
+    private static readonly Rect MainStartRect = new Rect(0.52f, 0.045f, 0.42f, 0.105f);
 
     [Header("References")]
     [SerializeField] private PrototypeInputManager inputManager;
@@ -96,12 +128,16 @@ public class VRTaskMenuManager : MonoBehaviour
     [SerializeField] private RaycastPointer raycastPointer;
     [SerializeField] private GazeProvider gazeProvider;
     [SerializeField] private GazeDisplayFocusManager gazeDisplayFocusManager;
+    [SerializeField] private Logger logger;
 
     [Header("Menu")]
     [SerializeField] private string menuDisplayId = "Display_B_Back";
     [SerializeField] private bool showMenuInConditionSelection = true;
     [SerializeField] private bool showLayoutButtons = false;
     [SerializeField] private bool applySelectedLayout = false;
+    [SerializeField] private bool assignMethodFromParticipantNumber = true;
+    [SerializeField] private int participantAllocationSeed =
+        ParticipantMethodAssignment.DefaultAllocationSeed;
     [SerializeField] private Color panelColor = new Color(0.025f, 0.035f, 0.055f, 0.96f);
     [SerializeField] private Color statusCardColor = new Color(0.06f, 0.09f, 0.14f, 0.98f);
     [SerializeField] private Color buttonColor = new Color(0.10f, 0.14f, 0.20f, 0.98f);
@@ -124,6 +160,9 @@ public class VRTaskMenuManager : MonoBehaviour
     private DisplayLayoutPreset selectedLayout = DisplayLayoutPreset.UpDownDepth;
     private PrototypeTask selectedTask = PrototypeTask.T1FocusPointing;
     private T2ContentSet selectedT2ContentSet = T2ContentSet.ACampGear2024;
+    private string participantNumberInput = string.Empty;
+    private bool participantAssignmentConfirmed;
+    private ParticipantMethodAssignment.Assignment participantAssignment;
 
     private void Awake()
     {
@@ -220,19 +259,33 @@ public class VRTaskMenuManager : MonoBehaviour
         {
             case MenuAction.SelectT1FocusPointing:
                 selectedTask = PrototypeTask.T1FocusPointing;
+                ApplySelectionsToManagers();
                 break;
             case MenuAction.SelectT2WebBrowsing:
                 selectedTask = PrototypeTask.T2WebBrowsing;
+                ApplySelectionsToManagers();
                 break;
             case MenuAction.SelectRaycastBaseline:
+                if (assignMethodFromParticipantNumber)
+                {
+                    break;
+                }
                 selectedCondition = InteractionCondition.RaycastBaseline;
                 ApplySelectionsToManagers();
                 break;
             case MenuAction.SelectGazeRay:
+                if (assignMethodFromParticipantNumber)
+                {
+                    break;
+                }
                 selectedCondition = InteractionCondition.GazeRay;
                 ApplySelectionsToManagers();
                 break;
             case MenuAction.SelectExplicitDisplayFocus:
+                if (assignMethodFromParticipantNumber)
+                {
+                    break;
+                }
                 selectedCondition = InteractionCondition.ExplicitDisplayFocus;
                 ApplySelectionsToManagers();
                 break;
@@ -248,12 +301,31 @@ public class VRTaskMenuManager : MonoBehaviour
                 selectedLayout = DisplayLayoutPreset.UpDownDepth;
                 ApplySelectionsToManagers();
                 break;
+            case MenuAction.ParticipantDigit0:
+            case MenuAction.ParticipantDigit1:
+            case MenuAction.ParticipantDigit2:
+            case MenuAction.ParticipantDigit3:
+            case MenuAction.ParticipantDigit4:
+            case MenuAction.ParticipantDigit5:
+            case MenuAction.ParticipantDigit6:
+            case MenuAction.ParticipantDigit7:
+            case MenuAction.ParticipantDigit8:
+            case MenuAction.ParticipantDigit9:
+                AppendParticipantDigit(action);
+                break;
+            case MenuAction.ParticipantBackspace:
+                BackspaceParticipantNumber();
+                break;
+            case MenuAction.ConfirmParticipant:
+                ConfirmParticipantAssignment();
+                break;
             case MenuAction.BeginTraining:
                 if (!CanStartSelectedCondition())
                 {
                     break;
                 }
                 ApplySelectionsToManagers();
+                PrepareRunContext("Practice");
                 if (selectedTask == PrototypeTask.T2WebBrowsing)
                 {
                     webViewSessionManager?.BeginTrainingTask();
@@ -269,9 +341,10 @@ public class VRTaskMenuManager : MonoBehaviour
                     break;
                 }
                 ApplySelectionsToManagers();
+                PrepareRunContext("Main");
                 if (selectedTask == PrototypeTask.T2WebBrowsing)
                 {
-                    webViewSessionManager?.BeginUnifiedTask();
+                    webViewSessionManager?.BeginMainTask();
                 }
                 else
                 {
@@ -279,6 +352,12 @@ public class VRTaskMenuManager : MonoBehaviour
                 }
                 break;
             case MenuAction.EndTraining:
+                if (webViewSessionManager != null
+                    && webViewSessionManager.CurrentPhase == WebViewSessionPhase.Training)
+                {
+                    webViewSessionManager.TryCompleteTraining();
+                    break;
+                }
                 if (focusPointingTaskManager != null
                     && focusPointingTaskManager.CurrentPhase == FocusPointingTaskPhase.Training
                     && !focusPointingTaskManager.CanEndTraining)
@@ -299,12 +378,84 @@ public class VRTaskMenuManager : MonoBehaviour
             + $"layout={selectedLayout}, t2ContentSet={selectedT2ContentSet}");
     }
 
+    private void AppendParticipantDigit(MenuAction action)
+    {
+        const int maximumDigits = 4;
+        if (participantNumberInput.Length >= maximumDigits)
+        {
+            return;
+        }
+
+        int digit = (int)action - (int)MenuAction.ParticipantDigit0;
+        if (digit < 0 || digit > 9)
+        {
+            return;
+        }
+
+        if (participantNumberInput.Length == 0 && digit == 0)
+        {
+            return;
+        }
+
+        participantNumberInput += digit.ToString(CultureInfo.InvariantCulture);
+        participantAssignmentConfirmed = false;
+    }
+
+    private void BackspaceParticipantNumber()
+    {
+        if (participantNumberInput.Length > 0)
+        {
+            participantNumberInput =
+                participantNumberInput.Substring(0, participantNumberInput.Length - 1);
+        }
+
+        participantAssignmentConfirmed = false;
+    }
+
+    private void ConfirmParticipantAssignment()
+    {
+        if (!int.TryParse(
+                participantNumberInput,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out int participantNumber)
+            || participantNumber <= 0)
+        {
+            participantAssignmentConfirmed = false;
+            Debug.LogWarning("[VRTaskMenu] Enter a participant number greater than zero.");
+            return;
+        }
+
+        participantAssignment = ParticipantMethodAssignment.GetAssignment(
+            participantNumber,
+            participantAllocationSeed);
+        participantAssignmentConfirmed = true;
+        selectedCondition = participantAssignment.Condition;
+        ApplySelectionsToManagers();
+        Debug.Log(
+            $"[VRTaskMenu] participant assignment confirmed: "
+            + $"participant={participantAssignment.ParticipantId}, "
+            + $"condition={participantAssignment.Condition}, "
+            + $"allocation={participantAssignment.AllocationCode}");
+    }
+
     private void ApplySelectionsToManagers()
     {
+        if (assignMethodFromParticipantNumber && participantAssignmentConfirmed)
+        {
+            selectedCondition = participantAssignment.Condition;
+        }
+
         if (focusPointingTaskManager != null)
         {
             focusPointingTaskManager.SetSelectedCondition(selectedCondition);
             focusPointingTaskManager.SetSelectedLayout(selectedLayout);
+            if (participantAssignmentConfirmed)
+            {
+                focusPointingTaskManager.SetParticipantContext(
+                    participantAssignment.ParticipantId,
+                    BuildSessionId(PrototypeTask.T1FocusPointing));
+            }
         }
 
         if (webViewSessionManager != null)
@@ -313,6 +464,13 @@ public class VRTaskMenuManager : MonoBehaviour
             webViewSessionManager.SetSelectedCondition(selectedCondition);
             webViewSessionManager.SetSelectedLayout(DisplayLayoutPreset.UpDownDepth);
             webViewSessionManager.SetSelectedContentSet(T2ContentSet.ACampGear2024);
+            if (participantAssignmentConfirmed)
+            {
+                webViewSessionManager.SetParticipantContext(
+                    participantAssignment.ParticipantId,
+                    BuildSessionId(PrototypeTask.T2WebBrowsing),
+                    participantAssignment.AllocationCode);
+            }
         }
 
         if (inputManager != null && !inputManager.IsConditionLocked)
@@ -342,6 +500,52 @@ public class VRTaskMenuManager : MonoBehaviour
         }
     }
 
+    private string BuildSessionId(PrototypeTask task)
+    {
+        return $"S{participantAssignment.ParticipantNumber:000}-"
+            + (task == PrototypeTask.T2WebBrowsing ? "T2" : "T1");
+    }
+
+    private void PrepareRunContext(string phaseCode)
+    {
+        if (!participantAssignmentConfirmed)
+        {
+            return;
+        }
+
+        string taskCode = selectedTask == PrototypeTask.T2WebBrowsing ? "T2" : "T1";
+        string runId = ExperimentDataFileNaming.CreateRunId();
+        string sessionId = ExperimentDataFileNaming.BuildSessionId(
+            participantAssignment.ParticipantId,
+            taskCode,
+            phaseCode,
+            runId);
+
+        if (selectedTask == PrototypeTask.T2WebBrowsing)
+        {
+            webViewSessionManager?.SetParticipantContext(
+                participantAssignment.ParticipantId,
+                sessionId,
+                participantAssignment.AllocationCode,
+                runId);
+        }
+        else
+        {
+            focusPointingTaskManager?.SetParticipantContext(
+                participantAssignment.ParticipantId,
+                sessionId,
+                runId);
+        }
+
+        logger?.SetParticipantContext(
+            participantAssignment.ParticipantId,
+            sessionId,
+            selectedCondition,
+            taskCode,
+            phaseCode,
+            runId);
+    }
+
     private void SyncSelectionsFromManagers()
     {
         if (inputManager != null)
@@ -361,7 +565,10 @@ public class VRTaskMenuManager : MonoBehaviour
 
     private void SyncConditionFromInput()
     {
-        if (inputManager == null || inputManager.IsConditionLocked || IsTaskRunning())
+        if (assignMethodFromParticipantNumber
+            || inputManager == null
+            || inputManager.IsConditionLocked
+            || IsTaskRunning())
         {
             return;
         }
@@ -423,7 +630,7 @@ public class VRTaskMenuManager : MonoBehaviour
         Text title = CreateText(
             chrome,
             "Title",
-            "EXPERIMENT SETUP",
+            "参加者と課題の設定",
             new Rect(0.06f, 0.91f, 0.88f, 0.07f),
             20,
             TextAnchor.MiddleLeft);
@@ -437,20 +644,21 @@ public class VRTaskMenuManager : MonoBehaviour
         statusText = CreateText(
             statusCard,
             "Status",
-            "Select a task and interaction method",
+            "参加者番号を入力して確定してください",
             new Rect(0.025f, 0.08f, 0.95f, 0.84f),
             14,
             TextAnchor.MiddleLeft);
 
-        CreateSectionLabel(chrome, "TaskSection", "TASK", new Rect(0.06f, 0.745f, 0.88f, 0.035f));
-        CreateSectionLabel(chrome, "MethodSection", "INTERACTION METHOD", new Rect(0.06f, 0.550f, 0.88f, 0.035f));
+        CreateSectionLabel(chrome, "ParticipantSection", "参加者番号", new Rect(0.06f, 0.710f, 0.88f, 0.035f));
+        CreateSectionLabel(chrome, "TaskSection", "課題", new Rect(0.06f, 0.485f, 0.88f, 0.035f));
+        CreateSectionLabel(chrome, "MethodSection", "割当手法（参加者番号から自動決定）", new Rect(0.06f, 0.305f, 0.88f, 0.035f));
         layoutSectionText = CreateSectionLabel(
             chrome,
             "LayoutSection",
-            "DISPLAY LAYOUT",
-            new Rect(0.06f, 0.340f, 0.88f, 0.035f));
+            "ディスプレイ配置",
+            new Rect(0.06f, 0.250f, 0.88f, 0.035f));
         layoutSection = layoutSectionText.gameObject;
-        CreateSectionLabel(chrome, "RunSection", "BEGIN SESSION", new Rect(0.06f, 0.170f, 0.88f, 0.035f));
+        CreateSectionLabel(chrome, "RunSection", "開始", new Rect(0.06f, 0.170f, 0.88f, 0.035f));
 
         BuildButtonBindings(true);
 
@@ -490,6 +698,14 @@ public class VRTaskMenuManager : MonoBehaviour
     private void BuildButtonBindings(bool createObjects)
     {
         buttons.Clear();
+        if (assignMethodFromParticipantNumber)
+        {
+            AddButtonSpecs(ParticipantButtonSpecs, createObjects);
+        }
+        else
+        {
+            AddButtonSpecs(ManualMethodButtonSpecs, createObjects);
+        }
         AddButtonSpecs(SelectionButtonSpecs, createObjects);
         if (showLayoutButtons)
         {
@@ -635,6 +851,20 @@ public class VRTaskMenuManager : MonoBehaviour
     {
         switch (action)
         {
+            case MenuAction.ConfirmParticipant:
+            case MenuAction.ParticipantBackspace:
+                return 13;
+            case MenuAction.ParticipantDigit0:
+            case MenuAction.ParticipantDigit1:
+            case MenuAction.ParticipantDigit2:
+            case MenuAction.ParticipantDigit3:
+            case MenuAction.ParticipantDigit4:
+            case MenuAction.ParticipantDigit5:
+            case MenuAction.ParticipantDigit6:
+            case MenuAction.ParticipantDigit7:
+            case MenuAction.ParticipantDigit8:
+            case MenuAction.ParticipantDigit9:
+                return 20;
             case MenuAction.SelectT1FocusPointing:
             case MenuAction.SelectT2WebBrowsing:
             case MenuAction.SelectGazeRay:
@@ -714,6 +944,30 @@ public class VRTaskMenuManager : MonoBehaviour
                 && webViewSessionManager.CurrentPhase != WebViewSessionPhase.ConditionSelection);
     }
 
+    public bool IsActiveTrainingReadyToEnd()
+    {
+        if (webViewSessionManager != null
+            && webViewSessionManager.CurrentPhase == WebViewSessionPhase.Training)
+        {
+            return webViewSessionManager.CanEndTraining;
+        }
+
+        return focusPointingTaskManager != null
+            && focusPointingTaskManager.CurrentPhase == FocusPointingTaskPhase.Training
+            && focusPointingTaskManager.CanEndTraining;
+    }
+
+    public bool TryCompleteActiveTraining()
+    {
+        if (webViewSessionManager != null
+            && webViewSessionManager.CurrentPhase == WebViewSessionPhase.Training)
+        {
+            return webViewSessionManager.TryCompleteTraining();
+        }
+
+        return false;
+    }
+
     private bool IsConditionSelectionVisible()
     {
         bool t1Idle = focusPointingTaskManager == null
@@ -756,19 +1010,18 @@ public class VRTaskMenuManager : MonoBehaviour
             MenuButton button = buttons[i];
             if (button.Action == MenuAction.BeginTraining)
             {
-                SetButtonRect(ref button, T1TrainingStartRect);
+                SetButtonRect(ref button, TrainingStartRect);
                 if (button.Text != null)
                 {
-                    button.Text.text = "START TRAINING";
+                    button.Text.text = "練習を開始";
                 }
             }
             else if (button.Action == MenuAction.BeginMain)
             {
-                bool unifiedT2 = selectedTask == PrototypeTask.T2WebBrowsing;
-                SetButtonRect(ref button, unifiedT2 ? T2UnifiedStartRect : T1MainStartRect);
+                SetButtonRect(ref button, MainStartRect);
                 if (button.Text != null)
                 {
-                    button.Text.text = unifiedT2 ? "START T2 TASK" : "START MAIN TASK";
+                    button.Text.text = "本番を開始";
                 }
             }
 
@@ -814,26 +1067,39 @@ public class VRTaskMenuManager : MonoBehaviour
 
         if (layoutSectionText != null)
         {
-            layoutSectionText.text = "T1 TASK";
+            layoutSectionText.text = "T1の配置";
         }
 
         if (statusText != null)
         {
             string orderSummary = selectedTask == PrototypeTask.T1FocusPointing
-                ? $"  |  {focusPointingTaskManager?.GetTargetOrderSummary(selectedCondition) ?? "Main List A / Training List G"}"
+                ? $"  |  配置順：左右 → 上下 → 上下＋奥行き／各{T1TrialSequenceGenerator.MainTrialsPerBlock}試行"
                 : $"  |  {GetT2ContentSetDisplayName(selectedT2ContentSet)}";
             DisplayLayoutPreset activeLayout = selectedTask == PrototypeTask.T2WebBrowsing
                 ? DisplayLayoutPreset.UpDownDepth
                 : selectedLayout;
             string layoutLabel = selectedTask == PrototypeTask.T1FocusPointing
                 && (focusPointingTaskManager?.UsesFixedMainTaskSequence ?? false)
-                    ? "Task A → B → C"
+                    ? "課題A → B → C"
                     : GetLayoutDisplayName(activeLayout);
-            statusText.text =
-                $"{GetTaskDisplayName(selectedTask)}  |  {GetConditionDisplayName(selectedCondition)}" +
-                $"{orderSummary}  |  {layoutLabel}\n" +
-                $"Visual feedback: Highlight ON  |  Controller Ray " +
-                $"{(selectedCondition == InteractionCondition.ExplicitDisplayFocus ? "OFF" : "Long")}";
+            if (assignMethodFromParticipantNumber && !participantAssignmentConfirmed)
+            {
+                string draftNumber = string.IsNullOrEmpty(participantNumberInput)
+                    ? "未入力"
+                    : participantNumberInput;
+                statusText.text =
+                    $"参加者番号：{draftNumber}（未確定）  |  数字を入力して「番号を確定」を押してください\n"
+                    + $"{GetTaskDisplayName(selectedTask)}  |  手法は番号確定後に自動割当";
+            }
+            else
+            {
+                string participantSummary = participantAssignmentConfirmed
+                    ? $"{participantAssignment.ParticipantId}  |  {participantAssignment.ShortAllocationCode}"
+                    : "参加者番号：手動設定";
+                statusText.text =
+                    $"{participantSummary}  |  割当：{GetConditionDisplayName(selectedCondition)}\n"
+                    + $"{GetTaskDisplayName(selectedTask)}{orderSummary}  |  {layoutLabel}";
+            }
         }
 
         if (menuPanel != null)
@@ -845,8 +1111,8 @@ public class VRTaskMenuManager : MonoBehaviour
     private static string GetTaskDisplayName(PrototypeTask task)
     {
         return task == PrototypeTask.T2WebBrowsing
-            ? "T2 Web Browsing"
-            : "T1 Target Selection";
+            ? "T2 動画・Web比較"
+            : "T1 ターゲット選択";
     }
 
     private static string GetConditionDisplayName(InteractionCondition condition)
@@ -864,7 +1130,7 @@ public class VRTaskMenuManager : MonoBehaviour
 
     private static string GetT2ContentSetDisplayName(T2ContentSet contentSet)
     {
-        return "2024 Content";
+        return "2024年コンテンツ";
     }
 
     private static void SetButtonRect(ref MenuButton button, Rect normalizedRect)
@@ -881,13 +1147,13 @@ public class VRTaskMenuManager : MonoBehaviour
         switch (layout)
         {
             case DisplayLayoutPreset.LeftRight:
-                return "Task A";
+                return "課題A（左右）";
             case DisplayLayoutPreset.UpDown:
-                return "Task B";
+                return "課題B（上下）";
             case DisplayLayoutPreset.UpDownDepth:
-                return "Task C";
+                return "課題C（上下＋奥行き）";
             default:
-                return "Legacy Up/Down + Depth";
+                return "旧・上下＋奥行き";
         }
     }
 
@@ -917,11 +1183,6 @@ public class VRTaskMenuManager : MonoBehaviour
                 return false;
             }
 
-            if (action == MenuAction.BeginTraining && selectedTask == PrototypeTask.T2WebBrowsing)
-            {
-                return false;
-            }
-
             if (action == MenuAction.SelectUpDownDepth
                 || action == MenuAction.SelectLeftRight
                 || action == MenuAction.SelectUpDown)
@@ -929,6 +1190,11 @@ public class VRTaskMenuManager : MonoBehaviour
                 return selectedTask == PrototypeTask.T1FocusPointing
                     && showLayoutButtons
                     && !(focusPointingTaskManager?.UsesFixedMainTaskSequence ?? false);
+            }
+
+            if (action == MenuAction.BeginTraining || action == MenuAction.BeginMain)
+            {
+                return !assignMethodFromParticipantNumber || participantAssignmentConfirmed;
             }
 
             return true;
@@ -967,8 +1233,8 @@ public class VRTaskMenuManager : MonoBehaviour
             && inputManager.CurrentCondition == InteractionCondition.ExplicitDisplayFocus
             && gazeProvider != null)
         {
-            ray = gazeProvider.GetGazeRay();
-            return ray.direction != Vector3.zero;
+            return gazeProvider.TryGetValidGazeRay(out ray)
+                && ray.direction != Vector3.zero;
         }
 
         if (raycastPointer != null)
@@ -985,6 +1251,7 @@ public class VRTaskMenuManager : MonoBehaviour
     {
         return (action == MenuAction.SelectT1FocusPointing && selectedTask == PrototypeTask.T1FocusPointing)
             || (action == MenuAction.SelectT2WebBrowsing && selectedTask == PrototypeTask.T2WebBrowsing)
+            || (action == MenuAction.ConfirmParticipant && participantAssignmentConfirmed)
             || (action == MenuAction.SelectRaycastBaseline && selectedCondition == InteractionCondition.RaycastBaseline)
             || (action == MenuAction.SelectGazeRay && selectedCondition == InteractionCondition.GazeRay)
             || (action == MenuAction.SelectExplicitDisplayFocus && selectedCondition == InteractionCondition.ExplicitDisplayFocus)
@@ -995,14 +1262,20 @@ public class VRTaskMenuManager : MonoBehaviour
 
     private bool CanStartSelectedCondition()
     {
-        if (selectedCondition != InteractionCondition.GazeRay)
+        if (assignMethodFromParticipantNumber && !participantAssignmentConfirmed)
+        {
+            Debug.LogError("[VRTaskMenu] Confirm a participant number before starting a task.");
+            return false;
+        }
+
+        if (selectedCondition == InteractionCondition.RaycastBaseline)
         {
             return true;
         }
 
         if (gazeProvider == null)
         {
-            Debug.LogError("[VRTaskMenu] GazeRay cannot start because GazeProvider is missing.");
+            Debug.LogError("[VRTaskMenu] The assigned gaze method cannot start because GazeProvider is missing.");
             return false;
         }
 
@@ -1012,7 +1285,7 @@ public class VRTaskMenuManager : MonoBehaviour
             return true;
         }
 
-        Debug.LogError("[VRTaskMenu] GazeRay experiment cannot start because Eye Tracking is unavailable. Select a development gaze source only for Editor debugging.");
+        Debug.LogError("[VRTaskMenu] The assigned gaze method cannot start because Eye Tracking is unavailable. Select a development gaze source only for Editor debugging.");
         return false;
     }
 
@@ -1082,6 +1355,11 @@ public class VRTaskMenuManager : MonoBehaviour
         if (gazeDisplayFocusManager == null)
         {
             gazeDisplayFocusManager = FindObjectOfType<GazeDisplayFocusManager>();
+        }
+
+        if (logger == null)
+        {
+            logger = FindObjectOfType<Logger>();
         }
     }
 

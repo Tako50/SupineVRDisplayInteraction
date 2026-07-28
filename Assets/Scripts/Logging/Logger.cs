@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using System.IO;
 using UnityEngine;
@@ -9,19 +10,32 @@ using UnityEngine;
 /// </summary>
 public class Logger : MonoBehaviour
 {
+    private const int CommonBaseColumnCount = 36;
+    private const int CommonContextColumnCount = 5;
+
     [SerializeField] private bool writeCsv = true;
     [SerializeField] private string filePrefix = "prototype";
     [SerializeField] private float sampleIntervalSeconds = 0.25f;
+    [SerializeField] private bool requireParticipantContextBeforeOpen = true;
 
     private StreamWriter writer;
     private StreamWriter gazeRayWriter;
     private float nextSampleTime;
+    private string participantContextId = string.Empty;
+    private string sessionContextId = string.Empty;
+    private string taskContextCode = string.Empty;
+    private string phaseContextCode = string.Empty;
+    private string runContextId = string.Empty;
+    private InteractionCondition conditionContext = InteractionCondition.RaycastBaseline;
 
     public bool IsOpen => writer != null;
 
     private void OnEnable()
     {
-        Open();
+        if (!requireParticipantContextBeforeOpen)
+        {
+            Open();
+        }
     }
 
     private void OnDisable()
@@ -38,6 +52,60 @@ public class Logger : MonoBehaviour
 
         nextSampleTime = Time.time + sampleIntervalSeconds;
         return true;
+    }
+
+    public void SetParticipantContext(
+        string participantId,
+        string sessionId,
+        InteractionCondition condition,
+        string taskCode,
+        string phaseCode,
+        string runId)
+    {
+        string normalizedParticipant = string.IsNullOrWhiteSpace(participantId)
+            ? "P000"
+            : participantId.Trim();
+        string normalizedSession = string.IsNullOrWhiteSpace(sessionId)
+            ? "S000"
+            : sessionId.Trim();
+        string normalizedTask = string.IsNullOrWhiteSpace(taskCode)
+            ? "TASK"
+            : taskCode.Trim();
+        string normalizedPhase = string.IsNullOrWhiteSpace(phaseCode)
+            ? "Phase"
+            : phaseCode.Trim();
+        string normalizedRun = string.IsNullOrWhiteSpace(runId)
+            ? normalizedSession
+            : runId.Trim();
+        if (writer != null
+            && participantContextId == normalizedParticipant
+            && sessionContextId == normalizedSession
+            && taskContextCode == normalizedTask
+            && phaseContextCode == normalizedPhase
+            && runContextId == normalizedRun
+            && conditionContext == condition)
+        {
+            return;
+        }
+
+        Close();
+        participantContextId = normalizedParticipant;
+        sessionContextId = normalizedSession;
+        taskContextCode = normalizedTask;
+        phaseContextCode = normalizedPhase;
+        runContextId = normalizedRun;
+        conditionContext = condition;
+        Open();
+    }
+
+    public void EndRunContext()
+    {
+        Close();
+        participantContextId = string.Empty;
+        sessionContextId = string.Empty;
+        taskContextCode = string.Empty;
+        phaseContextCode = string.Empty;
+        runContextId = string.Empty;
     }
 
     public void LogFrame(
@@ -59,11 +127,11 @@ public class Logger : MonoBehaviour
             return;
         }
 
-        writer.WriteLine(string.Join(",",
+        WriteNonTrialRow(
             Time.time.ToString("0.000", CultureInfo.InvariantCulture),
             "Frame",
-            condition,
-            layoutPreset,
+            condition.ToString(),
+            layoutPreset.ToString(),
             string.Empty,
             FormatDisplay(hasRaycastHit, raycastHit),
             FormatVector(hasRaycastHit ? raycastHit.Normalized : Vector2.zero),
@@ -77,17 +145,17 @@ public class Logger : MonoBehaviour
             FormatVector3(controllerRayDirection),
             string.Empty,
             string.Empty,
-            "False"));
+            "False");
     }
 
     public void LogEvent(string eventName, InteractionCondition condition, string displayId, Vector2 normalized)
     {
         if (writeCsv && writer != null)
         {
-            writer.WriteLine(string.Join(",",
+            WriteNonTrialRow(
                 Time.time.ToString("0.000", CultureInfo.InvariantCulture),
                 "Event",
-                condition,
+                condition.ToString(),
                 eventName,
                 string.Empty,
                 displayId,
@@ -102,7 +170,7 @@ public class Logger : MonoBehaviour
                 string.Empty,
                 string.Empty,
                 string.Empty,
-                "False"));
+                "False");
         }
 
         Debug.Log($"[Logger] event={eventName}, condition={condition}, displayId={displayId}, normalized={FormatVector(normalized)}");
@@ -113,10 +181,10 @@ public class Logger : MonoBehaviour
         string safeMarkerName = string.IsNullOrWhiteSpace(markerName) ? "UNKNOWN" : markerName.Trim();
         if (writeCsv && writer != null)
         {
-            writer.WriteLine(string.Join(",",
+            WriteNonTrialRow(
                 timestamp.ToString("0.000", CultureInfo.InvariantCulture),
                 "SyncMarker",
-                condition,
+                condition.ToString(),
                 safeMarkerName,
                 Escape(details),
                 string.Empty,
@@ -131,7 +199,7 @@ public class Logger : MonoBehaviour
                 string.Empty,
                 string.Empty,
                 string.Empty,
-                "False"));
+                "False");
             writer.Flush();
         }
 
@@ -259,7 +327,12 @@ public class Logger : MonoBehaviour
                 result.IsTargetError,
                 result.TrialStartTime.ToString("0.000", CultureInfo.InvariantCulture),
                 result.ClickTime.ToString("0.000", CultureInfo.InvariantCulture),
-                result.CompletionTime.ToString("0.000", CultureInfo.InvariantCulture)));
+                result.CompletionTime.ToString("0.000", CultureInfo.InvariantCulture),
+                ExperimentDataFileNaming.BuildAllocationCode(result.ParticipantId, result.Condition),
+                runContextId,
+                ExperimentDataFileNaming.CurrentSchemaVersion,
+                taskContextCode,
+                phaseContextCode));
         }
 
         Debug.Log($"[Logger] trialResult participant={result.ParticipantId}, session={result.SessionId}, trial={result.TrialIndex}, trialSetId={result.TrialSetId}, task={result.Task}, taskOrder={result.TaskOrder}, methodOrder={result.MethodOrder}, condition={result.Condition}, layout={result.LayoutPreset}, occlusion={(result.InputOccluded ? "inputOccluded" : "none")}, targetDisplay={result.TargetDisplayId}, target={FormatVector(result.TargetNormalizedPosition)}, size={result.TargetSizeNormalized:0.000}, clickedDisplay={result.ClickedDisplayId}, clicked={FormatVector(result.ClickedNormalizedPosition)}, result={result.ResultType}, correct={result.IsCorrect}, displayError={result.IsDisplayError}, targetError={result.IsTargetError}, completion={result.CompletionTime:0.000}, controllerMovementMeters={result.ControllerMovementMeters:0.000000}, controllerRotationDegrees={result.ControllerRotationDegrees:0.000}");
@@ -310,7 +383,14 @@ public class Logger : MonoBehaviour
             Escape(penetratedDisplayIds),
             penetratedCount,
             invalidPolicy,
-            switchDwellSeconds.ToString("0.000", CultureInfo.InvariantCulture)));
+            switchDwellSeconds.ToString("0.000", CultureInfo.InvariantCulture),
+            Escape(participantContextId),
+            Escape(sessionContextId),
+            Escape(ExperimentDataFileNaming.BuildAllocationCode(participantContextId, conditionContext)),
+            Escape(runContextId),
+            ExperimentDataFileNaming.CurrentSchemaVersion,
+            Escape(taskContextCode),
+            Escape(phaseContextCode)));
     }
 
     private void Open()
@@ -320,29 +400,57 @@ public class Logger : MonoBehaviour
             return;
         }
 
-        string directory = Path.Combine(Application.persistentDataPath, "Logs");
-        Directory.CreateDirectory(directory);
-
-        string timestamp = System.DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
-        string path = Path.Combine(directory, $"{filePrefix}_{timestamp}.csv");
-        writer = new StreamWriter(path);
-        writer.WriteLine("time,rowType,condition,layoutPresetOrEvent,details,displayId,normalized,gazeDisplay,gazeNormalized,focusedDisplay,cursorDisplay,cursorNormalized,scrollAmount,rayOrigin,rayDirection,candidateDisplayIds,focusState,gazeOnDifferentDisplay,participantId,sessionId,trialIndex,trialSetId,trialIndexInSet,occlusion_type,targetDisplayId,targetNormalized,targetSize,clickedDisplayId,clickedNormalized,resultType,isCorrect,displayError,targetError,trialStartTime,clickTime,completionTime");
-        Debug.Log($"[Logger] CSV logging to {path}");
-
-        string gazeRayPath = Path.Combine(directory, $"gazeray_{timestamp}.csv");
-        gazeRayWriter = new StreamWriter(gazeRayPath);
-        gazeRayWriter.WriteLine("timestamp,method,gazeValid,gazeHitDisplayId,gazeSelectedDisplayId,controllerRayOrigin,controllerRayDirection,controllerRayTargetDisplayId,controllerRayIntersectionPosition,controllerRayIntersectionNormalizedX,controllerRayIntersectionNormalizedY,pointerValid,displaySwitchCount,gazeDisplaySwitchCount,triggerPressCount,scrollTargetDisplayId,penetratedDisplayId,penetratedDisplayCount,gazeInvalidPolicy,gazeDisplaySwitchDwellSeconds");
-    }
-
-    private void Close()
-    {
-        if (writer == null)
+        if (requireParticipantContextBeforeOpen
+            && string.IsNullOrWhiteSpace(participantContextId))
         {
             return;
         }
 
-        writer.Flush();
-        writer.Dispose();
+        string directory = Path.Combine(Application.persistentDataPath, "Logs");
+        Directory.CreateDirectory(directory);
+
+        string timestamp = System.DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
+        string path = requireParticipantContextBeforeOpen
+            ? Path.Combine(
+                directory,
+                ExperimentDataFileNaming.BuildCsvFileName(
+                    participantContextId,
+                    conditionContext,
+                    taskContextCode,
+                    "common_events",
+                    timestamp,
+                    phaseContextCode,
+                    runContextId))
+            : Path.Combine(directory, $"{filePrefix}_{timestamp}.csv");
+        writer = new StreamWriter(path);
+        writer.WriteLine("time,rowType,condition,layoutPresetOrEvent,details,displayId,normalized,gazeDisplay,gazeNormalized,focusedDisplay,cursorDisplay,cursorNormalized,scrollAmount,rayOrigin,rayDirection,candidateDisplayIds,focusState,gazeOnDifferentDisplay,participantId,sessionId,trialIndex,trialSetId,trialIndexInSet,occlusion_type,targetDisplayId,targetNormalized,targetSize,clickedDisplayId,clickedNormalized,resultType,isCorrect,displayError,targetError,trialStartTime,clickTime,completionTime,allocationCode,runId,schemaVersion,taskCode,taskPhase");
+        Debug.Log($"[Logger] CSV logging to {path}");
+
+        if (conditionContext != InteractionCondition.GazeRay)
+        {
+            return;
+        }
+
+        string gazeRayPath = requireParticipantContextBeforeOpen
+            ? Path.Combine(
+                directory,
+                ExperimentDataFileNaming.BuildCsvFileName(
+                    participantContextId,
+                    conditionContext,
+                    taskContextCode,
+                    "gazeray_frames",
+                    timestamp,
+                    phaseContextCode,
+                    runContextId))
+            : Path.Combine(directory, $"gazeray_{timestamp}.csv");
+        gazeRayWriter = new StreamWriter(gazeRayPath);
+        gazeRayWriter.WriteLine("timestamp,method,gazeValid,gazeHitDisplayId,gazeSelectedDisplayId,controllerRayOrigin,controllerRayDirection,controllerRayTargetDisplayId,controllerRayIntersectionPosition,controllerRayIntersectionNormalizedX,controllerRayIntersectionNormalizedY,pointerValid,displaySwitchCount,gazeDisplaySwitchCount,triggerPressCount,scrollTargetDisplayId,penetratedDisplayId,penetratedDisplayCount,gazeInvalidPolicy,gazeDisplaySwitchDwellSeconds,participantId,sessionId,allocationCode,runId,schemaVersion,taskCode,taskPhase");
+    }
+
+    private void Close()
+    {
+        writer?.Flush();
+        writer?.Dispose();
         writer = null;
         gazeRayWriter?.Flush();
         gazeRayWriter?.Dispose();
@@ -363,10 +471,10 @@ public class Logger : MonoBehaviour
     {
         if (writeCsv && writer != null)
         {
-            writer.WriteLine(string.Join(",",
+            WriteNonTrialRow(
                 Time.time.ToString("0.000", CultureInfo.InvariantCulture),
                 "Event",
-                condition,
+                condition.ToString(),
                 eventName,
                 Escape(details),
                 displayId,
@@ -381,7 +489,7 @@ public class Logger : MonoBehaviour
                 FormatVector3(rayDirection),
                 string.Empty,
                 string.Empty,
-                "False"));
+                "False");
         }
 
         Debug.Log($"[Logger] event={eventName}, condition={condition}, displayId={displayId}, normalized={FormatVector(normalized)}, scrollAmount={scrollAmount:0.000}, rayOrigin={FormatVector3(rayOrigin)}, rayDirection={FormatVector3(rayDirection)}, details={details}");
@@ -404,10 +512,10 @@ public class Logger : MonoBehaviour
     {
         if (writeCsv && writer != null)
         {
-            writer.WriteLine(string.Join(",",
+            WriteNonTrialRow(
                 Time.time.ToString("0.000", CultureInfo.InvariantCulture),
                 "Event",
-                condition,
+                condition.ToString(),
                 eventName,
                 Escape(details),
                 displayId,
@@ -421,8 +529,8 @@ public class Logger : MonoBehaviour
                 FormatVector3(gazeRayOrigin),
                 FormatVector3(gazeRayDirection),
                 Escape(candidateDisplayIds),
-                focusState,
-                gazeOnDifferentDisplay));
+                focusState.ToString(),
+                gazeOnDifferentDisplay.ToString());
         }
 
         Debug.Log($"[Logger] event={eventName}, condition={condition}, gazeSource={gazeSource}, candidates={candidateDisplayIds}, focusedDisplay={focusedDisplayId}, displayId={displayId}, normalized={FormatVector(normalized)}, scrollAmount={scrollAmount:0.000}, gazeOnDifferentDisplay={gazeOnDifferentDisplay}, gazeRayOrigin={FormatVector3(gazeRayOrigin)}, gazeRayDirection={FormatVector3(gazeRayDirection)}, details={details}");
@@ -441,5 +549,34 @@ public class Logger : MonoBehaviour
         }
 
         return value.Replace(",", ";");
+    }
+
+    private void WriteNonTrialRow(params string[] leadingColumns)
+    {
+        if (writer == null)
+        {
+            return;
+        }
+
+        if (leadingColumns == null || leadingColumns.Length != 18)
+        {
+            Debug.LogError(
+                $"[Logger] Common non-trial row requires 18 leading columns, "
+                + $"received={leadingColumns?.Length ?? 0}.");
+            return;
+        }
+
+        string[] row = new string[CommonBaseColumnCount + CommonContextColumnCount];
+        Array.Copy(leadingColumns, row, leadingColumns.Length);
+        row[18] = Escape(participantContextId);
+        row[19] = Escape(sessionContextId);
+        row[36] = Escape(ExperimentDataFileNaming.BuildAllocationCode(
+            participantContextId,
+            conditionContext));
+        row[37] = Escape(runContextId);
+        row[38] = ExperimentDataFileNaming.CurrentSchemaVersion;
+        row[39] = Escape(taskContextCode);
+        row[40] = Escape(phaseContextCode);
+        writer.WriteLine(string.Join(",", row));
     }
 }

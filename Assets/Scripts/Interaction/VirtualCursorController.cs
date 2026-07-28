@@ -9,7 +9,6 @@ public class VirtualCursorController : MonoBehaviour
 {
     [SerializeField] private PrototypeInputManager inputManager;
     [SerializeField] private DisplayManager displayManager;
-    [SerializeField] private GazeProvider gazeProvider;
     [SerializeField] private WebViewSessionManager webViewSessionManager;
     [Tooltip("Cursor speed in display canvas pixels per second at full stick deflection.")]
     [SerializeField] private float cursorSpeedPixelsPerSecond = 220f;
@@ -50,8 +49,8 @@ public class VirtualCursorController : MonoBehaviour
 
         if (inputManager.GripHeld)
         {
-            // グリップ中は視線でカーソルを置き直す。表示外ならDisplaySurface側で端へクランプされる。
-            UpdateCursorFromGaze(focusedDisplay);
+            // 視線の有効性判定、候補解決、warpはFocusManagerが同じ1サンプルで行う。
+            // Eye Trackingが無効なフレームではFocusManagerがwarpしないため、現在位置を保持する。
             displayManager.SetCursorNormalized(focusedDisplay, NormalizedPosition, true);
             return;
         }
@@ -109,11 +108,6 @@ public class VirtualCursorController : MonoBehaviour
                 : FindObjectOfType<DisplayManager>();
         }
 
-        if (gazeProvider == null)
-        {
-            gazeProvider = FindObjectOfType<GazeProvider>();
-        }
-
         if (webViewSessionManager == null)
         {
             webViewSessionManager = FindObjectOfType<WebViewSessionManager>();
@@ -145,20 +139,6 @@ public class VirtualCursorController : MonoBehaviour
         }
 
         return Mathf.Abs(stick.x) > Mathf.Abs(stick.y);
-    }
-
-    private void UpdateCursorFromGaze(DisplaySurface focusedDisplay)
-    {
-        if (focusedDisplay == null || gazeProvider == null)
-        {
-            return;
-        }
-
-        Ray gazeRay = gazeProvider.GetGazeRay();
-        if (focusedDisplay.TryRayToClampedNormalized(gazeRay, out Vector2 clampedNormalized))
-        {
-            NormalizedPosition = clampedNormalized;
-        }
     }
 
     public void WarpTo(DisplaySurface display, Vector2 normalized)

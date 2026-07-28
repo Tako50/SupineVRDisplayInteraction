@@ -65,7 +65,6 @@ public class RaycastPointer : MonoBehaviour
     private int gazeDisplaySwitchCount;
     private int triggerPressCount;
     private string gazeHitDisplayId = "None";
-    private string previousIntersectionSignature = string.Empty;
     private string previousPenetratedDisplayIds = "None";
 
     public Ray CurrentRay { get; private set; }
@@ -174,12 +173,6 @@ public class RaycastPointer : MonoBehaviour
             displayManager.SetOnlyCursorsVisible(targetHit.Display, null);
             displayManager.SetCursorNormalized(targetHit.Display, targetHit.Normalized, true);
             penetratedDisplayIds = FindPenetratedDisplayIds(controllerRay, targetHit);
-            string intersectionSignature = targetHit.DisplayId + ":" + targetHit.Normalized.x.ToString("0.000") + ":" + targetHit.Normalized.y.ToString("0.000");
-            if (intersectionSignature != previousIntersectionSignature)
-            {
-                previousIntersectionSignature = intersectionSignature;
-                logger?.LogEvent("controller_ray_intersection_changed", InteractionCondition.GazeRay, targetHit.DisplayId, targetHit.Normalized);
-            }
 
             if (penetratedDisplayIds != "None" && penetratedDisplayIds != previousPenetratedDisplayIds)
             {
@@ -194,7 +187,6 @@ public class RaycastPointer : MonoBehaviour
         {
             displayManager.ClearCurrentRaycastHit();
             displayManager.SetOnlyCursorsVisible(null, null);
-            previousIntersectionSignature = string.Empty;
             previousPenetratedDisplayIds = "None";
         }
 

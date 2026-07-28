@@ -219,8 +219,8 @@ public class DisplayLayoutManager : MonoBehaviour
         display.SetSize(
             DisplayGeometry.ComputePhysicalSize(
                 placement.DistanceMeters,
-                apparentWidthDegrees,
-                apparentHeightDegrees,
+                placement.ResolveApparentWidthDegrees(apparentWidthDegrees),
+                placement.ResolveApparentHeightDegrees(apparentHeightDegrees),
                 preserveDisplayAspectRatio,
                 displayAspectRatio),
             ValidPixelSize());
@@ -323,10 +323,11 @@ public class DisplayLayoutConfig
 
     public static DisplayLayoutConfig UpDownDepthDefaults()
     {
-        // Layout 1: 従来のT1RayOcclusionLayoutProbeと同じ配置。
+        // T1 Task CとT2で共通使用する上下奥行き配置。
+        // 見かけサイズ差と2.5度の中央ギャップを保つ。垂直角は実験条件として小数1桁に丸める。
         return new DisplayLayoutConfig(
-            new DisplayPlacementConfig(1.15f, 0f, -25f),
-            new DisplayPlacementConfig(1.90f, 0f, 0f));
+            new DisplayPlacementConfig(0.75f, 0f, -13.2f, 37.5f, 21.09375f),
+            new DisplayPlacementConfig(2.25f, 0f, 11.8f, 42.5f, 23.90625f));
     }
 
     public static DisplayLayoutConfig LeftRightDefaults()
@@ -351,12 +352,34 @@ public class DisplayPlacementConfig
     [SerializeField] private float distanceMeters = 1.25f;
     [SerializeField] private float horizontalAngleDegrees;
     [SerializeField] private float verticalAngleDegrees;
+    [Tooltip("0 uses DisplayLayoutManager's shared apparent width.")]
+    [Min(0f)]
+    [SerializeField] private float apparentWidthDegreesOverride;
+    [Tooltip("0 uses DisplayLayoutManager's shared apparent height.")]
+    [Min(0f)]
+    [SerializeField] private float apparentHeightDegreesOverride;
     [SerializeField] private Vector3 rotationOffsetDegrees = Vector3.zero;
 
     public float DistanceMeters => distanceMeters;
     public float HorizontalAngleDegrees => horizontalAngleDegrees;
     public float VerticalAngleDegrees => verticalAngleDegrees;
+    public float ApparentWidthDegreesOverride => apparentWidthDegreesOverride;
+    public float ApparentHeightDegreesOverride => apparentHeightDegreesOverride;
     public Vector3 RotationOffsetDegrees => rotationOffsetDegrees;
+
+    public float ResolveApparentWidthDegrees(float sharedDegrees)
+    {
+        return apparentWidthDegreesOverride > 0f
+            ? apparentWidthDegreesOverride
+            : sharedDegrees;
+    }
+
+    public float ResolveApparentHeightDegrees(float sharedDegrees)
+    {
+        return apparentHeightDegreesOverride > 0f
+            ? apparentHeightDegreesOverride
+            : sharedDegrees;
+    }
 
     public DisplayPlacementConfig()
     {
@@ -366,11 +389,15 @@ public class DisplayPlacementConfig
         float distanceMeters,
         float horizontalAngleDegrees,
         float verticalAngleDegrees,
+        float apparentWidthDegreesOverride = 0f,
+        float apparentHeightDegreesOverride = 0f,
         Vector3 rotationOffsetDegrees = default)
     {
         this.distanceMeters = distanceMeters;
         this.horizontalAngleDegrees = horizontalAngleDegrees;
         this.verticalAngleDegrees = verticalAngleDegrees;
+        this.apparentWidthDegreesOverride = apparentWidthDegreesOverride;
+        this.apparentHeightDegreesOverride = apparentHeightDegreesOverride;
         this.rotationOffsetDegrees = rotationOffsetDegrees;
     }
 }

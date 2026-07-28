@@ -51,13 +51,17 @@ Proposed method.
 
 - Gaze ray obtains candidate displays.
 - Gaze is used only during an explicit grip focus gesture.
-- The focus gesture updates the focused display and warps the virtual cursor to the gaze hit position.
+- While grip is held, valid gaze continuously updates the focused display and virtual cursor.
+- Releasing grip keeps the last valid focused display and cursor position.
 - Gaze alone, outside the focus gesture, must not change focus or cursor position.
+- A direct display hit has priority. If gaze misses all displays by no more than 3.0 degrees, select the angularly nearest display rectangle and clamp the cursor to its nearest edge.
+- During off-display selection, prefer the current focused/candidate display until another display is at least 0.5 degrees closer.
+- If gaze is farther than 3.0 degrees from every display, do not update focus or cursor.
+- If configured Eye Tracking is invalid or untracked, hold the last valid focus/candidate/cursor state and do not substitute HMD forward.
 - Stick moves the virtual cursor inside the focused display.
 - A button clicks at the virtual cursor.
 - Trigger + stick scrolls the focused display.
 - The focused display remains the input target until the next explicit focus gesture.
-- The exact focus commit timing (`grip down`, continuous `grip held`, or `grip release`) is currently unresolved. Follow `Docs/experiment_design_sync.md` and do not change it implicitly.
 
 ## Eye tracking policy
 Use Meta Quest Pro Eye Tracking for experiment use.

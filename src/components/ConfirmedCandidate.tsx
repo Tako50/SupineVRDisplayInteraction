@@ -30,7 +30,6 @@ export default function ConfirmedCandidate({
             <p className="brand confirmed-brand">{item.brand}</p>
             <dl className="confirmed-specs">
               <div><dt>カテゴリ</dt><dd>{item.category}</dd></div>
-              <div><dt>価格</dt><dd>{item.price}</dd></div>
               <div><dt>サイズ</dt><dd>{item.size}</dd></div>
               <div><dt>重量</dt><dd>{item.weight}</dd></div>
             </dl>

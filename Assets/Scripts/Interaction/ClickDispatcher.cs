@@ -75,6 +75,7 @@ public class ClickDispatcher : MonoBehaviour
     private Vector2 pendingWebViewDragStartNormalized;
     private WebViewPointerActivation pendingWebViewDragActivation;
     private InteractionCondition pendingWebViewDragCondition;
+    private TLabWebViewDisplayBridge activeWebViewHoverBridge;
 
     private void Awake()
     {
@@ -87,9 +88,12 @@ public class ClickDispatcher : MonoBehaviour
 
         if (inputManager == null || displayManager == null)
         {
+            ClearActiveWebViewHover();
             CancelWebViewPointerDrag();
             return;
         }
+
+        UpdateWebViewPointerHover();
 
         if (inputManager.SecondaryButtonPressed)
         {
@@ -143,7 +147,46 @@ public class ClickDispatcher : MonoBehaviour
 
     private void OnDisable()
     {
+        ClearActiveWebViewHover();
         CancelWebViewPointerDrag();
+    }
+
+    private void UpdateWebViewPointerHover()
+    {
+        if (webViewSessionManager == null
+            || !webViewSessionManager.IsSessionRunning
+            || activeWebViewDragBridge != null
+            || !TryGetCurrentWebViewPointerTarget(out DisplaySurface display, out Vector2 normalized))
+        {
+            ClearActiveWebViewHover();
+            return;
+        }
+
+        TLabWebViewDisplayBridge bridge = GetWebViewBridge(display);
+        if (bridge == null)
+        {
+            ClearActiveWebViewHover();
+            return;
+        }
+
+        if (activeWebViewHoverBridge != bridge)
+        {
+            ClearActiveWebViewHover();
+            activeWebViewHoverBridge = bridge;
+        }
+
+        bridge.TryPointerHover(normalized);
+    }
+
+    private void ClearActiveWebViewHover()
+    {
+        if (activeWebViewHoverBridge == null)
+        {
+            return;
+        }
+
+        activeWebViewHoverBridge.TryPointerHoverExit();
+        activeWebViewHoverBridge = null;
     }
 
     private bool UpdateWebViewPointerInteraction(
@@ -567,6 +610,7 @@ public class ClickDispatcher : MonoBehaviour
         Vector2 normalized,
         WebViewPointerActivation activation)
     {
+        ClearActiveWebViewHover();
         activeWebViewDragBridge = bridge;
         activeWebViewDragDisplay = display;
         activeWebViewDragLastNormalized = normalized;
@@ -841,7 +885,8 @@ public class ClickDispatcher : MonoBehaviour
 
         LastClickResult = focusedDisplay.name;
         NotifyTaskLayer(focusedDisplay.name, normalized, true);
-        Ray gazeRay = gazeProvider != null ? gazeProvider.GetGazeRay() : default;
+        Ray gazeRay = default;
+        gazeProvider?.TryGetValidGazeRay(out gazeRay);
         bool gazeOnDifferentDisplay = focusManager != null && focusManager.IsGazeOnDifferentDisplay(focusedDisplay);
 
         if (logger != null)
@@ -1011,8 +1056,8 @@ public class ClickDispatcher : MonoBehaviour
             && inputManager.CurrentCondition == InteractionCondition.ExplicitDisplayFocus
             && gazeProvider != null)
         {
-            ray = gazeProvider.GetGazeRay();
-            return ray.direction != Vector3.zero;
+            return gazeProvider.TryGetValidGazeRay(out ray)
+                && ray.direction != Vector3.zero;
         }
 
         if (raycastPointer != null)

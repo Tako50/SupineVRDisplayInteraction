@@ -62,7 +62,6 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
     private readonly List<int> conditionOrder = new List<int>();
 
     private int currentPresentedIndex;
-    private bool isFinished;
     private bool previousPrimaryButton;
     private bool previousSecondaryButton;
     private bool previousRecenterButton;
@@ -117,7 +116,7 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
     {
         ReadButtons(out bool nextPressed, out bool previousPressed, out bool recenterPressed);
 
-        if (recenterPressed && !isFinished)
+        if (recenterPressed)
         {
             RecenterCurrentCondition();
         }
@@ -134,7 +133,7 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
 
     public void RecenterCurrentCondition()
     {
-        if (isFinished || conditionOrder.Count == 0)
+        if (conditionOrder.Count == 0)
         {
             return;
         }
@@ -146,11 +145,6 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
 
     private void GoNext()
     {
-        if (isFinished)
-        {
-            return;
-        }
-
         float exitTime = Time.time;
         LogCurrentCondition("Exit", exitTime, exitTime - conditionEnterTime);
 
@@ -159,14 +153,6 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
 
     private void GoPrevious()
     {
-        if (isFinished)
-        {
-            isFinished = false;
-            SetDisplaysVisible(true);
-            ShowCondition(conditionOrder.Count - 1, true);
-            return;
-        }
-
         if (currentPresentedIndex <= 0)
         {
             RecenterCurrentCondition();
@@ -178,18 +164,6 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
         ShowCondition(currentPresentedIndex - 1, true);
     }
 
-    private void FinishStudy()
-    {
-        isFinished = true;
-        SetDisplaysVisible(false);
-
-        SetText(conditionText, "Finished");
-        SetText(titleText, string.Empty);
-        SetText(progressText, string.Empty);
-        SetText(instructionText, string.Empty);
-        SetText(statusText, string.Empty);
-    }
-
     private void ShowCondition(int presentedIndex, bool logEnter)
     {
         if (conditionOrder.Count == 0)
@@ -198,7 +172,6 @@ public class LayoutPreferenceStudyManager : MonoBehaviour
         }
 
         currentPresentedIndex = Mathf.Clamp(presentedIndex, 0, conditionOrder.Count - 1);
-        isFinished = false;
         conditionEnterTime = Time.time;
         currentConditionEntered = true;
 

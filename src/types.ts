@@ -39,6 +39,7 @@ export interface Item {
 export type LogEventName =
   | 'category_open'
   | 'product_open'
+  | 'product_page_open'
   | 'add_candidate'
   | 'remove_candidate'
   | 'candidate_list_open'

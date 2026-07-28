@@ -72,7 +72,7 @@ public class T1RayOcclusionLayoutProbe : MonoBehaviour
 
     [Header("Debug")]
     [Tooltip("When the app starts, place D1/D2 from the current h1/h2/eta2 Inspector parameters instead of relying on saved scene transforms.")]
-    [SerializeField] private bool applyCurrentLayoutOnStart = true;
+    [SerializeField] private bool applyCurrentLayoutOnStart = false;
     [SerializeField] private bool logOnStart = false;
     [SerializeField] private bool logHandSamples = true;
     [SerializeField] private float targetRayOcclusionRatio = 0.30f;

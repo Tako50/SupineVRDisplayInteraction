@@ -65,12 +65,12 @@ Meta Quest ProのEye Trackingを原則として使用する。
 
 本研究の主張は「複数2D仮想ディスプレイにおける入力フォーカス管理」であるため、予備実験および本実験では、HMD forwardではなく実視線を用いる。視線は単なるカーソルワープではなく、入力先ディスプレイの候補取得とディスプレイ内カーソル初期位置の指定に用いる。
 
-ただし、開発初期のデバッグやEye Trackingが一時的に不安定な場合に備えて、`GazeProvider` は以下の2種類の入力源を切り替えられるようにする。
+開発初期のデバッグに備えて、`GazeProvider` は以下の2種類の入力源を明示的に切り替えられるようにする。
 
-1. 開発用フォールバック：HMDのforward方向をgaze rayとして扱う
+1. 開発用モード：HMDのforward方向をgaze rayとして扱う
 2. 実験用：Meta Quest ProのEye Tracking APIからgaze rayを取得する
 
-HMD forwardは実験評価用ではなく、実装確認・デバッグ・故障時のフォールバックに限定する。予備実験以降は、原則としてEye Tracking版でフォーカス切替・カーソルワープ・スクロール・ログ記録を行う。
+HMD forwardは実験評価用ではなく、実装確認・デバッグに限定する。実験中にEye Trackingがinvalidになった場合はHMD forwardへ自動fallbackせず、最後の有効なfocus/candidate/cursorを保持する。
 
 ```csharp
 public enum GazeSource
@@ -82,6 +82,7 @@ public enum GazeSource
 public interface IGazeProvider
 {
     Ray GetGazeRay();
+    bool TryGetValidGazeRay(out Ray ray);
     bool IsEyeTrackingAvailable();
     GazeSource CurrentGazeSource { get; }
 }
@@ -262,16 +263,18 @@ center = HMD position + HMD forward * distance
 | 操作 | 入力 | 実装 |
 |---|---|---|
 | 入力候補取得 | 視線 | gaze rayと複数Displayの交点候補を取得する |
-| ディスプレイフォーカス確定 | 右グリップ | gaze候補から入力先Displayを確定する |
-| カーソル初期配置 | 右グリップ確定時 | focus確定と同時に、該当Display内のgaze hit位置へcursorを配置する |
+| ディスプレイフォーカス更新 | 右グリップ保持 | 有効なgaze候補から入力先Displayを連続更新する |
+| カーソル再配置 | 右グリップ保持 | 該当Display内のgaze hit位置へcursorを連続配置し、release後は最後の位置を維持する |
 | カーソル微調整 | 右スティック | focus中のDisplay内で相対移動する |
 | クリック | Aボタン | focus中Displayのcursor位置にあるUI要素をクリックする。右トリガー単押しではクリックしない |
 | スクロール | 右トリガー＋右スティック上下 | focus中Displayをスクロールする。視線が他Displayへ移っても、明示的にfocus変更されるまでは入力先を維持する |
-| フォーカス解除・再指定 | 再度右グリップ | 現在のgaze候補に基づいて入力先Displayとcursor位置を更新する |
+| フォーカス再指定 | 再度右グリップ保持 | 保持中だけ現在のgaze候補に基づいて入力先Displayとcursor位置を更新する |
 
 この条件では、コントローラの位置・向きは操作対象の指定に使わない。
 
-視線は、入力先ディスプレイ候補の取得と、ディスプレイ内カーソル初期位置の指定に使う。ただし、視線が当たっただけではフォーカスを変更しない。グリップボタンが押された時点で、現在の視線候補を入力先ディスプレイとして確定する。
+視線は、入力先ディスプレイ候補の取得と、ディスプレイ内カーソル位置の指定に使う。ただし、視線が当たっただけではフォーカスを変更しない。グリップ保持中だけfocusとcursorを連続更新し、release後は最後の有効状態を維持する。
+
+直接hitがない場合は、gaze rayから各Display矩形までの角度距離が`3.0度`以内なら最寄りDisplayを候補とし、cursorを最寄りの表示端へclampする。画面間の境界では現在のfocused/candidate Displayを`0.5度`のhysteresisで優先する。全Displayから`3.0度`を超える場合とEye Trackingがinvalidの場合は更新しない。
 
 ## 実装モジュール設計
 
@@ -300,7 +303,8 @@ bool IsTriggerPressed;
 責務：
 
 - Eye Tracking APIからgaze rayを取得
-- HMD forwardを使った開発用フォールバックgaze rayの生成
+- HMD forwardを使った明示的な開発用gaze rayの生成
+- 実験用Eye Trackingのvalidity判定とinvalid時の更新抑止
 - gaze rayの安定化
 - gaze rayの可視化
 - gaze sourceの切替
@@ -315,6 +319,7 @@ public enum GazeSource
 }
 
 Ray GetGazeRay();
+bool TryGetValidGazeRay(out Ray ray);
 bool IsEyeTrackingAvailable();
 GazeSource CurrentGazeSource { get; }
 ```
@@ -374,11 +379,13 @@ bool IsFocused;
 - gaze rayがどのDisplay候補に当たっているか判定する
 - 視線方向上に複数Display候補がある場合、候補リストを保持する
 - 入力先Displayの確定と、Display内cursor初期位置の決定を同時に行う
-- focus確定後は、視線が別Displayへ移っても入力先Displayを維持する
-- gaze hitだけではfocusを変更せず、grip入力によってのみ入力先Displayを確定・変更する
+- gripを保持していない間は、視線が別Displayへ移っても入力先Displayを維持する
+- gaze hitだけではfocusを変更せず、grip保持中にのみ入力先Displayを連続更新する
+- 画面外3.0度以内では角度上の最寄りDisplayを候補にし、0.5度の切替hysteresisを適用する
+- Eye Tracking invalid時は最後の有効なfocus/candidate/cursorを保持し、HMD forwardを使わない
 - overlap領域では、前面ディスプレイの一時透過や候補ハイライトを行う
-- グリップ押下時にfocusを切り替える
-- focus切替時にcursorをgaze位置へwarpする
+- グリップ保持中にfocusを切り替える
+- グリップ保持中にcursorをgaze位置へ連続warpする
 
 状態：
 
@@ -396,10 +403,10 @@ FocusedLocked
 2. DisplayManagerでhit候補を取得する
 3. 候補が1つなら、そのDisplayをfocus candidateにする
 4. 候補が複数なら、近方Display/遠方Displayの候補を記録し、必要に応じて前面Displayを半透明化する
-5. gripが押されたら、現在の視線候補から入力先Displayを確定する。gaze hitだけではfocusを変更しない
-6. focus変更と同時に、該当Display内のgaze hit位置へcursorを初期配置する
-7. focus確定後はFocusedLocked状態になり、stick / click / scrollはfocus中Displayへ送る
-8. 視線が別Displayへ移っても、gripで再指定されるまでは入力先Displayを維持する
+5. 直接hitがなければ3.0度以内の最寄りDisplay矩形を候補にし、0.5度の切替hysteresisを適用する
+6. grip保持中は、有効な視線候補から入力先Displayとcursor位置を連続更新する
+7. grip release後は最後の有効状態を維持し、stick / click / scrollはfocus中Displayへ送る
+8. Eye Tracking invalid時は更新せず、HMD forwardへfallbackしない
 
 初期値案：
 
@@ -413,7 +420,7 @@ FocusedLocked
 責務：
 
 - focus中Displayのcursor座標を保持
-- grip確定時にgaze位置へwarp
+- grip保持中にFocusManagerから渡された有効gaze位置へwarp
 - stick入力でcursorを相対移動
 - Display範囲外へ出ないようにclamp
 - カーソル速度を調整

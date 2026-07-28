@@ -36,6 +36,7 @@ public class ExitPanelController : MonoBehaviour
     private RectTransform panelRoot;
     private Image panelImage;
     private RectTransform progressFill;
+    private Text titleText;
     private Text statusText;
     private BoxCollider panelCollider;
     private LineRenderer leftRayLine;
@@ -44,6 +45,7 @@ public class ExitPanelController : MonoBehaviour
     private bool taskWasRunning;
     private bool wasHovered;
     private bool exitInvoked;
+    private bool requireTriggerRelease;
 
     public bool IsVisible => panelRoot != null && panelRoot.gameObject.activeSelf;
     public bool IsHovered { get; private set; }
@@ -90,7 +92,13 @@ public class ExitPanelController : MonoBehaviour
         }
 
         wasHovered = IsHovered;
-        bool holding = inputManager != null && inputManager.LeftTriggerHeld;
+        bool triggerHeld = inputManager != null && inputManager.LeftTriggerHeld;
+        if (requireTriggerRelease && !triggerHeld)
+        {
+            requireTriggerRelease = false;
+        }
+
+        bool holding = triggerHeld && !requireTriggerRelease;
         if (IsHovered && holding && !exitInvoked)
         {
             holdElapsed += Time.unscaledDeltaTime;
@@ -125,6 +133,21 @@ public class ExitPanelController : MonoBehaviour
     {
         exitInvoked = true;
         inputManager?.SendLeftHapticImpulse(0.75f, 0.12f);
+        if (taskMenuManager != null && taskMenuManager.TryCompleteActiveTraining())
+        {
+            logger?.LogEvent(
+                "ExitPanel_EndTraining",
+                inputManager != null ? inputManager.CurrentCondition : InteractionCondition.RaycastBaseline,
+                "LeftExitPanel",
+                Vector2.zero);
+            Debug.Log("[ExitPanel] practice readiness confirmed. Returning to the task menu.");
+            holdElapsed = 0f;
+            exitInvoked = false;
+            requireTriggerRelease = true;
+            UpdateVisualState();
+            return;
+        }
+
         logger?.LogEvent(
             "ExitPanel_Exit",
             inputManager != null ? inputManager.CurrentCondition : InteractionCondition.RaycastBaseline,
@@ -218,14 +241,14 @@ public class ExitPanelController : MonoBehaviour
             panelColor);
         panelImage = background.GetComponent<Image>();
 
-        Text title = CreateText(
+        titleText = CreateText(
             panelRoot,
             "Title",
             "EXIT CONDITION",
             new Vector2(0.08f, 0.52f),
             new Vector2(0.92f, 0.86f),
             54);
-        title.fontStyle = FontStyle.Bold;
+        titleText.fontStyle = FontStyle.Bold;
 
         statusText = CreateText(
             panelRoot,
@@ -335,6 +358,14 @@ public class ExitPanelController : MonoBehaviour
 
     private void UpdateVisualState()
     {
+        bool canEndTraining = taskMenuManager != null && taskMenuManager.IsActiveTrainingReadyToEnd();
+        if (titleText != null)
+        {
+            titleText.text = canEndTraining
+                ? "END PRACTICE"
+                : "EXIT CONDITION";
+        }
+
         if (panelImage != null)
         {
             panelImage.color = IsHovered ? panelHoverColor : panelColor;
@@ -350,8 +381,12 @@ public class ExitPanelController : MonoBehaviour
         if (statusText != null)
         {
             statusText.text = IsHovered
-                ? $"HOLD LEFT TRIGGER  {HoldProgress * 100f:0}%"
-                : "AIM WITH LEFT CONTROLLER";
+                ? canEndTraining
+                    ? $"HOLD TO CONFIRM READY  {HoldProgress * 100f:0}%"
+                    : $"HOLD LEFT TRIGGER  {HoldProgress * 100f:0}%"
+                : canEndTraining
+                    ? "PARTICIPANT READY? AIM WITH LEFT CONTROLLER"
+                    : "AIM WITH LEFT CONTROLLER";
         }
     }
 
@@ -361,6 +396,7 @@ public class ExitPanelController : MonoBehaviour
         IsHovered = false;
         wasHovered = false;
         exitInvoked = false;
+        requireTriggerRelease = false;
         UpdateVisualState();
     }
 

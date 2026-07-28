@@ -44,6 +44,8 @@ public class WebViewSessionManager : MonoBehaviour
         Completed
     }
 
+    private const int PracticeStepsPerRound = (int)T2TrainingStep.Completed;
+
     private enum T2MainStage
     {
         V2D,
@@ -74,8 +76,8 @@ public class WebViewSessionManager : MonoBehaviour
     [SerializeField] private string initialUrl = "https://www.youtube.com";
     [SerializeField] private bool enableSecondaryWebView = true;
     [SerializeField] private string secondaryDisplayId = "Display_A_Front";
-    [Tooltip("Primary URL for the T2 comparison Web. In Dev_Prototype this points to the camp gear Web app; leave empty to use the secondary display bridge URL.")]
-    [SerializeField] private string secondaryInitialUrl = "";
+    [Tooltip("Comparison Web URL served by the local Vite development server. Update the host when the Mac LAN address changes.")]
+    [SerializeField] private string secondaryInitialUrl = "http://133.87.151.83:5173/";
     [SerializeField] private bool autoAddTLabBridgeToSecondaryDisplay = true;
     [SerializeField] private bool disableOtherWebViewsOnStart = true;
     [SerializeField] private bool disableWebViewOnReturn = true;
@@ -85,25 +87,31 @@ public class WebViewSessionManager : MonoBehaviour
     [Header("T2 Participant")]
     [SerializeField] private string participantId = "P000";
     [SerializeField] private string sessionId = "S000";
+    [SerializeField] private string runId = "Run";
     [Tooltip("Counterbalance label such as G1, G2, G3, or G4.")]
     [SerializeField] private string conditionOrder = "G1";
     [SerializeField] private T2ContentSet selectedContentSet = T2ContentSet.ACampGear2024;
 
     [Header("T2 Content")]
     [SerializeField] private string youtubeUrlSetA = "https://www.youtube.com/watch?v=oCKnZl-XT1Y";
+    [Tooltip("A separate video from the Main video's channel, used only for practice. Do not use another segment of the Main video.")]
+    [SerializeField] private string practiceYoutubeUrl = "https://www.youtube.com/watch?v=HQRzNpPDk0k";
+    [Tooltip("Practice-only comparison Web content. Keep the same UI as Main, but use different products/content.")]
+    [SerializeField] private string practiceComparisonInitialUrl = "http://133.87.151.83:5173/?mode=practice";
     [Tooltip("Forces YouTube's HTML video element to unmute when T2 telemetry attaches or playback starts.")]
     [SerializeField] private bool forceYoutubeUnmuted = true;
     [Range(0f, 1f)]
     [SerializeField] private float youtubeForcedVolume = 1f;
     [Tooltip("Strict D2V completion range for Content A. The task completes only when the D2V target detail has been opened and YouTube is paused within this range during the D2V stage.")]
     [SerializeField] private Vector2 d2vPauseRangeSetASeconds = new Vector2(688f, 743f);
-    [Tooltip("Optional TextAsset Resources path for a packaged T2 page. Leave empty to use Secondary Initial Url.")]
-    [SerializeField] private string comparisonPageResourceSetA = "";
+    [Tooltip("TextAsset Resources path for the standalone comparison Web bundled into the Unity build.")]
+    [SerializeField] private string comparisonPageResourceSetA = "T2/t2_content_2024";
 
     [Header("T2 Procedure")]
-    [Tooltip("Number of complete P01-P08 instruction rounds presented during practice.")]
+    [Tooltip("Minimum complete P01-P08 rounds before the experimenter may end practice. Practice repeats until readiness is confirmed.")]
     [Min(1)]
-    [SerializeField] private int practiceInstructionRounds = 2;
+    [FormerlySerializedAs("practiceInstructionRounds")]
+    [SerializeField] private int minimumPracticeRounds = 1;
     [Tooltip("Main-task duration, measured from the practice-to-Main transition.")]
     [Min(10f)]
     [SerializeField] private float totalTaskDurationSeconds = 720f;
@@ -179,7 +187,6 @@ public class WebViewSessionManager : MonoBehaviour
     private bool taskActive;
     private T2TrainingStep trainingStep;
     private float taskStartTime;
-    private float unifiedTaskStartTime;
     private float taskEndTime;
     private float nextTelemetryRefreshTime;
     private float currentStageStartTime;
@@ -201,6 +208,7 @@ public class WebViewSessionManager : MonoBehaviour
     private float webScrollAmount;
     private float practiceStepScrollAmount;
     private int completedPracticeRounds;
+    private int completedPracticeStepCount;
     private int webClickCount;
     private int detailPageOpenCount;
     private int candidateAddCount;
@@ -219,10 +227,12 @@ public class WebViewSessionManager : MonoBehaviour
     private float controllerRotationAmount;
     private string lastInputDisplayId = string.Empty;
     private bool hasControllerSample;
-    private Vector3 lastControllerOrigin;
-    private Vector3 lastControllerDirection;
+    private Vector3 lastControllerPosition;
+    private Quaternion lastControllerRotation;
     private StreamWriter t2EventWriter;
     private StreamWriter t2ResultWriter;
+    private StreamWriter t2PostTimeoutSelectionWriter;
+    private string t2PostTimeoutSelectionLogPath;
     private RectTransform instructionPanelRoot;
     private Image instructionPanelBackground;
     private Text instructionPanelPhaseText;
@@ -244,6 +254,7 @@ public class WebViewSessionManager : MonoBehaviour
     public bool IsSessionRunning => currentPhase != WebViewSessionPhase.ConditionSelection;
     public string ParticipantId => participantId;
     public string SessionId => sessionId;
+    public string RunId => runId;
     public string InitialUrl => initialUrl;
     public string SecondaryInitialUrl => secondaryInitialUrl;
     public WebViewInputMode InputMode => inputMode;
@@ -254,6 +265,15 @@ public class WebViewSessionManager : MonoBehaviour
     public bool IsTaskActive => taskActive;
     public string SelectedCandidate => selectedCandidate;
     public int YouTubeOperationCount => youtubeOperationCount;
+    public int CompletedPracticeRounds => completedPracticeRounds;
+    public int CompletedPracticeStepCount => completedPracticeStepCount;
+    public int AdditionalPracticeStepCount => Mathf.Max(
+        0,
+        completedPracticeStepCount - MinimumPracticeRounds * PracticeStepsPerRound);
+    public int MinimumPracticeRounds => Mathf.Max(1, minimumPracticeRounds);
+    public bool CanEndTraining => currentPhase == WebViewSessionPhase.Training
+        && taskActive
+        && completedPracticeRounds >= MinimumPracticeRounds;
 
     private void Awake()
     {
@@ -343,7 +363,11 @@ public class WebViewSessionManager : MonoBehaviour
         }
     }
 
-    public void SetParticipantContext(string newParticipantId, string newSessionId, string newConditionOrder)
+    public void SetParticipantContext(
+        string newParticipantId,
+        string newSessionId,
+        string newConditionOrder,
+        string newRunId = "")
     {
         if (IsSessionRunning)
         {
@@ -353,6 +377,7 @@ public class WebViewSessionManager : MonoBehaviour
         participantId = NormalizeId(newParticipantId, "P000");
         sessionId = NormalizeId(newSessionId, "S000");
         conditionOrder = NormalizeId(newConditionOrder, "G1");
+        runId = NormalizeId(newRunId, sessionId);
     }
 
     public void SetInitialUrl(string url)
@@ -379,17 +404,36 @@ public class WebViewSessionManager : MonoBehaviour
 
     public void BeginTrainingTask()
     {
-        BeginUnifiedTask();
+        BeginSession(WebViewSessionPhase.Training);
     }
 
     public void BeginMainTask()
     {
-        BeginUnifiedTask();
+        BeginSession(WebViewSessionPhase.MainTask);
     }
 
-    public void BeginUnifiedTask()
+    public bool TryCompleteTraining()
     {
-        BeginSession(WebViewSessionPhase.Training);
+        if (!CanEndTraining)
+        {
+            WriteT2Event(
+                "practice_end_blocked",
+                secondaryDisplayId,
+                completedPracticeRounds.ToString(CultureInfo.InvariantCulture),
+                $"minimum_rounds={MinimumPracticeRounds};completed_steps={completedPracticeStepCount}");
+            return false;
+        }
+
+        trainingStep = T2TrainingStep.Completed;
+        WriteT2Event(
+            "practice_readiness_confirmed",
+            secondaryDisplayId,
+            completedPracticeRounds.ToString(CultureInfo.InvariantCulture),
+            $"participant_ready;experimenter_confirmed;completed_steps={completedPracticeStepCount};"
+            + $"additional_steps={AdditionalPracticeStepCount}");
+        MarkPracticeCompleted();
+        ApplyCurrentPageInstruction();
+        return true;
     }
 
     public void ReturnToConditionSelection()
@@ -441,6 +485,7 @@ public class WebViewSessionManager : MonoBehaviour
             activeCondition,
             targetDisplayId,
             Vector2.zero);
+        logger?.EndRunContext();
 
         Debug.Log($"[WebViewSession] returned phase={endedPhase}, condition={activeCondition}");
     }
@@ -654,13 +699,18 @@ public class WebViewSessionManager : MonoBehaviour
 
         taskStartTime = Time.time;
         currentStageStartTime = taskStartTime;
-        if (unifiedTaskStartTime <= 0f)
-        {
-            unifiedTaskStartTime = taskStartTime;
-        }
         EmitStartSyncMarkerIfNeeded();
         WriteT2Event("task_start", targetDisplayId, selectedContentSet.ToString(),
             currentPhase == WebViewSessionPhase.Training ? "practice" : "main");
+        if (currentPhase == WebViewSessionPhase.MainTask)
+        {
+            WriteT2Event(
+                "main_start",
+                targetDisplayId,
+                selectedContentSet.ToString(),
+                "main_content_loaded;start_gate_completed");
+            logger?.LogEvent("T2Web_MainBegin", activeCondition, targetDisplayId, Vector2.zero);
+        }
     }
 
     private void ShowStartGate()
@@ -725,17 +775,36 @@ public class WebViewSessionManager : MonoBehaviour
     private void PrepareSessionUrls()
     {
         selectedContentSet = T2ContentSet.ACampGear2024;
-        activeYoutubeUrl = youtubeUrlSetA;
+        activeYoutubeUrl = currentPhase == WebViewSessionPhase.Training
+            ? practiceYoutubeUrl
+            : youtubeUrlSetA;
         if (string.IsNullOrWhiteSpace(activeYoutubeUrl))
         {
             activeYoutubeUrl = initialUrl;
         }
 
-        string resourcePath = comparisonPageResourceSetA;
-        activeComparisonPageUrl = BuildLocalComparisonPageUrl(resourcePath);
+        if (currentPhase == WebViewSessionPhase.Training
+            && !string.IsNullOrWhiteSpace(practiceComparisonInitialUrl))
+        {
+            activeComparisonPageUrl = practiceComparisonInitialUrl.Trim();
+            Debug.Log(
+                $"[WebViewSession] Using separate practice content youtube={activeYoutubeUrl}, "
+                + $"comparison={activeComparisonPageUrl}");
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(secondaryInitialUrl))
+        {
+            activeComparisonPageUrl = secondaryInitialUrl.Trim();
+            Debug.Log($"[WebViewSession] Using comparison Web server url={activeComparisonPageUrl}");
+            return;
+        }
+
+        activeComparisonPageUrl = BuildLocalComparisonPageUrl(comparisonPageResourceSetA);
         if (string.IsNullOrWhiteSpace(activeComparisonPageUrl))
         {
-            activeComparisonPageUrl = secondaryInitialUrl;
+            activeComparisonPageUrl = "about:blank";
+            Debug.LogError("[WebViewSession] T2 comparison Web URL and packaged page are both unavailable.");
         }
     }
 
@@ -760,7 +829,11 @@ public class WebViewSessionManager : MonoBehaviour
             const string fileName = "t2_content_2024.html";
             string path = Path.Combine(directory, fileName);
             File.WriteAllText(path, page.text);
-            return new Uri(path).AbsoluteUri;
+            string localUrl = new Uri(path).AbsoluteUri;
+            Debug.Log(
+                $"[WebViewSession] Prepared packaged T2 comparison page url={localUrl}, "
+                + $"bytes={new FileInfo(path).Length}");
+            return localUrl;
         }
         catch (Exception exception)
         {
@@ -771,12 +844,8 @@ public class WebViewSessionManager : MonoBehaviour
 
     private void ResetSessionMetrics()
     {
-        if (currentPhase == WebViewSessionPhase.Training)
-        {
-            unifiedTaskStartTime = 0f;
-            candidateConfirmationUnlockLogged = false;
-            candidateListOpenedAtUnlock = false;
-        }
+        candidateConfirmationUnlockLogged = false;
+        candidateListOpenedAtUnlock = false;
 
         taskStartTime = 0f;
         taskEndTime = 0f;
@@ -802,6 +871,7 @@ public class WebViewSessionManager : MonoBehaviour
         if (currentPhase == WebViewSessionPhase.Training)
         {
             completedPracticeRounds = 0;
+            completedPracticeStepCount = 0;
         }
         webClickCount = 0;
         detailPageOpenCount = 0;
@@ -860,32 +930,30 @@ public class WebViewSessionManager : MonoBehaviour
             lastInputDisplayId = inputDisplayId;
         }
 
-        if (raycastPointer == null)
+        Transform controllerTransform = raycastPointer != null
+            ? raycastPointer.RightControllerTransform
+            : null;
+        if (controllerTransform == null)
         {
             return;
         }
 
-        Ray ray = raycastPointer.CurrentRay;
-        if (ray.direction == Vector3.zero)
-        {
-            return;
-        }
-
-        Vector3 direction = ray.direction.normalized;
+        Vector3 position = controllerTransform.position;
+        Quaternion rotation = controllerTransform.rotation;
         if (hasControllerSample)
         {
-            controllerMovementAmount += Vector3.Distance(lastControllerOrigin, ray.origin);
-            controllerRotationAmount += Vector3.Angle(lastControllerDirection, direction);
+            controllerMovementAmount += Vector3.Distance(lastControllerPosition, position);
+            controllerRotationAmount += Quaternion.Angle(lastControllerRotation, rotation);
         }
 
-        lastControllerOrigin = ray.origin;
-        lastControllerDirection = direction;
+        lastControllerPosition = position;
+        lastControllerRotation = rotation;
         hasControllerSample = true;
     }
 
     private void UpdateTaskTiming()
     {
-        if (!IsSessionRunning || unifiedTaskStartTime <= 0f)
+        if (!IsSessionRunning || taskStartTime <= 0f)
         {
             return;
         }
@@ -952,6 +1020,7 @@ public class WebViewSessionManager : MonoBehaviour
         WriteT2Event(eventType, secondaryDisplayId,
             elapsed.ToString("0.000", CultureInfo.InvariantCulture), resultNote);
         EmitEndSyncMarkerIfNeeded("main_timeout");
+        FinalizeSessionResult(currentPhase, pendingResult, true);
         TryOpenCandidateListAtUnlock();
         ApplyCurrentPageInstruction();
         logger?.LogEvent("T2Web_MainTimeout", activeCondition, secondaryDisplayId, Vector2.zero);
@@ -1105,16 +1174,16 @@ public class WebViewSessionManager : MonoBehaviour
         else
         {
             script +=
-                "document.addEventListener('click',function(e){" +
-                "var c=e.target&&e.target.closest?e.target.closest('[data-t2-candidate]'):null;" +
-                "if(c){send('candidate',c.getAttribute('data-t2-candidate')||'');}" +
-                "var a=e.target&&e.target.closest?e.target.closest('[data-t2-action]'):null;" +
-                "if(a){send('action',a.getAttribute('data-t2-action')||'');}" +
-                "},true);" +
-                "var lastY=window.scrollY||0,scrollTimer=0;" +
-                "window.addEventListener('scroll',function(){if(scrollTimer){return;}scrollTimer=setTimeout(function(){" +
-                "scrollTimer=0;var y=window.scrollY||0,delta=y-lastY;lastY=y;if(delta!==0){send('scroll',String(delta));}" +
-                "},120);},{passive:true});";
+            "document.addEventListener('click',function(e){" +
+            "var c=e.target&&e.target.closest?e.target.closest('[data-t2-candidate]'):null;" +
+            "if(c){send('candidate',c.getAttribute('data-t2-candidate')||'');}" +
+            "var a=e.target&&e.target.closest?e.target.closest('[data-t2-action]'):null;" +
+            "if(a){send('action',a.getAttribute('data-t2-action')||'');}" +
+            "},true);" +
+            "var lastY=window.scrollY||0,scrollTimer=0;" +
+            "window.addEventListener('scroll',function(){if(scrollTimer){return;}scrollTimer=setTimeout(function(){" +
+            "scrollTimer=0;var y=window.scrollY||0,delta=y-lastY;lastY=y;if(delta!==0){send('scroll',String(delta));}" +
+            "},120);},{passive:true});";
         }
 
         return script + "}catch(e){}})();";
@@ -1176,7 +1245,7 @@ public class WebViewSessionManager : MonoBehaviour
                 return;
             case T2MainStage.Finalize:
                 message = IsCandidateConfirmationLocked(out _)
-                    ? "候補リストを確認し、今回のキャンプをより快適にするために最も良さそうな商品を1つ選んでください。候補の確定は本番開始から11分30秒後に可能になります。"
+                    ? "候補リストを確認し、今回のキャンプをより快適にするため最も良さそうな商品を1つ選んでください。候補の確定は本番開始11分30秒後です。"
                     : "候補リストを確認し、今回のキャンプをより快適にするために最も良さそうな商品を1つ選び、候補を確定してください。";
                 state = "reminder";
                 return;
@@ -1499,9 +1568,11 @@ public class WebViewSessionManager : MonoBehaviour
 
     private string GetTrainingInstruction()
     {
-        int targetRounds = Mathf.Max(1, practiceInstructionRounds);
-        int currentRound = Mathf.Min(completedPracticeRounds + 1, targetRounds);
-        string roundPrefix = $"練習 {currentRound}/{targetRounds}周　";
+        int currentRound = completedPracticeRounds + 1;
+        string readiness = completedPracticeRounds >= MinimumPracticeRounds
+            ? string.Empty
+            : $"（最低{MinimumPracticeRounds}周）";
+        string roundPrefix = $"{currentRound}周目{readiness}　";
         switch (trainingStep)
         {
             case T2TrainingStep.PauseYouTube:
@@ -1521,7 +1592,7 @@ public class WebViewSessionManager : MonoBehaviour
             case T2TrainingStep.RemoveCandidate:
                 return roundPrefix + "P08　候補リストから商品を1つ削除してください。";
             default:
-                return $"操作指示を{Mathf.Max(1, practiceInstructionRounds)}周完了しました。本番へ移行します。";
+                return "練習を終了するとタスク選択メニューへ戻ります。";
         }
     }
 
@@ -1533,13 +1604,17 @@ public class WebViewSessionManager : MonoBehaviour
                 youtubeOperationCount++;
                 youtubePlayCount++;
                 EndYouTubePause(Time.time);
-                WriteT2Event("youtube_play", targetDisplayId, youtubePlayCount.ToString(CultureInfo.InvariantCulture), value);
+                WriteT2Event(
+                    "youtube_play",
+                    targetDisplayId,
+                    youtubePlayCount.ToString(CultureInfo.InvariantCulture),
+                    value);
                 if (currentPhase == WebViewSessionPhase.Training
                     && trainingStep == T2TrainingStep.PlayYouTube)
                 {
                     AdvanceTrainingStep();
                 }
-                break;
+                return;
             case "pause":
                 youtubeOperationCount++;
                 youtubePauseCount++;
@@ -1547,8 +1622,14 @@ public class WebViewSessionManager : MonoBehaviour
                 {
                     youtubePauseStartedAt = Time.time;
                 }
-                WriteT2Event("youtube_pause", targetDisplayId, youtubePauseCount.ToString(CultureInfo.InvariantCulture), value);
-                if (currentPhase == WebViewSessionPhase.Training && trainingStep == T2TrainingStep.PauseYouTube)
+
+                WriteT2Event(
+                    "youtube_pause",
+                    targetDisplayId,
+                    youtubePauseCount.ToString(CultureInfo.InvariantCulture),
+                    value);
+                if (currentPhase == WebViewSessionPhase.Training
+                    && trainingStep == T2TrainingStep.PauseYouTube)
                 {
                     AdvanceTrainingStep();
                 }
@@ -1557,11 +1638,16 @@ public class WebViewSessionManager : MonoBehaviour
                 {
                     HandleStrictD2VPause(value);
                 }
-                break;
+                return;
             case "seek":
                 youtubeOperationCount++;
                 youtubeSeekCount++;
-                WriteT2Event("youtube_seek", targetDisplayId, youtubeSeekCount.ToString(CultureInfo.InvariantCulture), value);
+                WriteT2Event(
+                    "youtube_seek",
+                    targetDisplayId,
+                    youtubeSeekCount.ToString(CultureInfo.InvariantCulture),
+                    value);
+
                 bool hasSeekDelta = TryParseSeekDelta(value, out float seekDelta);
                 if (currentPhase == WebViewSessionPhase.Training
                     && trainingStep == T2TrainingStep.SeekYouTube
@@ -1575,7 +1661,7 @@ public class WebViewSessionManager : MonoBehaviour
                 {
                     AdvanceTrainingStep();
                 }
-                break;
+                return;
             case "paused_seek":
                 WriteT2Event("youtube_paused_seek", targetDisplayId, string.Empty, value);
                 if (currentPhase == WebViewSessionPhase.MainTask
@@ -1583,7 +1669,7 @@ public class WebViewSessionManager : MonoBehaviour
                 {
                     HandleStrictD2VPause(value);
                 }
-                break;
+                return;
         }
     }
 
@@ -1781,6 +1867,14 @@ public class WebViewSessionManager : MonoBehaviour
             return;
         }
 
+        T2TrainingStep completedStep = trainingStep;
+        completedPracticeStepCount++;
+        WriteT2Event(
+            "practice_step_complete",
+            string.Empty,
+            completedStep.ToString(),
+            $"completed_steps={completedPracticeStepCount};additional_steps={AdditionalPracticeStepCount}");
+
         trainingStep++;
         if (trainingStep == T2TrainingStep.ScrollComparisonPage)
         {
@@ -1794,17 +1888,10 @@ public class WebViewSessionManager : MonoBehaviour
                 "practice_round_complete",
                 secondaryDisplayId,
                 completedPracticeRounds.ToString(CultureInfo.InvariantCulture),
-                $"target_rounds={Mathf.Max(1, practiceInstructionRounds)}");
-            if (completedPracticeRounds < Mathf.Max(1, practiceInstructionRounds))
-            {
-                trainingStep = T2TrainingStep.PauseYouTube;
-                practiceStepScrollAmount = 0f;
-                WriteT2Event("practice_step", string.Empty, trainingStep.ToString(), GetTrainingInstruction());
-            }
-            else
-            {
-                MarkPracticeCompleted();
-            }
+                $"minimum_rounds={MinimumPracticeRounds};completed_steps={completedPracticeStepCount};can_end={CanEndTraining}");
+            trainingStep = T2TrainingStep.PauseYouTube;
+            practiceStepScrollAmount = 0f;
+            WriteT2Event("practice_step", string.Empty, trainingStep.ToString(), GetTrainingInstruction());
         }
         else
         {
@@ -1825,28 +1912,22 @@ public class WebViewSessionManager : MonoBehaviour
         float practiceDuration = taskStartTime > 0f
             ? Mathf.Max(0f, Time.time - taskStartTime)
             : 0f;
+        pendingResult = "completed";
+        taskEndTime = Time.time;
         WriteT2Event(
             "practice_complete",
             secondaryDisplayId,
             practiceDuration.ToString("0.000", CultureInfo.InvariantCulture),
-            "duration_seconds;continue_immediately");
+            $"duration_seconds;rounds={completedPracticeRounds};completed_steps={completedPracticeStepCount};"
+            + $"additional_steps={AdditionalPracticeStepCount};readiness_confirmed");
         logger?.LogEvent("T2Web_PracticeCompleted", activeCondition, secondaryDisplayId, Vector2.zero);
-        ContinueFromPracticeToMain("practice_rounds_completed");
-    }
-
-    private void ContinueFromPracticeToMain(string note)
-    {
-        currentPhase = WebViewSessionPhase.MainTask;
-        ResetSessionMetrics();
-        taskStartTime = Time.time;
-        currentStageStartTime = taskStartTime;
-        taskActive = true;
-        activeSecondaryWebViewBridge?.TryEvaluateJavaScript(
-            "window.t2ResetCandidates&&window.t2ResetCandidates();");
-        WriteT2Event("main_start", targetDisplayId, selectedContentSet.ToString(), note);
-        logger?.LogEvent("T2Web_MainBegin", activeCondition, targetDisplayId, Vector2.zero);
-        ApplyCurrentPageInstruction();
-        Debug.Log($"[WebViewSession] continuing to Main without reloading WebViews, condition={activeCondition}, note={note}");
+        FinalizeSessionResult(WebViewSessionPhase.Training, pendingResult);
+        taskActive = false;
+        ReturnToConditionSelection();
+        Debug.Log(
+            $"[WebViewSession] Practice completed and returned to task selection. "
+            + $"condition={activeCondition}, duration={practiceDuration:0.000}, "
+            + $"rounds={completedPracticeRounds}, additionalSteps={AdditionalPracticeStepCount}");
     }
 
     private void HandleCandidateSelection(string candidate)
@@ -1893,14 +1974,23 @@ public class WebViewSessionManager : MonoBehaviour
             return;
         }
 
-        if (youtubeOperationCount <= 0)
+        bool selectedAfterTimeout = awaitingPostTimeoutSelection;
+        if (youtubeOperationCount <= 0 && !selectedAfterTimeout)
         {
             WriteT2Event("candidate_blocked", secondaryDisplayId, normalizedCandidate, "youtube_operation_required");
             RejectCandidate("先に奥のYouTubeを少なくとも1回、再生・停止・シークしてください。");
             return;
         }
 
-        bool selectedAfterTimeout = awaitingPostTimeoutSelection;
+        if (youtubeOperationCount <= 0)
+        {
+            WriteT2Event(
+                "post_timeout_youtube_requirement_skipped",
+                targetDisplayId,
+                normalizedCandidate,
+                "main_metrics_already_frozen");
+        }
+
         selectedCandidate = normalizedCandidate;
         if (selectedAfterTimeout)
         {
@@ -1911,6 +2001,7 @@ public class WebViewSessionManager : MonoBehaviour
                 secondaryDisplayId,
                 postTimeoutFinalSelection,
                 $"selection_time={postTimeoutSelectionTime:0.000};delay={Mathf.Max(0f, postTimeoutSelectionTime - taskEndTime):0.000}");
+            WritePostTimeoutSelectionResult();
             awaitingPostTimeoutSelection = false;
         }
         else
@@ -1922,6 +2013,10 @@ public class WebViewSessionManager : MonoBehaviour
         }
 
         FinalizeSessionResult(currentPhase, pendingResult);
+        if (selectedAfterTimeout)
+        {
+            CloseT2LogWriters();
+        }
         taskActive = false;
         awaitingPostTaskReset = true;
         ApplyCurrentPageInstruction();
@@ -1988,7 +2083,10 @@ public class WebViewSessionManager : MonoBehaviour
         youtubePauseStartedAt = -1f;
     }
 
-    private void FinalizeSessionResult(WebViewSessionPhase endedPhase, string result)
+    private void FinalizeSessionResult(
+        WebViewSessionPhase endedPhase,
+        string result,
+        bool keepLogWritersOpen = false)
     {
         if (resultWritten)
         {
@@ -1997,20 +2095,34 @@ public class WebViewSessionManager : MonoBehaviour
 
         EndYouTubePause(taskEndTime);
         EnsureT2LogWriters();
-        float measurementStartTime = endedPhase == WebViewSessionPhase.Training && unifiedTaskStartTime > 0f
-            ? unifiedTaskStartTime
-            : taskStartTime;
+        float measurementStartTime = taskStartTime;
         float duration = Mathf.Max(0f, taskEndTime - measurementStartTime);
         t2ResultWriter?.WriteLine(string.Join(",",
             Csv(participantId),
+            Csv(ExperimentDataFileNaming.BuildAllocationCode(participantId, activeCondition)),
             Csv(sessionId),
+            Csv(runId),
+            Csv(ExperimentDataFileNaming.CurrentSchemaVersion),
             Csv(conditionOrder),
-            Csv(GetMethodLabel()),
+            Csv(GetMethodDataLabel()),
             Csv(GetContentSetLabel()),
             Csv(endedPhase == WebViewSessionPhase.Training ? "practice" : "main"),
             measurementStartTime.ToString("0.000", CultureInfo.InvariantCulture),
             taskEndTime.ToString("0.000", CultureInfo.InvariantCulture),
             duration.ToString("0.000", CultureInfo.InvariantCulture),
+            endedPhase == WebViewSessionPhase.Training
+                ? MinimumPracticeRounds.ToString(CultureInfo.InvariantCulture)
+                : string.Empty,
+            endedPhase == WebViewSessionPhase.Training
+                ? completedPracticeRounds.ToString(CultureInfo.InvariantCulture)
+                : string.Empty,
+            endedPhase == WebViewSessionPhase.Training
+                ? completedPracticeStepCount.ToString(CultureInfo.InvariantCulture)
+                : string.Empty,
+            endedPhase == WebViewSessionPhase.Training
+                ? AdditionalPracticeStepCount.ToString(CultureInfo.InvariantCulture)
+                : string.Empty,
+            endedPhase == WebViewSessionPhase.Training && result == "completed" ? "1" : "0",
             Csv(string.Equals(result, "timeout", StringComparison.Ordinal) ? string.Empty : selectedCandidate),
             Csv(postTimeoutFinalSelection),
             postTimeoutSelectionTime.ToString("0.000", CultureInfo.InvariantCulture),
@@ -2040,7 +2152,15 @@ public class WebViewSessionManager : MonoBehaviour
             result,
             $"duration={duration:0.000};candidate={selectedCandidate};post_timeout_candidate={postTimeoutFinalSelection}");
         EmitEndSyncMarkerIfNeeded($"finalize_result={result}");
-        CloseT2LogWriters();
+        if (keepLogWritersOpen)
+        {
+            t2EventWriter?.Flush();
+            t2ResultWriter?.Flush();
+        }
+        else
+        {
+            CloseT2LogWriters();
+        }
     }
 
     private void EmitStartSyncMarkerIfNeeded()
@@ -2095,34 +2215,102 @@ public class WebViewSessionManager : MonoBehaviour
         string directory = Path.Combine(Application.persistentDataPath, "Logs", "T2");
         Directory.CreateDirectory(directory);
         string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture);
-        string participant = SanitizeFilePart(participantId);
-        string session = SanitizeFilePart(sessionId);
-
-        t2EventWriter = new StreamWriter(Path.Combine(directory, $"t2_events_{participant}_{session}_{stamp}.csv"));
-        t2EventWriter.WriteLine("timestamp,participant_id,session_id,condition_order,method,content_set,task_phase,event_type,display_id,value,details");
-        t2ResultWriter = new StreamWriter(Path.Combine(directory, $"t2_results_{participant}_{session}_{stamp}.csv"));
+        string phaseCode = currentPhase == WebViewSessionPhase.Training ? "Practice" : "Main";
+        t2EventWriter = new StreamWriter(Path.Combine(
+            directory,
+            ExperimentDataFileNaming.BuildCsvFileName(
+                participantId,
+                activeCondition,
+                "T2",
+                "events",
+                stamp,
+                phaseCode,
+                runId)));
+        t2EventWriter.WriteLine("timestamp,participant_id,allocation_code,session_id,run_id,schema_version,condition_order,method,content_set,task_phase,event_type,display_id,value,details");
+        t2ResultWriter = new StreamWriter(Path.Combine(
+            directory,
+            ExperimentDataFileNaming.BuildCsvFileName(
+                participantId,
+                activeCondition,
+                "T2",
+                "results",
+                stamp,
+                phaseCode,
+                runId)));
         t2ResultWriter.WriteLine(
-            "participant_id,session_id,condition_order,method,content_set,task_phase,task_start_time,task_end_time,duration,selected_candidates," +
+            "participant_id,allocation_code,session_id,run_id,schema_version,condition_order,method,content_set,task_phase,task_start_time,task_end_time,duration," +
+            "minimum_practice_rounds,completed_practice_rounds,completed_practice_steps,additional_practice_steps,readiness_confirmed,selected_candidate," +
             "post_timeout_final_selection,post_timeout_selection_time," +
             "youtube_operation_count,youtube_pause_count,youtube_play_count,youtube_seek_count,youtube_total_pause_time," +
             "web_scroll_amount,web_click_count,detail_page_open_count,candidate_add_count,candidate_remove_count,v2d_completion_time,d2v_completion_time," +
             "display_switch_count,controller_movement_amount,controller_rotation_amount,clutch_count,result,note");
+        t2PostTimeoutSelectionLogPath = Path.Combine(
+            directory,
+            ExperimentDataFileNaming.BuildCsvFileName(
+                participantId,
+                activeCondition,
+                "T2",
+                "post_timeout_selections",
+                stamp,
+                phaseCode,
+                runId));
     }
 
-    private void WriteT2Event(string eventType, string displayId, string value, string details)
+    private void WritePostTimeoutSelectionResult()
     {
-        if (taskStartTime <= 0f)
+        EnsureT2LogWriters();
+        if (string.IsNullOrWhiteSpace(t2PostTimeoutSelectionLogPath))
         {
             return;
         }
 
+        if (t2PostTimeoutSelectionWriter == null)
+        {
+            bool writeHeader = !File.Exists(t2PostTimeoutSelectionLogPath)
+                || new FileInfo(t2PostTimeoutSelectionLogPath).Length == 0;
+            t2PostTimeoutSelectionWriter = new StreamWriter(
+                t2PostTimeoutSelectionLogPath,
+                true);
+            if (writeHeader)
+            {
+                t2PostTimeoutSelectionWriter.WriteLine(
+                    "participant_id,allocation_code,session_id,run_id,schema_version,condition_order,method,content_set,task_end_time," +
+                    "post_timeout_final_selection,post_timeout_selection_time,selection_delay_seconds," +
+                    "youtube_operation_count,timestamp");
+            }
+        }
+
+        t2PostTimeoutSelectionWriter.WriteLine(string.Join(",",
+            Csv(participantId),
+            Csv(ExperimentDataFileNaming.BuildAllocationCode(participantId, activeCondition)),
+            Csv(sessionId),
+            Csv(runId),
+            Csv(ExperimentDataFileNaming.CurrentSchemaVersion),
+            Csv(conditionOrder),
+            Csv(GetMethodDataLabel()),
+            Csv(GetContentSetLabel()),
+            taskEndTime.ToString("0.000", CultureInfo.InvariantCulture),
+            Csv(postTimeoutFinalSelection),
+            postTimeoutSelectionTime.ToString("0.000", CultureInfo.InvariantCulture),
+            Mathf.Max(0f, postTimeoutSelectionTime - taskEndTime)
+                .ToString("0.000", CultureInfo.InvariantCulture),
+            youtubeOperationCount.ToString(CultureInfo.InvariantCulture),
+            DateTime.Now.ToString("O", CultureInfo.InvariantCulture)));
+        t2PostTimeoutSelectionWriter.Flush();
+    }
+
+    private void WriteT2Event(string eventType, string displayId, string value, string details)
+    {
         EnsureT2LogWriters();
         t2EventWriter?.WriteLine(string.Join(",",
             Time.time.ToString("0.000", CultureInfo.InvariantCulture),
             Csv(participantId),
+            Csv(ExperimentDataFileNaming.BuildAllocationCode(participantId, activeCondition)),
             Csv(sessionId),
+            Csv(runId),
+            Csv(ExperimentDataFileNaming.CurrentSchemaVersion),
             Csv(conditionOrder),
-            Csv(GetMethodLabel()),
+            Csv(GetMethodDataLabel()),
             Csv(GetContentSetLabel()),
             Csv(currentPhase == WebViewSessionPhase.Training ? "practice" : "main"),
             Csv(eventType),
@@ -2140,6 +2328,9 @@ public class WebViewSessionManager : MonoBehaviour
         t2ResultWriter?.Flush();
         t2ResultWriter?.Dispose();
         t2ResultWriter = null;
+        t2PostTimeoutSelectionWriter?.Flush();
+        t2PostTimeoutSelectionWriter?.Dispose();
+        t2PostTimeoutSelectionWriter = null;
     }
 
     private string GetMethodLabel()
@@ -2155,6 +2346,11 @@ public class WebViewSessionManager : MonoBehaviour
         }
     }
 
+    private string GetMethodDataLabel()
+    {
+        return activeCondition.ToString();
+    }
+
     private string GetContentSetLabel()
     {
         return "A";
@@ -2163,17 +2359,6 @@ public class WebViewSessionManager : MonoBehaviour
     private static string NormalizeId(string value, string fallback)
     {
         return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
-    }
-
-    private static string SanitizeFilePart(string value)
-    {
-        string normalized = NormalizeId(value, "unknown");
-        foreach (char invalid in Path.GetInvalidFileNameChars())
-        {
-            normalized = normalized.Replace(invalid, '_');
-        }
-
-        return normalized;
     }
 
     private static string Csv(string value)

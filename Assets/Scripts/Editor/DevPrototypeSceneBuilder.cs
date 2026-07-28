@@ -69,9 +69,19 @@ public static class DevPrototypeSceneBuilder
         SetEnum(layoutManager, "initialPreset", DisplayLayoutPreset.UpDownDepth);
         SetBool(layoutManager, "useFixedSceneLayout", false);
         SetBool(layoutManager, "applyOnStart", true);
+        SetFloat(layoutManager, "upDownDepth.displayA.distanceMeters", 0.75f);
+        SetFloat(layoutManager, "upDownDepth.displayA.horizontalAngleDegrees", 0f);
+        SetFloat(layoutManager, "upDownDepth.displayA.verticalAngleDegrees", -13.2f);
+        SetFloat(layoutManager, "upDownDepth.displayA.apparentWidthDegreesOverride", 37.5f);
+        SetFloat(layoutManager, "upDownDepth.displayA.apparentHeightDegreesOverride", 21.09375f);
+        SetFloat(layoutManager, "upDownDepth.displayB.distanceMeters", 2.25f);
+        SetFloat(layoutManager, "upDownDepth.displayB.horizontalAngleDegrees", 0f);
+        SetFloat(layoutManager, "upDownDepth.displayB.verticalAngleDegrees", 11.8f);
+        SetFloat(layoutManager, "upDownDepth.displayB.apparentWidthDegreesOverride", 42.5f);
+        SetFloat(layoutManager, "upDownDepth.displayB.apparentHeightDegreesOverride", 23.90625f);
 
         SetBool(tLabWebViewBridgeA, "enableOnStart", false);
-        SetString(tLabWebViewBridgeA, "initialUrl", "https://www.youtube.com");
+        SetString(tLabWebViewBridgeA, "initialUrl", "about:blank");
         SetVector2Int(tLabWebViewBridgeA, "viewSize", new Vector2Int(960, 540));
         SetVector2Int(tLabWebViewBridgeA, "textureSize", new Vector2Int(1920, 1080));
         SetBool(tLabWebViewBridgeA, "matchDisplayAspect", true);
@@ -142,10 +152,13 @@ public static class DevPrototypeSceneBuilder
         SetObject(focusManager, "displayManager", displayManager);
         SetObject(focusManager, "virtualCursorController", cursorController);
         SetObject(focusManager, "logger", logger);
+        SetFloat(focusManager, "offDisplaySnapMaxAngleDegrees", 3f);
+        SetFloat(focusManager, "offDisplaySwitchHysteresisDegrees", 0.5f);
 
         SetObject(gazeDisplayFocusManager, "inputManager", inputManager);
         SetObject(gazeDisplayFocusManager, "gazeProvider", gazeProvider);
         SetObject(gazeDisplayFocusManager, "displayManager", displayManager);
+        SetObject(gazeDisplayFocusManager, "focusManager", focusManager);
         SetBool(gazeDisplayFocusManager, "highlightEnabled", true);
         SetBool(gazeDisplayFocusManager, "logStateChanges", true);
 
@@ -193,6 +206,9 @@ public static class DevPrototypeSceneBuilder
         SetFloat(clickDispatcher, "webViewVerticalGestureEdgeMargin", 0.08f);
         SetFloat(clickDispatcher, "webViewVerticalGestureReentry", 0.28f);
 
+        SetBool(vrTaskMenuManager, "assignMethodFromParticipantNumber", true);
+        SetInt(vrTaskMenuManager, "participantAllocationSeed", 20260725);
+
         SetObject(focusPointingTaskManager, "inputManager", inputManager);
         SetObject(focusPointingTaskManager, "experimentManager", experimentManager);
         SetObject(focusPointingTaskManager, "displayManager", displayManager);
@@ -210,6 +226,7 @@ public static class DevPrototypeSceneBuilder
         SetBool(focusPointingTaskManager, "useLatest48TrialDesign", true);
         SetFloat(focusPointingTaskManager, "smallTargetSizeDegrees", 1.5f);
         SetFloat(focusPointingTaskManager, "largeTargetSizeDegrees", 3f);
+        SetFloat(focusPointingTaskManager, "feedbackVolume", 0.8f);
         SetString(focusPointingTaskManager, "targetOrderResourcePath", "T1/target_orders_ABCDEFG");
         SetBool(focusPointingTaskManager, "rebuildTrialsOnStart", true);
         SetBool(focusPointingTaskManager, "randomizeTrialsWithinCondition", false);
@@ -233,14 +250,16 @@ public static class DevPrototypeSceneBuilder
         SetString(webViewSessionManager, "secondaryInitialUrl", "http://133.87.151.83:5173/");
         SetEnum(webViewSessionManager, "selectedContentSet", T2ContentSet.ACampGear2024);
         SetString(webViewSessionManager, "youtubeUrlSetA", "https://www.youtube.com/watch?v=oCKnZl-XT1Y");
+        SetString(webViewSessionManager, "practiceYoutubeUrl", "https://www.youtube.com/watch?v=HQRzNpPDk0k");
+        SetString(webViewSessionManager, "practiceComparisonInitialUrl", "http://133.87.151.83:5173/?mode=practice");
         SetString(webViewSessionManager, "youtubeUrlSetB", "https://www.youtube.com/watch?v=wIHPxl6OPOc");
         SetBool(webViewSessionManager, "forceYoutubeUnmuted", true);
         SetFloat(webViewSessionManager, "youtubeForcedVolume", 1f);
         SetVector2(webViewSessionManager, "d2vPauseRangeSetASeconds", new Vector2(688f, 743f));
         SetVector2(webViewSessionManager, "d2vPauseRangeSetBSeconds", new Vector2(948f, 1011f));
-        SetString(webViewSessionManager, "comparisonPageResourceSetA", "");
+        SetString(webViewSessionManager, "comparisonPageResourceSetA", "T2/t2_content_2024");
         SetString(webViewSessionManager, "comparisonPageResourceSetB", "");
-        SetInt(webViewSessionManager, "practiceInstructionRounds", 2);
+        SetInt(webViewSessionManager, "minimumPracticeRounds", 1);
         SetFloat(webViewSessionManager, "totalTaskDurationSeconds", 720f);
         SetFloat(webViewSessionManager, "candidateConfirmationUnlockSeconds", 690f);
         SetFloat(webViewSessionManager, "practiceStageTimeoutSeconds", 0f);
@@ -301,6 +320,8 @@ public static class DevPrototypeSceneBuilder
         SetObject(vrTaskMenuManager, "raycastPointer", raycastPointer);
         SetObject(vrTaskMenuManager, "gazeProvider", gazeProvider);
         SetObject(vrTaskMenuManager, "gazeDisplayFocusManager", gazeDisplayFocusManager);
+        SetObject(vrTaskMenuManager, "logger", logger);
+        SetBool(logger, "requireParticipantContextBeforeOpen", true);
         SetBool(vrTaskMenuManager, "showLayoutButtons", true);
         SetBool(vrTaskMenuManager, "applySelectedLayout", true);
 

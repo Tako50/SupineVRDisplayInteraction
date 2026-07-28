@@ -207,8 +207,10 @@ public class ExperimentManager : MonoBehaviour
 
         if (logger != null && logger.ShouldSample())
         {
-            Ray gazeRay = gazeProvider.GetGazeRay();
-            bool hasGazeHit = displayManager.TryGetForemostHit(gazeRay, out DisplayHit gazeHit);
+            bool gazeValid = gazeProvider.TryGetValidGazeRay(out Ray gazeRay);
+            DisplayHit gazeHit = default;
+            bool hasGazeHit = gazeValid
+                && displayManager.TryGetForemostHit(gazeRay, out gazeHit);
 
             bool hasCursor = false;
             string cursorDisplayId = "None";

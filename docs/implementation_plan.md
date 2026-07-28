@@ -137,15 +137,19 @@ Implement:
 
 Requirements:
 - Gaze ray retrieves display candidates.
-- Grip button confirms the current gaze candidate as the focused display.
-- Focus confirmation also warps the virtual cursor to the gaze hit position on that display.
+- While Grip is held, valid gaze continuously updates the focused display and virtual cursor.
+- Releasing Grip keeps the last valid focused display and cursor position.
 - Gaze alone must not change focus.
+- A direct display hit has priority. If gaze misses every display by no more than 3.0 degrees, select the angularly nearest display rectangle and clamp the cursor to its nearest edge.
+- Use 0.5-degree switching hysteresis in favor of the current focused/candidate display during off-display selection.
+- Gaze farther than 3.0 degrees from every display does not update focus or cursor.
+- Invalid or untracked Eye Tracking holds the last valid focus/candidate/cursor state and never substitutes HMD forward.
 - After focus is confirmed, stick movement controls the virtual cursor on the focused display.
 - A button clicks at the virtual cursor position. Right trigger alone never clicks.
 - Trigger release never clicks; trigger is reserved for modified operations such as scrolling.
 - Trigger + stick vertical scrolls the focused display.
 - The focused display remains the input target even if gaze moves to another display.
-- Grip can be pressed again to refocus based on the current gaze candidate.
+- Grip can be held again to refocus continuously from the current valid gaze candidate.
 - When gaze hits overlapping displays, use RaycastAll-like candidate detection and visually indicate candidates.
 - Optionally make the front display semi-transparent during overlap preview.
 
@@ -155,7 +159,7 @@ Done when:
 - Stick moves the cursor.
 - A button clicks; right trigger alone does not.
 - Trigger + stick scrolls the focused display.
-- Input focus remains locked until grip is pressed again.
+- Input focus and cursor remain at their last valid state after grip is released.
 ```
 
 ---
@@ -215,7 +219,8 @@ Implement:
 - Keep content-set, year, item ID, and video timestamps internal; do not render them on the comparison Web
 - Use the fixed category order from the current Notion T2 specification
 - Use the Notion-specified video time ranges for V2D and category positions for D2V
-- Present P01-P08 for two Practice rounds without a time limit and continue immediately when both rounds complete, without closing or reloading either WebView
+- Present P01-P08 for at least one Practice round without a time limit; allow additional partial or complete rounds until participant readiness and experimenter confirmation
+- End Practice by writing its result and returning to task selection; start Main only from a separate button with a fresh run/session and fresh CSV files
 - Immediate task-completion-driven progression through V2D and D2V; keep semi-free candidate exploration active until 11:30, then switch to finalization and open the candidate list
 - Keep the V2D and D2V stage-specific instructions; use the unrestricted candidate-list instruction for semi-free comparison and the final-selection instruction for finalization
 - Run Main for 12 minutes with its own countdown; unlock final confirmation at 11:30
@@ -233,8 +238,8 @@ Input:
 - ExplicitDisplayFocus trigger + stick = scroll / seek on the focused WebView
 
 Done when:
-- Both RaycastBaseline and ExplicitDisplayFocus can run the same WebView task.
-- Practice automatically continues to Main; completion or abort returns cleanly to condition selection.
+- RaycastBaseline, GazeRay, and ExplicitDisplayFocus can run the same WebView task.
+- Practice and Main start independently; ending Practice writes its summary and returns cleanly to task selection without automatically starting Main.
 - T2 CSV files record completion, YouTube operations, scrolling/clicking, display switches, controller movement/rotation, and clutch count.
 ```
 

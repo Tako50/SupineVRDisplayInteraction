@@ -89,9 +89,8 @@ public class PrototypeDebugVisualizer : MonoBehaviour
             Gizmos.DrawSphere(controllerHit.Hit.point, hitPointRadius);
         }
 
-        if (gazeProvider != null)
+        if (gazeProvider != null && gazeProvider.TryGetValidGazeRay(out Ray gazeRay))
         {
-            Ray gazeRay = gazeProvider.GetGazeRay();
             Gizmos.color = Color.magenta;
             Gizmos.DrawLine(gazeRay.origin, gazeRay.origin + gazeRay.direction * rayLength);
             DisplayHit[] gazeHits = displayManager.GetDisplayHitsAll(gazeRay);
@@ -294,7 +293,12 @@ public class PrototypeDebugVisualizer : MonoBehaviour
             return;
         }
 
-        Ray gazeRay = gazeProvider.GetGazeRay();
+        if (!gazeProvider.TryGetValidGazeRay(out Ray gazeRay))
+        {
+            SetGazeRayVisible(false);
+            return;
+        }
+
         Vector3 lineStart = gazeRay.origin + gazeRay.direction * Mathf.Max(0f, gazeRayStartOffset);
         Vector3 lineEnd = gazeRay.origin + gazeRay.direction * rayLength;
         bool hasHit = displayManager.TryGetForemostHit(gazeRay, out DisplayHit gazeHit);
@@ -509,13 +513,34 @@ public class PrototypeDebugVisualizer : MonoBehaviour
 
         Transform labelTransform = worldConditionLabel.transform.parent;
         labelTransform.gameObject.SetActive(true);
-        labelTransform.position = GetWorldConditionLabelPosition(out Quaternion labelRotation);
+        Vector3 labelPosition = GetWorldConditionLabelPosition(out Quaternion labelRotation);
         labelTransform.rotation = labelRotation;
         labelTransform.localScale = Vector3.one * worldConditionLabelScale;
 
         string condition = inputManager != null ? inputManager.CurrentCondition.ToString() : "Unknown";
         string phase = focusPointingTaskManager != null ? focusPointingTaskManager.CurrentPhase.ToString() : "Dev";
-        worldConditionLabel.text = $"{phase} | {condition}";
+        string progress = focusPointingTaskManager != null
+            ? focusPointingTaskManager.MainSetProgressText
+            : string.Empty;
+        bool hasProgress = !string.IsNullOrEmpty(progress);
+        RectTransform labelRect = labelTransform as RectTransform;
+        if (labelRect != null)
+        {
+            const float progressLineHeight = 48f;
+            labelRect.sizeDelta = new Vector2(
+                worldConditionLabelSize.x,
+                worldConditionLabelSize.y + (hasProgress ? progressLineHeight : 0f));
+            if (hasProgress)
+            {
+                labelPosition -= labelRotation * Vector3.up
+                    * (progressLineHeight * worldConditionLabelScale * 0.5f);
+            }
+        }
+
+        labelTransform.position = labelPosition;
+        worldConditionLabel.text = hasProgress
+            ? $"{phase} | {condition}\n{progress}"
+            : $"{phase} | {condition}";
     }
 
     private Vector3 GetWorldConditionLabelPosition(out Quaternion rotation)
@@ -582,7 +607,9 @@ public class PrototypeDebugVisualizer : MonoBehaviour
         Ray controllerRay = GetControllerRay();
         bool hasRayHit = displayManager.TryGetForemostHit(controllerRay, out DisplayHit rayHit);
         DisplayHit gazeHit = default;
-        bool hasGazeHit = gazeProvider != null && displayManager.TryGetForemostHit(gazeProvider.GetGazeRay(), out gazeHit);
+        Ray gazeRay = default;
+        bool gazeValid = gazeProvider != null && gazeProvider.TryGetValidGazeRay(out gazeRay);
+        bool hasGazeHit = gazeValid && displayManager.TryGetForemostHit(gazeRay, out gazeHit);
         string condition = inputManager != null ? inputManager.CurrentCondition.ToString() : "Unknown";
         string focusState = focusManager != null ? focusManager.CurrentState.ToString() : "Unknown";
         string candidates = focusManager != null ? focusManager.CurrentCandidateIds : "None";
@@ -622,7 +649,7 @@ public class PrototypeDebugVisualizer : MonoBehaviour
             $"Eye tracking: {eyeTracking}\n" +
             $"Focus state: {focusState}\n" +
             $"Focused display: {focusedDisplay}\n" +
-            $"Gaze candidates: {candidates}\n" +
+            $"Gaze candidates: {candidates} ({BuildExplicitCandidateMode()})\n" +
             $"Gaze hit: {(hasGazeHit ? gazeHit.DisplayId + " " + Format(gazeHit.Normalized) : "None")}\n" +
             $"Controller hit: {(hasRayHit ? rayHit.DisplayId + " " + Format(rayHit.Normalized) : "None")}\n" +
             $"Cursor normalized: {cursorPosition}\n" +
@@ -650,5 +677,22 @@ public class PrototypeDebugVisualizer : MonoBehaviour
     private static string Format(Vector2 value)
     {
         return $"({value.x:0.000}, {value.y:0.000})";
+    }
+
+    private string BuildExplicitCandidateMode()
+    {
+        if (focusManager == null)
+        {
+            return "Unknown";
+        }
+
+        if (!focusManager.HasValidGazeThisFrame)
+        {
+            return "invalid gaze: held";
+        }
+
+        return focusManager.CurrentCandidateUsesOffDisplaySnap
+            ? $"off-display snap {focusManager.CurrentCandidateAngularDistanceDegrees:0.00}deg"
+            : "direct";
     }
 }

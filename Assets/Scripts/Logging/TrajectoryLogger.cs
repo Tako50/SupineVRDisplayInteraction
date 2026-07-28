@@ -44,7 +44,7 @@ public class TrajectoryLogger : MonoBehaviour
         {
             if (wasExperimentTaskRunning && writer != null)
             {
-                writer.Flush();
+                CloseWriter();
             }
 
             wasExperimentTaskRunning = false;
@@ -112,10 +112,37 @@ public class TrajectoryLogger : MonoBehaviour
         string directory = Path.Combine(Application.persistentDataPath, "Logs", "Trajectory");
         Directory.CreateDirectory(directory);
         string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture);
-        string path = Path.Combine(directory, $"trajectory_{stamp}.csv");
+        bool isT1 = focusPointingTaskManager != null
+            && focusPointingTaskManager.IsTaskRunning;
+        string participantId = isT1
+            ? focusPointingTaskManager.ParticipantId
+            : webViewSessionManager != null ? webViewSessionManager.ParticipantId : "P000";
+        string taskCode = isT1 ? "T1" : "T2";
+        string phaseCode = isT1
+            ? focusPointingTaskManager.CurrentPhase.ToString()
+            : webViewSessionManager != null
+                ? webViewSessionManager.CurrentPhase.ToString()
+                : "Phase";
+        string runId = isT1
+            ? focusPointingTaskManager.RunId
+            : webViewSessionManager != null ? webViewSessionManager.RunId : "Run";
+        InteractionCondition condition = inputManager != null
+            ? inputManager.CurrentCondition
+            : InteractionCondition.RaycastBaseline;
+        string path = Path.Combine(
+            directory,
+            ExperimentDataFileNaming.BuildCsvFileName(
+                participantId,
+                condition,
+                taskCode,
+                "trajectory_60hz",
+                stamp,
+                phaseCode,
+                runId));
         writer = new StreamWriter(path, false, Encoding.UTF8, 65536);
+        sampleIndex = 0;
         writer.WriteLine(
-            "timestamp,sampleIndex,participantId,sessionId,taskType,taskPhase,condition,layout,t1Task,trialIndex,globalTrialIndex,trialSetId,trialIndexInSet," +
+            "timestamp,sampleIndex,participantId,sessionId,allocationCode,runId,schemaVersion,taskType,taskPhase,condition,layout,t1Task,trialIndex,globalTrialIndex,trialSetId,trialIndexInSet," +
             "hmdPosX,hmdPosY,hmdPosZ,hmdRotX,hmdRotY,hmdRotZ,hmdRotW," +
             "controllerPosX,controllerPosY,controllerPosZ,controllerRotX,controllerRotY,controllerRotZ,controllerRotW," +
             "eyeTrackingValid,gazeOriginX,gazeOriginY,gazeOriginZ,gazeDirectionX,gazeDirectionY,gazeDirectionZ," +
@@ -137,8 +164,9 @@ public class TrajectoryLogger : MonoBehaviour
             ? rightControllerTransform.rotation
             : Quaternion.identity;
 
-        Ray gazeRay = gazeProvider != null ? gazeProvider.GetGazeRay() : default;
-        bool eyeTrackingValid = gazeProvider != null
+        Ray gazeRay = default;
+        bool gazeValid = gazeProvider != null && gazeProvider.TryGetValidGazeRay(out gazeRay);
+        bool eyeTrackingValid = gazeValid
             && gazeProvider.CurrentGazeSource == GazeSource.EyeTracking;
         DisplayHit gazeHit = default;
         bool hasGazeHit = eyeTrackingValid
@@ -157,19 +185,28 @@ public class TrajectoryLogger : MonoBehaviour
         string sessionId = isT1
             ? focusPointingTaskManager.SessionId
             : webViewSessionManager != null ? webViewSessionManager.SessionId : string.Empty;
+        string runId = isT1
+            ? focusPointingTaskManager.RunId
+            : webViewSessionManager != null ? webViewSessionManager.RunId : string.Empty;
         string taskType = isT1 ? "T1" : "T2";
         string taskPhase = isT1
             ? focusPointingTaskManager.CurrentPhase.ToString()
             : webViewSessionManager != null ? webViewSessionManager.CurrentPhase.ToString() : string.Empty;
+        InteractionCondition condition = inputManager != null
+            ? inputManager.CurrentCondition
+            : InteractionCondition.RaycastBaseline;
 
         lineBuilder.Clear();
         Append(timestamp.ToString("0.000000", CultureInfo.InvariantCulture));
         Append(sampleIndex++.ToString(CultureInfo.InvariantCulture));
         AppendCsv(participantId);
         AppendCsv(sessionId);
+        AppendCsv(ExperimentDataFileNaming.BuildAllocationCode(participantId, condition));
+        AppendCsv(runId);
+        Append(ExperimentDataFileNaming.CurrentSchemaVersion);
         Append(taskType);
         Append(taskPhase);
-        Append(inputManager != null ? inputManager.CurrentCondition.ToString() : string.Empty);
+        Append(condition.ToString());
         Append(experimentManager != null ? experimentManager.CurrentLayout.ToString() : string.Empty);
         Append(isT1 ? focusPointingTaskManager.SelectedTask.ToString() : string.Empty);
         Append(isT1 ? focusPointingTaskManager.CurrentTrialIndex.ToString(CultureInfo.InvariantCulture) : string.Empty);

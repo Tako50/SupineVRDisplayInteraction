@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import itemsData from './data/items.json'
+import practiceItemsData from './data/practiceItems.json'
 import CandidateList from './components/CandidateList'
 import CategoryList from './components/CategoryList'
 import ConfirmedCandidate from './components/ConfirmedCandidate'
@@ -9,7 +10,10 @@ import ProductList from './components/ProductList'
 import { logEvent } from './utils/logger'
 import type { Category, Item } from './types'
 
-const CANDIDATES_STORAGE_KEY = 't2_web_candidates'
+const isPracticeMode = new URLSearchParams(window.location.search).get('mode') === 'practice'
+const CANDIDATES_STORAGE_KEY = isPracticeMode
+  ? 't2_practice_web_candidates'
+  : 't2_web_candidates'
 
 const CATEGORY_DISPLAY_ORDER: Record<Category, string[]> = {
   '居住・寝具': ['A04', 'A08', 'A09', 'B01', 'B04'],
@@ -25,11 +29,13 @@ const displayOrderById = new Map(
     .map((itemId, index) => [itemId, index] as const),
 )
 
-const items = (itemsData as Item[])
+const activeItemsData = isPracticeMode ? practiceItemsData : itemsData
+const items = (activeItemsData as Item[])
   .filter((item) => item.display_in_web)
   .sort((left, right) =>
     (displayOrderById.get(left.item_id) ?? Number.MAX_SAFE_INTEGER)
-    - (displayOrderById.get(right.item_id) ?? Number.MAX_SAFE_INTEGER),
+    - (displayOrderById.get(right.item_id) ?? Number.MAX_SAFE_INTEGER)
+    || left.item_order - right.item_order,
   )
 
 type View =
@@ -39,6 +45,51 @@ type View =
   | { name: 'detail'; category: Category; itemId: string }
   | { name: 'candidates' }
   | { name: 'confirmed'; itemId: string }
+
+const HISTORY_VIEW_KEY = '__t2View'
+const HISTORY_DEPTH_KEY = '__t2Depth'
+
+function readHistoryView(): View | null {
+  const candidate = window.history.state?.[HISTORY_VIEW_KEY] as Partial<View> | undefined
+  if (!candidate || typeof candidate.name !== 'string') return null
+
+  switch (candidate.name) {
+    case 'home':
+    case 'categories':
+    case 'candidates':
+      return { name: candidate.name }
+    case 'products':
+      return typeof candidate.category === 'string'
+        && Object.hasOwn(CATEGORY_DISPLAY_ORDER, candidate.category)
+        ? { name: 'products', category: candidate.category as Category }
+        : null
+    case 'detail':
+      return typeof candidate.category === 'string'
+        && Object.hasOwn(CATEGORY_DISPLAY_ORDER, candidate.category)
+        && typeof candidate.itemId === 'string'
+        ? { name: 'detail', category: candidate.category as Category, itemId: candidate.itemId }
+        : null
+    case 'confirmed':
+      return typeof candidate.itemId === 'string'
+        ? { name: 'confirmed', itemId: candidate.itemId }
+        : null
+    default:
+      return null
+  }
+}
+
+function readHistoryDepth(): number {
+  const depth = Number(window.history.state?.[HISTORY_DEPTH_KEY])
+  return Number.isInteger(depth) && depth >= 0 ? depth : 0
+}
+
+function createHistoryState(view: View, depth: number) {
+  return {
+    ...window.history.state,
+    [HISTORY_VIEW_KEY]: view,
+    [HISTORY_DEPTH_KEY]: Math.max(0, depth),
+  }
+}
 
 declare global {
   interface Window {
@@ -64,12 +115,37 @@ function loadCandidateIds(): string[] {
 }
 
 export default function App() {
-  const [view, setView] = useState<View>({ name: 'home' })
+  const [view, setView] = useState<View>(() => readHistoryView() ?? { name: 'home' })
   const [candidateIds, setCandidateIds] = useState<string[]>(loadCandidateIds)
   const [pendingConfirmationId, setPendingConfirmationId] = useState<string | null>(null)
   const [confirmationError, setConfirmationError] = useState('')
   const [confirmationLocked, setConfirmationLocked] = useState(false)
   const [confirmationUnlockRemainingSeconds, setConfirmationUnlockRemainingSeconds] = useState(0)
+
+  const navigateTo = useCallback((nextView: View, replace = false) => {
+    const nextDepth = replace ? readHistoryDepth() : readHistoryDepth() + 1
+    const nextState = createHistoryState(nextView, nextDepth)
+    if (replace) {
+      window.history.replaceState(nextState, '')
+    } else {
+      window.history.pushState(nextState, '')
+    }
+    setView(nextView)
+  }, [])
+
+  useEffect(() => {
+    const storedView = readHistoryView()
+    const initialView = storedView ?? { name: 'home' }
+    if (!storedView) {
+      window.history.replaceState(createHistoryState(initialView, 0), '')
+    }
+
+    const handlePopState = () => {
+      setView(readHistoryView() ?? { name: 'home' })
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
 
   useEffect(() => {
     try {
@@ -93,24 +169,24 @@ export default function App() {
       setCandidateIds([])
       setPendingConfirmationId(null)
       setConfirmationError('')
-      setView({ name: 'home' })
+      navigateTo({ name: 'home' }, true)
     }
     window.t2ConfirmCandidate = (itemId) => {
       const item = items.find((candidate) => candidate.item_id === itemId)
       setPendingConfirmationId(null)
       if (!item) {
         setConfirmationError('確定した商品を表示できませんでした。実験者にお知らせください。')
-        setView({ name: 'candidates' })
+        navigateTo({ name: 'candidates' }, true)
         return
       }
 
       setConfirmationError('')
-      setView({ name: 'confirmed', itemId: item.item_id })
+      navigateTo({ name: 'confirmed', itemId: item.item_id }, true)
     }
     window.t2RejectCandidate = (message) => {
       setPendingConfirmationId(null)
       setConfirmationError(message || '条件を確認して、もう一度選択してください。')
-      setView({ name: 'candidates' })
+      navigateTo({ name: 'candidates' }, true)
     }
     window.t2SetConfirmationLock = (locked, remainingSeconds) => {
       setConfirmationLocked(Boolean(locked))
@@ -123,7 +199,7 @@ export default function App() {
       window.__t2OpenCandidateListRequested = false
       setPendingConfirmationId(null)
       setConfirmationError('')
-      setView({ name: 'candidates' })
+      navigateTo({ name: 'candidates' })
       logEvent('candidate_list_open', { from: 'confirmation_unlock' })
     }
     if (window.__t2OpenCandidateListRequested) {
@@ -136,7 +212,7 @@ export default function App() {
       delete window.t2SetConfirmationLock
       delete window.t2OpenCandidateList
     }
-  }, [])
+  }, [navigateTo])
 
   const candidates = useMemo(
     () => candidateIds.flatMap((id) => {
@@ -146,14 +222,28 @@ export default function App() {
     [candidateIds],
   )
 
-  const goBack = (to: View, from: string) => {
-    logEvent('back', { from, to: to.name })
-    setView(to)
+  const goBack = (steps: number, fallback: View, from: string) => {
+    logEvent('back', { from, to: fallback.name })
+    if (readHistoryDepth() >= steps) {
+      window.history.go(-steps)
+      return
+    }
+    navigateTo(fallback, true)
+  }
+
+  const goHome = (from: string) => {
+    const depth = readHistoryDepth()
+    logEvent('back', { from, to: 'home' })
+    if (depth > 0) {
+      window.history.go(-depth)
+      return
+    }
+    navigateTo({ name: 'home' }, true)
   }
 
   const openCandidates = (from: string) => {
     logEvent('candidate_list_open', { from })
-    setView({ name: 'candidates' })
+    navigateTo({ name: 'candidates' })
   }
 
   const currentItem = view.name === 'detail'
@@ -167,8 +257,9 @@ export default function App() {
     <div className="app-shell">
       {view.name === 'home' && (
         <Home
+          isPracticeMode={isPracticeMode}
           candidateCount={candidateIds.length}
-          onOpenCategories={() => setView({ name: 'categories' })}
+          onOpenCategories={() => navigateTo({ name: 'categories' })}
           onOpenCandidates={() => openCandidates('home')}
         />
       )}
@@ -178,9 +269,9 @@ export default function App() {
           items={items}
           onSelect={(category) => {
             logEvent('category_open', { category })
-            setView({ name: 'products', category })
+            navigateTo({ name: 'products', category })
           }}
-          onBack={() => goBack({ name: 'home' }, 'categories')}
+          onBack={() => goHome('categories')}
         />
       )}
 
@@ -191,10 +282,10 @@ export default function App() {
           candidateCount={candidateIds.length}
           onOpenProduct={(item) => {
             logEvent('product_open', { item_id: item.item_id })
-            setView({ name: 'detail', category: view.category, itemId: item.item_id })
+            navigateTo({ name: 'detail', category: view.category, itemId: item.item_id })
           }}
           onOpenCandidates={() => openCandidates('products')}
-          onBack={() => goBack({ name: 'categories' }, 'products')}
+          onBack={() => goBack(1, { name: 'categories' }, 'products')}
         />
       )}
 
@@ -202,26 +293,28 @@ export default function App() {
         <ProductDetail
           item={currentItem}
           isCandidate={candidateIds.includes(currentItem.item_id)}
-          candidateLimitReached={candidateIds.length >= 3}
           candidateCount={candidateIds.length}
           onAddCandidate={(item) => {
-            if (candidateIds.includes(item.item_id) || candidateIds.length >= 3) return
+            if (candidateIds.includes(item.item_id)) return
             setCandidateIds((current) => [...current, item.item_id])
             setPendingConfirmationId(null)
             setConfirmationError('')
             logEvent('add_candidate', { item_id: item.item_id })
           }}
-          onBackToProducts={() => goBack({ name: 'products', category: view.category }, 'detail')}
-          onBackToCategories={() => goBack({ name: 'categories' }, 'detail')}
-          onBackHome={() => goBack({ name: 'home' }, 'detail')}
+          onBackToProducts={() => goBack(1, { name: 'products', category: view.category }, 'detail')}
+          onBackToCategories={() => goBack(2, { name: 'categories' }, 'detail')}
+          onBackHome={() => goHome('detail')}
           onOpenCandidates={() => openCandidates('detail')}
+          onOpenProductPage={(item) => {
+            logEvent('product_page_open', { item_id: item.item_id, url: item.product_url })
+          }}
         />
       )}
 
       {view.name === 'detail' && !currentItem && (
         <main className="screen empty-state">
           <h1>商品が見つかりません</h1>
-          <button className="primary-button" onClick={() => goBack({ name: 'categories' }, 'detail_missing')}>
+          <button className="primary-button" onClick={() => goBack(1, { name: 'categories' }, 'detail_missing')}>
             カテゴリ一覧に戻る
           </button>
         </main>
@@ -249,7 +342,7 @@ export default function App() {
               window.t2ConfirmCandidate?.(item.item_id)
             }
           }}
-          onBack={() => goBack({ name: 'home' }, 'candidates')}
+          onBack={() => goHome('candidates')}
         />
       )}
 
@@ -266,7 +359,7 @@ export default function App() {
             setPendingConfirmationId(null)
             setConfirmationError('')
             logEvent('reset_candidates_and_home', { item_id: confirmedItem.item_id })
-            setView({ name: 'home' })
+            navigateTo({ name: 'home' }, true)
             window.__t2UnitySend?.('action', 'reset_candidates_and_home')
           }}
         />

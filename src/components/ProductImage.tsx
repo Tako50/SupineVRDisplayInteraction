@@ -7,6 +7,10 @@ interface ProductImageProps {
 }
 
 function resolveImagePath(path: string): string {
+  if (path.startsWith('data:')) {
+    return path
+  }
+
   const relativePath = path.replace(/^\//, '')
   return `${import.meta.env.BASE_URL}${relativePath}`
 }

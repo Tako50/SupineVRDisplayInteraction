@@ -367,8 +367,29 @@ public class DisplaySurface : MonoBehaviour
     public bool TryRayToClampedNormalized(Ray ray, out Vector2 normalized)
     {
         // 視線が表示のHitPlane外を向いていても、表示平面との交点を使って一番近い端へ寄せる。
+        return TryGetClosestPointToRay(
+            ray,
+            out normalized,
+            out _,
+            out _);
+    }
+
+    /// <summary>
+    /// Rayと表示平面の交点を表示矩形へクランプし、視線から矩形までの角度距離を返す。
+    /// 画面外へ少し外れたEye Trackingを、最寄りの表示端へ救済するために使う。
+    /// </summary>
+    public bool TryGetClosestPointToRay(
+        Ray ray,
+        out Vector2 normalized,
+        out Vector3 worldPoint,
+        out float angularDistanceDegrees)
+    {
         normalized = new Vector2(0.5f, 0.5f);
-        if (physicalSizeMeters.x <= 0f || physicalSizeMeters.y <= 0f || ray.direction == Vector3.zero)
+        worldPoint = transform.position;
+        angularDistanceDegrees = float.PositiveInfinity;
+        if (physicalSizeMeters.x <= 0f
+            || physicalSizeMeters.y <= 0f
+            || ray.direction.sqrMagnitude <= Mathf.Epsilon)
         {
             return false;
         }
@@ -379,8 +400,25 @@ public class DisplaySurface : MonoBehaviour
             return false;
         }
 
-        Vector3 worldPoint = ray.GetPoint(enter);
+        Vector3 planePoint = ray.GetPoint(enter);
+        Vector3 localPoint = transform.InverseTransformPoint(planePoint);
+        float halfWidth = physicalSizeMeters.x * 0.5f;
+        float halfHeight = physicalSizeMeters.y * 0.5f;
+        Vector3 clampedLocalPoint = new Vector3(
+            Mathf.Clamp(localPoint.x, -halfWidth, halfWidth),
+            Mathf.Clamp(localPoint.y, -halfHeight, halfHeight),
+            0f);
+        worldPoint = transform.TransformPoint(clampedLocalPoint);
+
+        Vector3 directionToClosestPoint = worldPoint - ray.origin;
+        if (directionToClosestPoint.sqrMagnitude <= Mathf.Epsilon
+            || Vector3.Dot(ray.direction, directionToClosestPoint) <= 0f)
+        {
+            return false;
+        }
+
         normalized = WorldToNormalized(worldPoint);
+        angularDistanceDegrees = Vector3.Angle(ray.direction, directionToClosestPoint);
         return true;
     }
 

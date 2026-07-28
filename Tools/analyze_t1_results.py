@@ -2,7 +2,8 @@
 """Prototype analyzer for T1 target-selection CSV logs.
 
 Input:
-  Logs/Quest/t1_results_*.csv by default, or explicit files/directories.
+  Logs/Quest/**/*_T1_*_results_*.csv (schema v2) and
+  Logs/Quest/**/t1_results_*.csv (legacy) by default, or explicit files/directories.
 
 Output:
   Analysis/T1/cleaned_attempts.csv
@@ -24,7 +25,10 @@ from statistics import mean, median, stdev
 
 EXPECTED_COLUMNS = [
     "participantId",
+    "allocationCode",
     "sessionId",
+    "runId",
+    "schemaVersion",
     "taskPhase",
     "conditionName",
     "interactionCondition",
@@ -68,7 +72,10 @@ def parse_args() -> argparse.Namespace:
         "inputs",
         nargs="*",
         default=["Logs/Quest"],
-        help="CSV files or directories. Directories are searched for t1_results_*.csv.",
+        help=(
+            "CSV files or directories. Directories are searched for both "
+            "*_T1_*_results_*.csv (schema v2) and t1_results_*.csv (legacy)."
+        ),
     )
     parser.add_argument(
         "--out",
@@ -88,6 +95,7 @@ def find_input_files(inputs: list[str]) -> list[Path]:
     for item in inputs:
         path = Path(item)
         if path.is_dir():
+            files.extend(sorted(path.rglob("*_T1_*_results_*.csv")))
             files.extend(sorted(path.rglob("t1_results_*.csv")))
         elif path.is_file():
             files.append(path)

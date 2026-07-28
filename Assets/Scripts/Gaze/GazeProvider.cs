@@ -73,8 +73,8 @@ public class GazeProvider : MonoBehaviour
 
     /// <summary>
     /// Returns the configured gaze ray without treating the development fallback as valid
-    /// Eye Tracking. GazeRay uses this API so loss of tracking never becomes an implicit
-    /// controller-Ray target selection.
+    /// Eye Tracking. Experiment interaction paths use this API so loss of tracking never
+    /// becomes an implicit HMD-forward target selection.
     /// </summary>
     public bool TryGetValidGazeRay(out Ray ray)
     {
@@ -86,7 +86,16 @@ public class GazeProvider : MonoBehaviour
                 return true;
             }
 
-            ray = GetDevelopmentFallbackRay();
+            if (Application.isPlaying
+                && warnWhenEyeTrackingFallsBack
+                && !warnedAboutFallback)
+            {
+                warnedAboutFallback = true;
+                Debug.LogWarning(
+                    "[GazeProvider] EyeTracking is selected, but eye tracking is unavailable or untracked. Gaze-driven state is held; HMD forward is not used.");
+            }
+
+            ray = default;
             activeGazeSource = GazeSource.HmdForward;
             return false;
         }
@@ -139,10 +148,4 @@ public class GazeProvider : MonoBehaviour
         return false;
     }
 
-    private Ray GetDevelopmentFallbackRay()
-    {
-        Camera cameraForRay = hmdCamera != null ? hmdCamera : Camera.main;
-        Transform source = cameraForRay != null ? cameraForRay.transform : transform;
-        return new Ray(source.position, source.forward);
-    }
 }

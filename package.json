@@ -4,8 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "vite --host 0.0.0.0",
+    "quest:reverse": "adb reverse tcp:5173 tcp:5173",
+    "dev:quest": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build && node scripts/package-t2-web.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

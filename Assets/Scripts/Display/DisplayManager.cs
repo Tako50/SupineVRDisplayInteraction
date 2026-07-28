@@ -125,6 +125,95 @@ public class DisplayManager : MonoBehaviour
         return reusableHits.ToArray();
     }
 
+    /// <summary>
+    /// RayがどのHitPlaneにも直接当たらない場合に、表示矩形までの角度距離が最小のDisplayを返す。
+    /// preferredDisplayは境界付近の微小な視線揺れによるDisplay切替を抑えるためにだけ優先する。
+    /// </summary>
+    public bool TryGetNearestDisplayCandidate(
+        Ray ray,
+        DisplaySurface preferredDisplay,
+        float maxAngularDistanceDegrees,
+        float switchHysteresisDegrees,
+        out DisplaySurface display,
+        out Vector2 normalized,
+        out float angularDistanceDegrees)
+    {
+        display = null;
+        normalized = new Vector2(0.5f, 0.5f);
+        angularDistanceDegrees = float.PositiveInfinity;
+
+        if (ray.direction.sqrMagnitude <= Mathf.Epsilon || maxAngularDistanceDegrees < 0f)
+        {
+            return false;
+        }
+
+        if (displays == null || displays.Length == 0)
+        {
+            RefreshDisplays();
+        }
+
+        DisplaySurface bestDisplay = null;
+        Vector2 bestNormalized = normalized;
+        float bestAngle = float.PositiveInfinity;
+        Vector2 preferredNormalized = normalized;
+        float preferredAngle = float.PositiveInfinity;
+        bool preferredIsEligible = false;
+
+        for (int i = 0; i < displays.Length; i++)
+        {
+            DisplaySurface candidate = displays[i];
+            if (!IsEligibleGazeCandidate(candidate)
+                || !candidate.TryGetClosestPointToRay(
+                    ray,
+                    out Vector2 candidateNormalized,
+                    out _,
+                    out float candidateAngle))
+            {
+                continue;
+            }
+
+            if (candidate == preferredDisplay)
+            {
+                preferredNormalized = candidateNormalized;
+                preferredAngle = candidateAngle;
+                preferredIsEligible = true;
+            }
+
+            bool hasLowerAngle = candidateAngle < bestAngle - 0.0001f;
+            bool winsDeterministicTie = Mathf.Abs(candidateAngle - bestAngle) <= 0.0001f
+                && (bestDisplay == null
+                    || string.CompareOrdinal(candidate.name, bestDisplay.name) < 0);
+            if (hasLowerAngle || winsDeterministicTie)
+            {
+                bestDisplay = candidate;
+                bestNormalized = candidateNormalized;
+                bestAngle = candidateAngle;
+            }
+        }
+
+        if (bestDisplay == null || bestAngle > maxAngularDistanceDegrees)
+        {
+            return false;
+        }
+
+        float hysteresis = Mathf.Max(0f, switchHysteresisDegrees);
+        if (preferredIsEligible
+            && preferredDisplay != bestDisplay
+            && preferredAngle <= maxAngularDistanceDegrees
+            && bestAngle + hysteresis >= preferredAngle)
+        {
+            display = preferredDisplay;
+            normalized = preferredNormalized;
+            angularDistanceDegrees = preferredAngle;
+            return true;
+        }
+
+        display = bestDisplay;
+        normalized = bestNormalized;
+        angularDistanceDegrees = bestAngle;
+        return true;
+    }
+
     public void SetCurrentRaycastHit(DisplayHit hit)
     {
         CurrentRaycastHit = hit;
@@ -301,6 +390,16 @@ public class DisplayManager : MonoBehaviour
         }
 
         return false;
+    }
+
+    private static bool IsEligibleGazeCandidate(DisplaySurface display)
+    {
+        return display != null
+            && display.isActiveAndEnabled
+            && display.gameObject.activeInHierarchy
+            && display.TransparentHitPlane != null
+            && display.TransparentHitPlane.enabled
+            && display.TransparentHitPlane.gameObject.activeInHierarchy;
     }
 }
 

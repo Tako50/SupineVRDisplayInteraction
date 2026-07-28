@@ -162,6 +162,8 @@ public enum T1TargetSize
 public class FocusPointingTaskManager : MonoBehaviour
 {
     private const int TrainingTrialsPerLayout = 12;
+    private const int MainTrialsPerSet = 24;
+    private const int MainSetsPerLayout = 4;
 
     [Header("References")]
     [SerializeField] private PrototypeInputManager inputManager;
@@ -176,6 +178,7 @@ public class FocusPointingTaskManager : MonoBehaviour
     [Header("Session")]
     [SerializeField] private string participantId = "P000";
     [SerializeField] private string sessionId = "S000";
+    [SerializeField] private string runId = "Run";
     [SerializeField] private bool autoStartOnPlay = false;
     [SerializeField] private bool returnToConditionSelectionAfterMainTask = true;
     [SerializeField] private InteractionCondition selectedCondition = InteractionCondition.RaycastBaseline;
@@ -213,6 +216,7 @@ public class FocusPointingTaskManager : MonoBehaviour
     [Header("T1 Target Order Lists")]
     [FormerlySerializedAs("useLatest48TrialDesign")]
     [SerializeField] private bool useGeneratedTrialDesign = true;
+    [Tooltip("Main uses this base plus 1000 per task, shared by every participant, method, and run.")]
     [SerializeField] private int latestSequenceSeedBase = 3100;
     [SerializeField] private TextAsset targetOrderCsv;
     [SerializeField] private string targetOrderResourcePath = "T1/target_orders_ABCDEFG";
@@ -227,6 +231,19 @@ public class FocusPointingTaskManager : MonoBehaviour
     [SerializeField] private float startCountdownSeconds = 3f;
     [SerializeField] private Color startGateButtonColor = new Color(0.502f, 0.812f, 1f, 1f);
     [SerializeField] private Color startGateCountdownColor = new Color(0.125f, 0.125f, 0.125f, 1f);
+
+    [Header("T1 Feedback")]
+    [Tooltip("Optional 2D AudioSource. If empty, one is created on this GameObject at runtime.")]
+    [SerializeField] private AudioSource feedbackAudioSource;
+    [Tooltip("Optional correct sound. If empty, a short high tone is generated at runtime.")]
+    [SerializeField] private AudioClip correctFeedbackClip;
+    [Tooltip("Optional incorrect sound. If empty, a short low tone is generated at runtime.")]
+    [SerializeField] private AudioClip incorrectFeedbackClip;
+    [Range(0f, 1f)]
+    [SerializeField] private float feedbackVolume = 0.8f;
+
+    [Header("T1 Progress")]
+    [SerializeField] private bool showMainSetProgress = true;
 
     private readonly Dictionary<DisplaySurface, RectTransform> targetRects = new Dictionary<DisplaySurface, RectTransform>();
     private readonly Dictionary<DisplaySurface, RectTransform> missClickMarkerRects = new Dictionary<DisplaySurface, RectTransform>();
@@ -258,6 +275,9 @@ public class FocusPointingTaskManager : MonoBehaviour
     private int currentTrainingSequenceIndex = -1;
     private int completedTrainingTrialCount;
     private int completedTrainingBlockCount;
+    private int displayedMainSetCount = -1;
+    private AudioClip generatedCorrectFeedbackClip;
+    private AudioClip generatedIncorrectFeedbackClip;
     private static Sprite circleTargetSprite;
 
     private static readonly T1PointingTask[] FixedMainTaskSequence =
@@ -278,6 +298,7 @@ public class FocusPointingTaskManager : MonoBehaviour
     public bool IsTaskRunning => taskRunning;
     public string ParticipantId => participantId;
     public string SessionId => sessionId;
+    public string RunId => runId;
     public FocusPointingTaskPhase CurrentPhase => currentPhase;
     public InteractionCondition SelectedCondition => selectedCondition;
     public DisplayLayoutPreset SelectedLayout => selectedLayout;
@@ -288,6 +309,11 @@ public class FocusPointingTaskManager : MonoBehaviour
     public int CompletedTrainingTrialCount => completedTrainingTrialCount;
     public bool CanEndTraining => currentPhase == FocusPointingTaskPhase.Training
         && completedTrainingTrialCount >= TrainingTrialsPerLayout * TrainingTaskSequence.Length;
+    public string MainSetProgressText => currentPhase == FocusPointingTaskPhase.MainTask
+        && showMainSetProgress
+        && displayedMainSetCount >= 0
+            ? $"T1 PROGRESS | {displayedMainSetCount}/{MainSetsPerLayout}"
+            : string.Empty;
     public string CurrentTargetDisplayId => currentTrial != null ? currentTrial.targetDisplayId : "None";
     public int CurrentTrialIndex => currentTrial != null ? currentTrial.trialIndex : -1;
     public int CurrentGlobalTrialIndex => currentTrial != null ? currentTrial.globalTrialIndex : -1;
@@ -305,10 +331,14 @@ public class FocusPointingTaskManager : MonoBehaviour
     private void Awake()
     {
         ResolveReferences();
+        EnsureFeedbackAudio();
     }
 
     private void OnValidate()
     {
+        feedbackVolume = Mathf.Clamp01(feedbackVolume);
+        ConfigureFeedbackAudioSource();
+
         if (useGeneratedTrialDesign)
         {
             selectedLayout = LayoutForTask(selectedTask);
@@ -322,6 +352,8 @@ public class FocusPointingTaskManager : MonoBehaviour
     {
         ResolveReferences();
         EnsureTargets();
+        EnsureFeedbackAudio();
+        HideProgressDisplay();
 
         if (autoStartOnPlay)
         {
@@ -338,8 +370,22 @@ public class FocusPointingTaskManager : MonoBehaviour
     private void OnDisable()
     {
         HideStartGate();
+        HideProgressDisplay();
         CloseTargetSelectionCsv();
         CloseT1ResultsCsv();
+    }
+
+    private void OnDestroy()
+    {
+        if (generatedCorrectFeedbackClip != null)
+        {
+            Destroy(generatedCorrectFeedbackClip);
+        }
+
+        if (generatedIncorrectFeedbackClip != null)
+        {
+            Destroy(generatedIncorrectFeedbackClip);
+        }
     }
 
     public void SetSelectedCondition(InteractionCondition condition)
@@ -355,12 +401,28 @@ public class FocusPointingTaskManager : MonoBehaviour
         {
             methodOrder = T1MethodOrder.GazeRayOnly;
         }
-        else if (methodOrder == T1MethodOrder.GazeRayOnly)
+        else
         {
             methodOrder = condition == InteractionCondition.RaycastBaseline
                 ? T1MethodOrder.RayFirst
                 : T1MethodOrder.ExplicitFirst;
         }
+    }
+
+    public void SetParticipantContext(
+        string newParticipantId,
+        string newSessionId,
+        string newRunId = "")
+    {
+        if (taskRunning)
+        {
+            Debug.Log("[FocusPointingTask] participant context change ignored while task is running.");
+            return;
+        }
+
+        participantId = NormalizeSessionId(newParticipantId, "P000");
+        sessionId = NormalizeSessionId(newSessionId, "S000");
+        runId = NormalizeSessionId(newRunId, sessionId);
     }
 
     public void SetSelectedLayout(DisplayLayoutPreset layout)
@@ -460,6 +522,7 @@ public class FocusPointingTaskManager : MonoBehaviour
         currentPhase = FocusPointingTaskPhase.ConditionSelection;
         activeTaskCondition = selectedCondition;
         HideStartGate();
+        HideProgressDisplay();
         HideAllTargets();
         HideAllMissClickMarkers();
         SetDisplayContentMode(DisplayContentMode.ConditionSelection);
@@ -472,6 +535,7 @@ public class FocusPointingTaskManager : MonoBehaviour
         }
 
         EmitEndSyncMarkerIfNeeded(endedPhase, "return_to_condition_selection");
+        logger?.EndRunContext();
         startSyncMarkerLogged = false;
         endSyncMarkerLogged = false;
         Debug.Log("[FocusPointingTask] returned to condition selection");
@@ -487,6 +551,12 @@ public class FocusPointingTaskManager : MonoBehaviour
         EnsureDefaultTrials();
         EnsureTargets();
         HideAllTargets();
+        HideProgressDisplay();
+        if (currentPhase == FocusPointingTaskPhase.MainTask)
+        {
+            ShowMainSetProgress(0);
+        }
+
         SetDisplayContentMode(DisplayContentMode.PointingTask);
         OpenTargetSelectionCsv();
         OpenT1ResultsCsv();
@@ -664,6 +734,7 @@ public class FocusPointingTaskManager : MonoBehaviour
             }
 
             Debug.Log($"[FocusPointingTask] miss trial={result.TrialIndex}, result={result.ResultType}, clickedDisplay={result.ClickedDisplayId}, clicked={Format(result.ClickedNormalizedPosition)}");
+            PlayEvaluationFeedback(false);
             return;
         }
 
@@ -674,6 +745,8 @@ public class FocusPointingTaskManager : MonoBehaviour
         }
 
         Debug.Log($"[FocusPointingTask] result conditionName={currentTrial.conditionName}, trialInCondition={currentTrial.trialIndexInCondition}, trialSetId={currentTrial.trialSetId}, global={currentTrial.globalTrialIndex}, occlusion={currentTrial.occlusionType}, result={result.ResultType}, clickedDisplay={result.ClickedDisplayId}, clicked={Format(result.ClickedNormalizedPosition)}, completion={result.CompletionTime:0.000}");
+        PlayEvaluationFeedback(true);
+        UpdateMainSetProgressAfterCorrectTrial(currentTrial.trialIndexInCondition);
         trialRunning = false;
         HideAllTargets();
         HideAllMissClickMarkers();
@@ -685,6 +758,7 @@ public class FocusPointingTaskManager : MonoBehaviour
         trialRunning = false;
         HideAllTargets();
         HideAllMissClickMarkers();
+        HideProgressDisplay();
         HideStartGate();
         EmitEndSyncMarkerIfNeeded(currentPhase, "completed");
 
@@ -742,6 +816,7 @@ public class FocusPointingTaskManager : MonoBehaviour
         EnsureDefaultTrials();
         currentTrialListIndex = FindIndexBeforeFirstTrialForCondition(activeTaskCondition);
         SetDisplayContentMode(DisplayContentMode.PointingTask);
+        ShowMainSetProgress(0);
 
         if (requireStartButtonBeforeTask)
         {
@@ -841,9 +916,10 @@ public class FocusPointingTaskManager : MonoBehaviour
             for (int i = 0; i < sourceTrials.Count; i++)
             {
                 FocusPointingTrialConfig trial = CloneTrialForCondition(sourceTrials[i], conditionBlock);
-                trial.globalTrialIndex = globalIndex;
-                trial.trialIndex = globalIndex;
                 trial.trialIndexInCondition = i + 1;
+                int loggedTrialIndex = GetLoggedTrialIndex(trial.trialIndexInCondition, globalIndex);
+                trial.globalTrialIndex = loggedTrialIndex;
+                trial.trialIndex = loggedTrialIndex;
                 trial.layoutPreset = selectedLayout;
                 trials.Add(trial);
                 globalIndex++;
@@ -855,6 +931,19 @@ public class FocusPointingTaskManager : MonoBehaviour
             $"[FocusPointingTask] loaded phase={currentPhase}, task={selectedTask}, layout={selectedLayout}, "
             + $"totalTrials={trials.Count}, design={(useGeneratedTrialDesign ? T1TrialSequenceGenerator.MainTrialsPerBlock + "-trial" : "legacy CSV")}, "
             + $"taskOrder={taskOrder}, methodOrder={methodOrder}");
+    }
+
+    private int GetLoggedTrialIndex(int trialIndexInCondition, int fallbackIndex)
+    {
+        if (currentPhase != FocusPointingTaskPhase.MainTask || !runFixedMainTaskSequence)
+        {
+            return fallbackIndex;
+        }
+
+        int taskIndex = Array.IndexOf(FixedMainTaskSequence, selectedTask);
+        return taskIndex >= 0
+            ? taskIndex * T1TrialSequenceGenerator.MainTrialsPerBlock + trialIndexInCondition
+            : fallbackIndex;
     }
 
     private List<FocusPointingTrialConfig> BuildLatestTrialSet(
@@ -1436,6 +1525,128 @@ public class FocusPointingTaskManager : MonoBehaviour
         startGate?.Hide();
     }
 
+    private void EnsureFeedbackAudio()
+    {
+        if (feedbackAudioSource == null)
+        {
+            feedbackAudioSource = GetComponent<AudioSource>();
+        }
+
+        if (feedbackAudioSource == null)
+        {
+            feedbackAudioSource = gameObject.AddComponent<AudioSource>();
+        }
+
+        ConfigureFeedbackAudioSource();
+
+        if (correctFeedbackClip == null && generatedCorrectFeedbackClip == null)
+        {
+            generatedCorrectFeedbackClip = CreateToneClip("T1_Correct_Generated", 880f, 0.09f);
+        }
+
+        if (incorrectFeedbackClip == null && generatedIncorrectFeedbackClip == null)
+        {
+            generatedIncorrectFeedbackClip = CreateToneClip("T1_Incorrect_Generated", 300f, 0.11f);
+        }
+    }
+
+    private void ConfigureFeedbackAudioSource()
+    {
+        if (feedbackAudioSource == null)
+        {
+            return;
+        }
+
+        feedbackAudioSource.playOnAwake = false;
+        feedbackAudioSource.loop = false;
+        feedbackAudioSource.spatialBlend = 0f;
+        feedbackAudioSource.volume = 1f;
+    }
+
+    private void PlayEvaluationFeedback(bool isCorrect)
+    {
+        EnsureFeedbackAudio();
+        AudioClip clip = isCorrect
+            ? (correctFeedbackClip != null ? correctFeedbackClip : generatedCorrectFeedbackClip)
+            : (incorrectFeedbackClip != null ? incorrectFeedbackClip : generatedIncorrectFeedbackClip);
+        if (feedbackAudioSource != null && clip != null && feedbackVolume > 0f)
+        {
+            // PlayOneShot is asynchronous and does not delay the next T1 trial.
+            feedbackAudioSource.PlayOneShot(clip, feedbackVolume);
+        }
+    }
+
+    private static AudioClip CreateToneClip(string clipName, float frequencyHz, float durationSeconds)
+    {
+        const int sampleRate = 44100;
+        int sampleCount = Mathf.Max(1, Mathf.CeilToInt(sampleRate * durationSeconds));
+        float[] samples = new float[sampleCount];
+        for (int i = 0; i < sampleCount; i++)
+        {
+            float time = i / (float)sampleRate;
+            float normalizedTime = sampleCount > 1 ? i / (float)(sampleCount - 1) : 1f;
+            float envelope = Mathf.Sin(Mathf.PI * normalizedTime);
+            samples[i] = Mathf.Sin(2f * Mathf.PI * frequencyHz * time) * envelope * 0.2f;
+        }
+
+        AudioClip clip = AudioClip.Create(clipName, sampleCount, 1, sampleRate, false);
+        clip.SetData(samples, 0);
+        return clip;
+    }
+
+    private void UpdateMainSetProgressAfterCorrectTrial(int completedTrialInLayout)
+    {
+        if (currentPhase != FocusPointingTaskPhase.MainTask || !showMainSetProgress)
+        {
+            HideProgressDisplay();
+            return;
+        }
+
+        if (completedTrialInLayout >= MainTrialsPerSet * MainSetsPerLayout)
+        {
+            // The 96th correct response belongs to the existing layout-completion flow.
+            HideProgressDisplay();
+            return;
+        }
+
+        if (!TryGetCompletedMainSet(completedTrialInLayout, out int completedSetCount))
+        {
+            return;
+        }
+
+        ShowMainSetProgress(completedSetCount);
+    }
+
+    private void ShowMainSetProgress(int completedSetCount)
+    {
+        if (currentPhase != FocusPointingTaskPhase.MainTask || !showMainSetProgress)
+        {
+            HideProgressDisplay();
+            return;
+        }
+
+        displayedMainSetCount = Mathf.Clamp(completedSetCount, 0, MainSetsPerLayout);
+    }
+
+    public static bool TryGetCompletedMainSet(int completedTrialInLayout, out int completedSetCount)
+    {
+        completedSetCount = 0;
+        if (completedTrialInLayout <= 0
+            || completedTrialInLayout >= MainTrialsPerSet * MainSetsPerLayout
+            || completedTrialInLayout % MainTrialsPerSet != 0)
+        {
+            return false;
+        }
+
+        completedSetCount = completedTrialInLayout / MainTrialsPerSet;
+        return completedSetCount > 0 && completedSetCount < MainSetsPerLayout;
+    }
+
+    private void HideProgressDisplay()
+    {
+        displayedMainSetCount = -1;
+    }
+
     private static Sprite GetCircleTargetSprite()
     {
         if (circleTargetSprite != null)
@@ -1559,6 +1770,10 @@ public class FocusPointingTaskManager : MonoBehaviour
         {
             targetSelectionWriter.WriteLine(string.Join(",",
                 Escape(participantId),
+                Escape(ExperimentDataFileNaming.BuildAllocationCode(participantId, selectedCondition)),
+                Escape(sessionId),
+                Escape(runId),
+                Escape(ExperimentDataFileNaming.CurrentSchemaVersion),
                 Escape(currentTrial.conditionName),
                 Escape(currentTrial.task.ToString()),
                 Escape(taskOrder.ToString()),
@@ -1605,7 +1820,10 @@ public class FocusPointingTaskManager : MonoBehaviour
 
         t1ResultsWriter.WriteLine(string.Join(",",
             Escape(participantId),
+            Escape(ExperimentDataFileNaming.BuildAllocationCode(participantId, result.Condition)),
             Escape(sessionId),
+            Escape(runId),
+            Escape(ExperimentDataFileNaming.CurrentSchemaVersion),
             Escape(currentPhase.ToString()),
             Escape(currentTrial.conditionName),
             Escape(result.Condition.ToString()),
@@ -1670,9 +1888,18 @@ public class FocusPointingTaskManager : MonoBehaviour
         string directory = Path.Combine(Application.persistentDataPath, "Logs");
         Directory.CreateDirectory(directory);
         string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
-        targetSelectionCsvPath = Path.Combine(directory, $"target_selection_{participantId}_{timestamp}.csv");
+        targetSelectionCsvPath = Path.Combine(
+            directory,
+            ExperimentDataFileNaming.BuildCsvFileName(
+                participantId,
+                selectedCondition,
+                "T1",
+                "target_selection",
+                timestamp,
+                currentPhase.ToString(),
+                runId));
         targetSelectionWriter = new StreamWriter(targetSelectionCsvPath);
-        targetSelectionWriter.WriteLine("participantId,conditionName,t1Task,taskOrder,methodOrder,layoutPreset,sequenceSeed,trialOrder,randomSeed,targetOrderList,sourcePhase,cycleIndex,positionId,targetSizeName,targetSizeDegrees,repetition,trialIndexInCondition,globalTrialIndex,trialSetId,trialIndexInSet,occlusion_type,legacyOcclusionType,displayName,targetPositionId,targetLocalX,targetLocalY,responseTime,timestamp");
+        targetSelectionWriter.WriteLine("participantId,allocationCode,sessionId,runId,schemaVersion,conditionName,t1Task,taskOrder,methodOrder,layoutPreset,sequenceSeed,trialOrder,randomSeed,targetOrderList,sourcePhase,cycleIndex,positionId,targetSizeName,targetSizeDegrees,repetition,trialIndexInCondition,globalTrialIndex,trialSetId,trialIndexInSet,occlusion_type,legacyOcclusionType,displayName,targetPositionId,targetLocalX,targetLocalY,responseTime,timestamp");
         Debug.Log($"[FocusPointingTask] target selection CSV logging to {targetSelectionCsvPath}");
     }
 
@@ -1686,9 +1913,18 @@ public class FocusPointingTaskManager : MonoBehaviour
         string directory = Path.Combine(Application.persistentDataPath, "Logs");
         Directory.CreateDirectory(directory);
         string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
-        t1ResultsCsvPath = Path.Combine(directory, $"t1_results_{participantId}_{sessionId}_{timestamp}.csv");
+        t1ResultsCsvPath = Path.Combine(
+            directory,
+            ExperimentDataFileNaming.BuildCsvFileName(
+                participantId,
+                selectedCondition,
+                "T1",
+                "results",
+                timestamp,
+                currentPhase.ToString(),
+                runId));
         t1ResultsWriter = new StreamWriter(t1ResultsCsvPath);
-        t1ResultsWriter.WriteLine("participantId,sessionId,taskPhase,conditionName,interactionCondition,t1Task,taskOrder,methodOrder,layoutPreset,sequenceSeed,trialOrder,randomSeed,targetOrderList,sourcePhase,cycleIndex,positionId,targetSizeName,targetSizeDegrees,repetition,previousDisplay,previousPositionId,transitionDirection,transitionType,occlusionPrevType,trialIndexInCondition,globalTrialIndex,trialSetId,trialIndexInSet,occlusion_type,legacyOcclusionType,targetDisplayId,targetPositionId,targetLocalX,targetLocalY,targetSize,attemptIndex,clickedDisplayId,clickedLocalX,clickedLocalY,resultType,isCorrect,displayError,targetError,miss,advancesTrial,trialStartTime,clickTime,responseTime,controllerMovementMeters,controllerRotationDegrees,timestamp");
+        t1ResultsWriter.WriteLine("participantId,allocationCode,sessionId,runId,schemaVersion,taskPhase,conditionName,interactionCondition,t1Task,taskOrder,methodOrder,layoutPreset,sequenceSeed,trialOrder,randomSeed,targetOrderList,sourcePhase,cycleIndex,positionId,targetSizeName,targetSizeDegrees,repetition,previousDisplay,previousPositionId,transitionDirection,transitionType,occlusionPrevType,trialIndexInCondition,globalTrialIndex,trialSetId,trialIndexInSet,occlusion_type,legacyOcclusionType,targetDisplayId,targetPositionId,targetLocalX,targetLocalY,targetSize,attemptIndex,clickedDisplayId,clickedLocalX,clickedLocalY,resultType,isCorrect,displayError,targetError,miss,advancesTrial,trialStartTime,clickTime,responseTime,controllerMovementMeters,controllerRotationDegrees,timestamp");
         Debug.Log($"[FocusPointingTask] T1 result CSV logging to {t1ResultsCsvPath}");
     }
 
@@ -1940,11 +2176,12 @@ public class FocusPointingTaskManager : MonoBehaviour
         InteractionCondition condition,
         FocusPointingTaskPhase phase)
     {
+        if (phase == FocusPointingTaskPhase.MainTask)
+        {
+            return latestSequenceSeedBase + (int)task * 1000;
+        }
+
         int participantHash = StableHash(participantId + "|" + sessionId) % 997;
-        int phaseOffset = phase == FocusPointingTaskPhase.Training ? 50000 : 0;
-        int trainingBlockOffset = phase == FocusPointingTaskPhase.Training
-            ? completedTrainingBlockCount * 10000
-            : 0;
         int conditionSeedIndex = condition == InteractionCondition.GazeRay
             ? (int)InteractionCondition.RaycastBaseline
             : (int)condition;
@@ -1957,8 +2194,8 @@ public class FocusPointingTaskManager : MonoBehaviour
             + conditionSeedIndex * 100
             + (int)taskOrder * 10
             + methodSeedIndex
-            + phaseOffset
-            + trainingBlockOffset;
+            + 50000
+            + completedTrainingBlockCount * 10000;
     }
 
     private static int StableHash(string value)
@@ -1973,6 +2210,11 @@ public class FocusPointingTaskManager : MonoBehaviour
             }
             return (int)(hash & 0x7fffffff);
         }
+    }
+
+    private static string NormalizeSessionId(string value, string fallback)
+    {
+        return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
     }
 
     private static DisplayLayoutPreset LayoutForTask(T1PointingTask task)

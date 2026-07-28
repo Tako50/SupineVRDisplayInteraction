@@ -72,6 +72,10 @@ public class TLabWebViewDisplayBridge : MonoBehaviour
     [SerializeField] private bool invertScrollDirection = true;
     [Tooltip("Horizontal trigger+stick seek speed for HTML video elements.")]
     [SerializeField] private float seekSecondsPerSecond = 30f;
+    [Tooltip("Sends button-free pointer movement into the page so controls such as YouTube's seek bar can show hover previews.")]
+    [SerializeField] private bool enablePointerHover = true;
+    [Range(1f, 60f)]
+    [SerializeField] private float pointerHoverUpdatesPerSecond = 30f;
     [SerializeField] private bool logInputEvents = false;
 
     [Header("Shutdown")]
@@ -95,6 +99,9 @@ public class TLabWebViewDisplayBridge : MonoBehaviour
     private bool pointerDownActive;
     private long activePointerDownTime;
     private Vector2 activePointerNormalized;
+    private float nextPointerHoverTime;
+    private bool hasPointerHoverPosition;
+    private Vector2 lastPointerHoverNormalized;
 
     public bool IsWebViewEnabled => enableOnStart;
     public bool IsReady => initialized && browser != null;
@@ -209,6 +216,9 @@ public class TLabWebViewDisplayBridge : MonoBehaviour
         }
 
         initialUrl = url.Trim();
+        Debug.Log(
+            $"[TLabWebViewDisplayBridge] {name} load requested url={initialUrl}, "
+            + $"ready={initialized}");
         if (initialized && browser != null && TryInvoke(browser, "LoadUrl", initialUrl))
         {
             Status = $"Loaded URL: {initialUrl}";
@@ -254,6 +264,55 @@ public class TLabWebViewDisplayBridge : MonoBehaviour
 
         RequestKeyboardFocusBridgeRefresh();
         return sent && consumeExperimentInput;
+    }
+
+    public bool TryPointerHover(Vector2 displayNormalized)
+    {
+        if (!enablePointerHover
+            || pointerDownActive
+            || IsDisplayKeyboardArea(displayNormalized)
+            || !CanReceiveInput())
+        {
+            return false;
+        }
+
+        float now = Time.unscaledTime;
+        if (now < nextPointerHoverTime)
+        {
+            return false;
+        }
+
+        Vector2 webNormalized = ToWebNormalizedPoint(displayNormalized);
+        Vector2Int size = ResolveViewSize();
+        Vector2 hoverDeltaPixels = Vector2.Scale(
+            webNormalized - lastPointerHoverNormalized,
+            new Vector2(Mathf.Max(1, size.x), Mathf.Max(1, size.y)));
+        if (hasPointerHoverPosition && hoverDeltaPixels.sqrMagnitude < 1f)
+        {
+            return false;
+        }
+
+        nextPointerHoverTime = now + 1f / Mathf.Max(1f, pointerHoverUpdatesPerSecond);
+        bool sent = TryInvoke(browser, "EvaluateJS", BuildPointerHoverJavaScript(webNormalized));
+        if (sent)
+        {
+            lastPointerHoverNormalized = webNormalized;
+            hasPointerHoverPosition = true;
+        }
+
+        return sent;
+    }
+
+    public bool TryPointerHoverExit()
+    {
+        if (!enablePointerHover || !CanReceiveInput())
+        {
+            return false;
+        }
+
+        nextPointerHoverTime = 0f;
+        hasPointerHoverPosition = false;
+        return TryInvoke(browser, "EvaluateJS", BuildPointerHoverExitJavaScript());
     }
 
     public bool TryScroll(float stickVertical, float deltaTime, Vector2 displayNormalized, out float appliedScrollPixels)
@@ -695,6 +754,46 @@ public class TLabWebViewDisplayBridge : MonoBehaviour
             + $"var max=Math.max(0,(e.scrollHeight||0)-(e.clientHeight||0));var next=Math.max(0,Math.min(max,before+({pixels})));"
             + "e.scrollTop=next;"
             + "return next!==before;"
+            + "})();";
+    }
+
+    private static string BuildPointerHoverJavaScript(Vector2 webNormalized)
+    {
+        string normalizedX = webNormalized.x.ToString("0.######", CultureInfo.InvariantCulture);
+        string normalizedY = webNormalized.y.ToString("0.######", CultureInfo.InvariantCulture);
+        return "(function(){"
+            + $"var x=Math.max(0,Math.min(Math.max(0,window.innerWidth-1),({normalizedX})*window.innerWidth));"
+            + $"var y=Math.max(0,Math.min(Math.max(0,window.innerHeight-1),({normalizedY})*window.innerHeight));"
+            + "var target=document.elementFromPoint(x,y)||document.documentElement||document;"
+            + "var previous=window.__supineVirtualHoverTarget||null;"
+            + "function mouse(t,type,related){"
+            + "if(!t||!t.dispatchEvent){return;}"
+            + "try{t.dispatchEvent(new MouseEvent(type,{bubbles:true,cancelable:true,view:window,clientX:x,clientY:y,screenX:x,screenY:y,buttons:0,button:0,relatedTarget:related||null}));}catch(e){}"
+            + "}"
+            + "function pointer(t,type,related){"
+            + "if(!t||!t.dispatchEvent||typeof PointerEvent!=='function'){return;}"
+            + "try{t.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,view:window,clientX:x,clientY:y,screenX:x,screenY:y,buttons:0,button:0,pointerId:1,pointerType:'mouse',isPrimary:true,relatedTarget:related||null}));}catch(e){}"
+            + "}"
+            + "if(previous!==target){"
+            + "pointer(previous,'pointerout',target);mouse(previous,'mouseout',target);"
+            + "pointer(target,'pointerover',previous);mouse(target,'mouseover',previous);"
+            + "window.__supineVirtualHoverTarget=target;"
+            + "}"
+            + "pointer(target,'pointermove',null);mouse(target,'mousemove',null);"
+            + "return true;"
+            + "})();";
+    }
+
+    private static string BuildPointerHoverExitJavaScript()
+    {
+        return "(function(){"
+            + "var previous=window.__supineVirtualHoverTarget||null;"
+            + "if(previous&&previous.dispatchEvent){"
+            + "try{if(typeof PointerEvent==='function'){previous.dispatchEvent(new PointerEvent('pointerout',{bubbles:true,cancelable:true,pointerId:1,pointerType:'mouse',isPrimary:true}));}}catch(e){}"
+            + "try{previous.dispatchEvent(new MouseEvent('mouseout',{bubbles:true,cancelable:true,view:window,buttons:0,button:0}));}catch(e){}"
+            + "}"
+            + "window.__supineVirtualHoverTarget=null;"
+            + "return true;"
             + "})();";
     }
 

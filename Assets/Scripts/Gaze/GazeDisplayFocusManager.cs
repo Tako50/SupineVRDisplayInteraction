@@ -11,6 +11,7 @@ public class GazeDisplayFocusManager : MonoBehaviour
     [SerializeField] private PrototypeInputManager inputManager;
     [SerializeField] private GazeProvider gazeProvider;
     [SerializeField] private DisplayManager displayManager;
+    [SerializeField] private FocusManager focusManager;
     [Header("Highlight")]
     [SerializeField, HideInInspector] private bool highlightEnabled = true;
     [SerializeField] private bool logStateChanges = true;
@@ -120,12 +121,11 @@ public class GazeDisplayFocusManager : MonoBehaviour
         {
             target = raycastPointer != null ? raycastPointer.GazeSelectedDisplay : null;
         }
-        else if (gazeProvider != null)
+        else if (currentInteractionMethod == InteractionCondition.ExplicitDisplayFocus)
         {
-            Ray gazeRay = gazeProvider.GetGazeRay();
-            target = displayManager.TryGetForemostHit(gazeRay, out DisplayHit hit)
-                ? hit.Display
-                : null;
+            // FocusManagerと同じ直接hit／画面外近傍候補を表示し、
+            // Eye Tracking無効時は最後の有効候補を保持する。
+            target = focusManager != null ? focusManager.CandidateDisplay : null;
         }
         else
         {
@@ -200,6 +200,11 @@ public class GazeDisplayFocusManager : MonoBehaviour
         if (raycastPointer == null)
         {
             raycastPointer = FindObjectOfType<RaycastPointer>();
+        }
+
+        if (focusManager == null)
+        {
+            focusManager = FindObjectOfType<FocusManager>();
         }
 
         if (displayManager == null)

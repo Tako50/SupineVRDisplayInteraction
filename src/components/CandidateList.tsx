@@ -41,7 +41,7 @@ export default function CandidateList({
             <article className="candidate-row" key={item.item_id}>
               <div>
                 <h2>{item.product_name}</h2>
-                <p>{item.brand} · {item.price}</p>
+                <p>{item.brand} · {item.category}</p>
               </div>
               <button
                 className="final-button"

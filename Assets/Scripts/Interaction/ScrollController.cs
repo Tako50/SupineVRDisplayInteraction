@@ -234,7 +234,8 @@ public class ScrollController : MonoBehaviour
         if (Time.time - lastScrollLogTime >= scrollLogInterval)
         {
             lastScrollLogTime = Time.time;
-            Ray gazeRay = gazeProvider != null ? gazeProvider.GetGazeRay() : default;
+            Ray gazeRay = default;
+            gazeProvider?.TryGetValidGazeRay(out gazeRay);
             bool gazeOnDifferentDisplay = focusManager != null && focusManager.IsGazeOnDifferentDisplay(focusedDisplay);
             if (logger != null)
             {
