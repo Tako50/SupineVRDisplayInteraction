@@ -2,11 +2,27 @@ using UnityEngine;
 
 [DisallowMultipleComponent]
 /// <summary>
-/// Aボタン/トリガー短押しを、現在の条件に応じたクリックイベントへ変換する。
-/// BaselineではRayヒット位置、ExplicitDisplayFocusではフォーカス表示上の仮想カーソル位置でクリックする。
+/// Aボタンをクリックへ変換する。トリガー単押しはクリックに使わない。
+/// 既定のDirectScrollAndSeekではBaselineのtrigger+RayとExplicitのtrigger+horizontal stickでWeb UI dragする。
+/// BaselineはRay、ExplicitDisplayFocusはフォーカス表示上の仮想カーソルをポインター位置に使う。
 /// </summary>
 public class ClickDispatcher : MonoBehaviour
 {
+    private enum WebViewPointerActivation
+    {
+        None,
+        Submit,
+        Stick,
+        Trigger
+    }
+
+    private enum WebViewStickGestureAxis
+    {
+        None,
+        Horizontal,
+        Vertical
+    }
+
     [SerializeField] private PrototypeInputManager inputManager;
     [SerializeField] private DisplayManager displayManager;
     [SerializeField] private RaycastPointer raycastPointer;
@@ -14,13 +30,52 @@ public class ClickDispatcher : MonoBehaviour
     [SerializeField] private VirtualCursorController virtualCursorController;
     [SerializeField] private GazeProvider gazeProvider;
     [SerializeField] private FocusPointingTaskManager focusPointingTaskManager;
+    [SerializeField] private WebViewSessionManager webViewSessionManager;
     [SerializeField] private VRTaskMenuManager vrTaskMenuManager;
     [SerializeField] private Logger logger;
-    [SerializeField] private float triggerScrollDeadzone = 0.05f;
-
+    [Tooltip("Legacy WebView input only: holding A sends pointer down/move/up.")]
+    [SerializeField] private bool enableWebViewPointerDrag = true;
+    [Header("WebView Stick Touch Gesture")]
+    [Range(0.01f, 0.95f)]
+    [SerializeField] private float webViewStickGestureDeadzone = 0.12f;
+    [Min(0.01f)]
+    [Tooltip("Web UI drag speed in display canvas pixels per second at full stick deflection.")]
+    [SerializeField] private float webViewStickGestureSpeedPixelsPerSecond = 260f;
+    [Tooltip("RaycastBaseline keeps a touch down briefly while the stick crosses neutral so horizontal drags can reverse direction.")]
+    [Min(0f)]
+    [SerializeField] private float webViewRayNeutralReleaseDelay = 0.12f;
+    [Tooltip("Vertical page gestures are re-clutched before the hidden touch reaches this distance from a display edge.")]
+    [Range(0.01f, 0.2f)]
+    [SerializeField] private float webViewVerticalGestureEdgeMargin = 0.08f;
+    [Tooltip("After a vertical re-clutch, the hidden touch restarts this far from the opposite edge. The visible cursor does not move.")]
+    [Range(0.15f, 0.45f)]
+    [SerializeField] private float webViewVerticalGestureReentry = 0.28f;
+    [SerializeField] private bool invertWebViewStickGestureX = false;
+    [SerializeField] private bool invertWebViewStickGestureY = false;
+    [Header("WebView Direct Drag")]
+    [Tooltip("Minimum pointer movement in display canvas pixels before a latched Web UI drag sends pointer down. This prevents trigger taps from becoming Web clicks.")]
+    [Min(0f)]
+    [SerializeField] private float webViewDirectDragStartThresholdPixels = 16f;
     public string LastClickResult { get; private set; } = "None";
+    public bool IsExplicitTriggerWebViewPointerDragActive =>
+        activeWebViewDragBridge != null
+        && activeWebViewDragCondition == InteractionCondition.ExplicitDisplayFocus
+        && activeWebViewPointerActivation == WebViewPointerActivation.Trigger;
 
-    private bool triggerGestureScrolled;
+    private TLabWebViewDisplayBridge activeWebViewDragBridge;
+    private DisplaySurface activeWebViewDragDisplay;
+    private Vector2 activeWebViewDragLastNormalized;
+    private Vector2 activeWebViewDragAnchorNormalized;
+    private InteractionCondition activeWebViewDragCondition;
+    private WebViewPointerActivation activeWebViewPointerActivation;
+    private WebViewStickGestureAxis activeWebViewStickGestureAxis;
+    private float webViewRayNeutralStartTime = -1f;
+    private TLabWebViewDisplayBridge pendingWebViewDragBridge;
+    private DisplaySurface pendingWebViewDragDisplay;
+    private Vector2 pendingWebViewDragStartNormalized;
+    private WebViewPointerActivation pendingWebViewDragActivation;
+    private InteractionCondition pendingWebViewDragCondition;
+    private TLabWebViewDisplayBridge activeWebViewHoverBridge;
 
     private void Awake()
     {
@@ -33,10 +88,26 @@ public class ClickDispatcher : MonoBehaviour
 
         if (inputManager == null || displayManager == null)
         {
+            ClearActiveWebViewHover();
+            CancelWebViewPointerDrag();
             return;
         }
 
-        UpdateTriggerClickState();
+        UpdateWebViewPointerHover();
+
+        if (inputManager.SecondaryButtonPressed)
+        {
+            CancelWebViewPointerDrag();
+            return;
+        }
+
+        bool useStickTouchGesture = UsesStickTouchGestureMode();
+        bool useDirectScrollAndSeek = UsesDirectScrollAndSeekMode();
+        if (UpdateWebViewPointerInteraction(useStickTouchGesture, useDirectScrollAndSeek))
+        {
+            return;
+        }
+
         bool submitRequested = ShouldDispatchClickThisFrame();
         if (!submitRequested)
         {
@@ -49,16 +120,20 @@ public class ClickDispatcher : MonoBehaviour
             return;
         }
 
-        if (focusPointingTaskManager != null
-            && raycastPointer != null
-            && displayManager.TryGetForemostHit(raycastPointer.CurrentRay, out DisplayHit taskControlHit)
-            && focusPointingTaskManager.TryHandleTaskControlClick(taskControlHit.DisplayId, taskControlHit.Normalized))
+        if (TryHandleDisplayMenuClick())
+        {
+            return;
+        }
+
+        if (TryGetTaskControlPointerHit(out DisplayHit taskControlHit)
+            && TryHandleTaskControlClick(taskControlHit.DisplayId, taskControlHit.Normalized))
         {
             LastClickResult = $"{taskControlHit.DisplayId} taskControl=True";
             return;
         }
 
-        if (inputManager.CurrentCondition == InteractionCondition.RaycastBaseline)
+        if (inputManager.CurrentCondition == InteractionCondition.RaycastBaseline
+            || inputManager.CurrentCondition == InteractionCondition.GazeRay)
         {
             DispatchRaycastBaselineClick();
             return;
@@ -70,29 +145,678 @@ public class ClickDispatcher : MonoBehaviour
         }
     }
 
-    private void UpdateTriggerClickState()
+    private void OnDisable()
     {
-        if (inputManager.TriggerPressed)
+        ClearActiveWebViewHover();
+        CancelWebViewPointerDrag();
+    }
+
+    private void UpdateWebViewPointerHover()
+    {
+        if (webViewSessionManager == null
+            || !webViewSessionManager.IsSessionRunning
+            || activeWebViewDragBridge != null
+            || !TryGetCurrentWebViewPointerTarget(out DisplaySurface display, out Vector2 normalized))
         {
-            triggerGestureScrolled = false;
+            ClearActiveWebViewHover();
+            return;
         }
 
-        if (inputManager.TriggerHeld && Mathf.Abs(inputManager.Stick.y) >= triggerScrollDeadzone)
+        TLabWebViewDisplayBridge bridge = GetWebViewBridge(display);
+        if (bridge == null)
         {
-            triggerGestureScrolled = true;
+            ClearActiveWebViewHover();
+            return;
         }
+
+        if (activeWebViewHoverBridge != bridge)
+        {
+            ClearActiveWebViewHover();
+            activeWebViewHoverBridge = bridge;
+        }
+
+        bridge.TryPointerHover(normalized);
+    }
+
+    private void ClearActiveWebViewHover()
+    {
+        if (activeWebViewHoverBridge == null)
+        {
+            return;
+        }
+
+        activeWebViewHoverBridge.TryPointerHoverExit();
+        activeWebViewHoverBridge = null;
+    }
+
+    private bool UpdateWebViewPointerInteraction(
+        bool useStickTouchGesture,
+        bool useDirectScrollAndSeek)
+    {
+        if (!useDirectScrollAndSeek)
+        {
+            ClearPendingDirectWebViewDrag();
+        }
+
+        if (useStickTouchGesture)
+        {
+            return UpdateWebViewStickTouchGesture();
+        }
+
+        if (useDirectScrollAndSeek)
+        {
+            return UpdateDirectWebViewPointerDrag();
+        }
+
+        return UpdateLegacyWebViewSubmitDrag();
+    }
+
+    private bool UpdateDirectWebViewPointerDrag()
+    {
+        if (!enableWebViewPointerDrag)
+        {
+            CancelWebViewPointerDrag();
+            return false;
+        }
+
+        if (activeWebViewDragBridge != null)
+        {
+            if (!IsWebViewDragContextValid(
+                    activeWebViewDragBridge,
+                    activeWebViewDragDisplay,
+                    activeWebViewDragCondition)
+                || ShouldEndDirectWebViewPointerDrag())
+            {
+                EndActiveWebViewPointerDrag();
+                return true;
+            }
+
+            UpdateActiveWebViewPointerDrag();
+            return true;
+        }
+
+        if (pendingWebViewDragBridge != null)
+        {
+            return UpdatePendingDirectWebViewDrag();
+        }
+
+        if (inputManager.CurrentCondition == InteractionCondition.RaycastBaseline
+            && inputManager.TriggerPressed
+            && TryLatchDirectWebViewDrag(WebViewPointerActivation.Trigger))
+        {
+            return true;
+        }
+
+        if (inputManager.CurrentCondition == InteractionCondition.GazeRay
+            && inputManager.TriggerPressed
+            && TryLatchDirectWebViewDrag(WebViewPointerActivation.Trigger))
+        {
+            return true;
+        }
+
+        if (inputManager.CurrentCondition == InteractionCondition.ExplicitDisplayFocus
+            && inputManager.TriggerPressed
+            && TryLatchDirectWebViewDrag(WebViewPointerActivation.Trigger))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool UpdatePendingDirectWebViewDrag()
+    {
+        if (!IsWebViewDragContextValid(
+                pendingWebViewDragBridge,
+                pendingWebViewDragDisplay,
+                pendingWebViewDragCondition))
+        {
+            ClearPendingDirectWebViewDrag();
+            return true;
+        }
+
+        if (pendingWebViewDragActivation == WebViewPointerActivation.Trigger)
+        {
+            if (!inputManager.TriggerHeld)
+            {
+                ClearPendingDirectWebViewDrag();
+                return true;
+            }
+        }
+
+        Vector2 currentNormalized = GetWebViewDragPosition(
+            pendingWebViewDragDisplay,
+            pendingWebViewDragStartNormalized,
+            pendingWebViewDragCondition);
+        if (!HasReachedDirectDragStartThreshold(
+                pendingWebViewDragDisplay,
+                pendingWebViewDragStartNormalized,
+                currentNormalized))
+        {
+            return true;
+        }
+
+        TLabWebViewDisplayBridge bridge = pendingWebViewDragBridge;
+        DisplaySurface display = pendingWebViewDragDisplay;
+        Vector2 startNormalized = pendingWebViewDragStartNormalized;
+        WebViewPointerActivation activation = pendingWebViewDragActivation;
+        ClearPendingDirectWebViewDrag();
+
+        if (bridge == null || !bridge.TryPointerDown(startNormalized))
+        {
+            return true;
+        }
+
+        ActivateWebViewDrag(bridge, display, startNormalized, activation);
+        UpdateActiveWebViewPointerDrag(currentNormalized);
+        LastClickResult = $"{display.name} webViewDragStarted=True activation={activation}";
+        return true;
+    }
+
+    private bool HasReachedDirectDragStartThreshold(
+        DisplaySurface display,
+        Vector2 startNormalized,
+        Vector2 currentNormalized)
+    {
+        Vector2 canvasSize = display != null ? display.CanvasPixelSize : Vector2.one;
+        canvasSize.x = Mathf.Max(1f, canvasSize.x);
+        canvasSize.y = Mathf.Max(1f, canvasSize.y);
+        Vector2 deltaPixels = Vector2.Scale(currentNormalized - startNormalized, canvasSize);
+        return deltaPixels.magnitude >= Mathf.Max(0f, webViewDirectDragStartThresholdPixels);
+    }
+
+    private bool ShouldEndDirectWebViewPointerDrag()
+    {
+        if (inputManager == null)
+        {
+            return true;
+        }
+
+        switch (activeWebViewPointerActivation)
+        {
+            case WebViewPointerActivation.Trigger:
+                return !inputManager.TriggerHeld;
+            default:
+                return false;
+        }
+    }
+
+    private bool UpdateLegacyWebViewSubmitDrag()
+    {
+        if (!enableWebViewPointerDrag)
+        {
+            CancelWebViewPointerDrag();
+            return false;
+        }
+
+        if (activeWebViewDragBridge != null)
+        {
+            if (!IsWebViewDragContextValid(
+                activeWebViewDragBridge,
+                activeWebViewDragDisplay,
+                activeWebViewDragCondition))
+            {
+                EndActiveWebViewPointerDrag();
+                return true;
+            }
+
+            if (inputManager.SubmitHeld)
+            {
+                UpdateActiveWebViewPointerDrag();
+                return true;
+            }
+
+            EndActiveWebViewPointerDrag();
+            return true;
+        }
+
+        if (inputManager.SubmitPressed && TryBeginSubmitWebViewDrag())
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool UpdateWebViewStickTouchGesture()
+    {
+        if (activeWebViewPointerActivation == WebViewPointerActivation.Submit)
+        {
+            CancelWebViewPointerDrag();
+            return true;
+        }
+
+        if (activeWebViewDragBridge != null)
+        {
+            if (!IsWebViewDragContextValid(
+                    activeWebViewDragBridge,
+                    activeWebViewDragDisplay,
+                    activeWebViewDragCondition)
+                || ShouldEndActiveWebViewStickGesture()
+                || inputManager.SubmitHeld)
+            {
+                EndActiveWebViewPointerDrag();
+                return true;
+            }
+
+            UpdateActiveWebViewStickTouchGesture();
+            return true;
+        }
+
+        bool gestureRequested = IsWebViewStickGestureRequested();
+        if (!gestureRequested || inputManager.SubmitHeld)
+        {
+            return false;
+        }
+
+        return TryBeginWebViewStickTouchGesture();
+    }
+
+    private bool TryBeginWebViewStickTouchGesture()
+    {
+        if (!TryGetCurrentWebViewPointerTarget(out DisplaySurface display, out Vector2 normalized))
+        {
+            return false;
+        }
+
+        TLabWebViewDisplayBridge webViewBridge = GetWebViewBridge(display);
+        if (webViewBridge == null || !webViewBridge.TryPointerDown(normalized))
+        {
+            return false;
+        }
+
+        ActivateWebViewDrag(webViewBridge, display, normalized, WebViewPointerActivation.Stick);
+        LastClickResult = $"{display.name} webViewPointerDown=True activation=Stick";
+        UpdateActiveWebViewStickTouchGesture();
+        return true;
+    }
+
+    private void UpdateActiveWebViewStickTouchGesture()
+    {
+        Vector2 stick = inputManager.Stick;
+        if (stick.magnitude < webViewStickGestureDeadzone)
+        {
+            return;
+        }
+
+        if (invertWebViewStickGestureX)
+        {
+            stick.x *= -1f;
+        }
+
+        if (invertWebViewStickGestureY)
+        {
+            stick.y *= -1f;
+        }
+
+        if (activeWebViewStickGestureAxis == WebViewStickGestureAxis.None)
+        {
+            activeWebViewStickGestureAxis = Mathf.Abs(stick.x) > Mathf.Abs(stick.y)
+                ? WebViewStickGestureAxis.Horizontal
+                : WebViewStickGestureAxis.Vertical;
+        }
+
+        Vector2 canvasSize = activeWebViewDragDisplay != null
+            ? activeWebViewDragDisplay.CanvasPixelSize
+            : Vector2.one;
+        canvasSize.x = Mathf.Max(1f, canvasSize.x);
+        canvasSize.y = Mathf.Max(1f, canvasSize.y);
+
+        Vector2 deltaPixels = stick * webViewStickGestureSpeedPixelsPerSecond * Time.deltaTime;
+        Vector2 delta = new Vector2(deltaPixels.x / canvasSize.x, deltaPixels.y / canvasSize.y);
+        if (activeWebViewStickGestureAxis == WebViewStickGestureAxis.Horizontal)
+        {
+            delta.y = 0f;
+        }
+        else
+        {
+            delta.x = 0f;
+            if (!ReClutchVerticalWebViewGestureIfNeeded(delta.y))
+            {
+                CancelWebViewPointerDrag();
+                return;
+            }
+        }
+
+        Vector2 normalized = activeWebViewDragLastNormalized + delta;
+        normalized.x = Mathf.Clamp01(normalized.x);
+        normalized.y = Mathf.Clamp01(normalized.y);
+        UpdateActiveWebViewPointerDrag(normalized);
+        LastClickResult = $"{GetActiveWebViewDragDisplayId()} webViewGesture=True axis={activeWebViewStickGestureAxis}";
+    }
+
+    private bool ReClutchVerticalWebViewGestureIfNeeded(float verticalDelta)
+    {
+        if (Mathf.Approximately(verticalDelta, 0f) || activeWebViewDragBridge == null)
+        {
+            return true;
+        }
+
+        float edgeMargin = Mathf.Clamp(webViewVerticalGestureEdgeMargin, 0.01f, 0.2f);
+        float nextY = activeWebViewDragLastNormalized.y + verticalDelta;
+        bool reachesEdge = verticalDelta > 0f
+            ? nextY >= 1f - edgeMargin
+            : nextY <= edgeMargin;
+        if (!reachesEdge)
+        {
+            return true;
+        }
+
+        activeWebViewDragBridge.TryPointerUp(activeWebViewDragLastNormalized);
+
+        float reentry = Mathf.Clamp(webViewVerticalGestureReentry, edgeMargin + 0.01f, 0.49f);
+        Vector2 restartNormalized = new Vector2(
+            Mathf.Clamp(activeWebViewDragAnchorNormalized.x, edgeMargin, 1f - edgeMargin),
+            verticalDelta > 0f ? reentry : 1f - reentry);
+
+        bool restarted = activeWebViewDragBridge.TryPointerDown(restartNormalized);
+        if (restarted)
+        {
+            activeWebViewDragLastNormalized = restartNormalized;
+        }
+
+        return restarted;
+    }
+
+    private bool IsWebViewStickGestureRequested()
+    {
+        if (inputManager == null || inputManager.Stick.magnitude < webViewStickGestureDeadzone)
+        {
+            return false;
+        }
+
+        if (inputManager.CurrentCondition == InteractionCondition.RaycastBaseline
+            || inputManager.CurrentCondition == InteractionCondition.GazeRay)
+        {
+            return true;
+        }
+
+        return inputManager.CurrentCondition == InteractionCondition.ExplicitDisplayFocus
+            && inputManager.TriggerHeld;
+    }
+
+    private bool ShouldEndActiveWebViewStickGesture()
+    {
+        if (inputManager == null)
+        {
+            return true;
+        }
+
+        if (activeWebViewDragCondition == InteractionCondition.ExplicitDisplayFocus)
+        {
+            webViewRayNeutralStartTime = -1f;
+            return !inputManager.TriggerHeld;
+        }
+
+        if (inputManager.Stick.magnitude >= webViewStickGestureDeadzone)
+        {
+            webViewRayNeutralStartTime = -1f;
+            return false;
+        }
+
+        if (webViewRayNeutralStartTime < 0f)
+        {
+            webViewRayNeutralStartTime = Time.unscaledTime;
+            return false;
+        }
+
+        return Time.unscaledTime - webViewRayNeutralStartTime
+            >= Mathf.Max(0f, webViewRayNeutralReleaseDelay);
+    }
+
+    private bool TryBeginSubmitWebViewDrag()
+    {
+        if (!TryGetCurrentWebViewPointerTarget(out DisplaySurface display, out Vector2 normalized))
+        {
+            return false;
+        }
+
+        TLabWebViewDisplayBridge webViewBridge = GetWebViewBridge(display);
+        if (webViewBridge == null || !webViewBridge.TryPointerDown(normalized))
+        {
+            return false;
+        }
+
+        ActivateWebViewDrag(webViewBridge, display, normalized, WebViewPointerActivation.Submit);
+        LastClickResult = $"{display.name} webViewPointerDown=True activation=Submit";
+        return true;
+    }
+
+    private bool TryLatchDirectWebViewDrag(WebViewPointerActivation activation)
+    {
+        if (!TryGetCurrentWebViewPointerTarget(out DisplaySurface display, out Vector2 normalized))
+        {
+            return false;
+        }
+
+        TLabWebViewDisplayBridge webViewBridge = GetWebViewBridge(display);
+        if (webViewBridge == null)
+        {
+            return false;
+        }
+
+        pendingWebViewDragBridge = webViewBridge;
+        pendingWebViewDragDisplay = display;
+        pendingWebViewDragStartNormalized = normalized;
+        pendingWebViewDragActivation = activation;
+        pendingWebViewDragCondition = inputManager.CurrentCondition;
+        LastClickResult = $"{display.name} webViewDragLatched=True activation={activation}";
+        return true;
+    }
+
+    private void ActivateWebViewDrag(
+        TLabWebViewDisplayBridge bridge,
+        DisplaySurface display,
+        Vector2 normalized,
+        WebViewPointerActivation activation)
+    {
+        ClearActiveWebViewHover();
+        activeWebViewDragBridge = bridge;
+        activeWebViewDragDisplay = display;
+        activeWebViewDragLastNormalized = normalized;
+        activeWebViewDragAnchorNormalized = normalized;
+        activeWebViewDragCondition = inputManager.CurrentCondition;
+        activeWebViewPointerActivation = activation;
+        activeWebViewStickGestureAxis = WebViewStickGestureAxis.None;
+        webViewRayNeutralStartTime = -1f;
+    }
+
+    private void UpdateActiveWebViewPointerDrag()
+    {
+        Vector2 normalized = GetWebViewDragPosition(
+            activeWebViewDragDisplay,
+            activeWebViewDragLastNormalized,
+            activeWebViewDragCondition);
+        UpdateActiveWebViewPointerDrag(normalized);
+    }
+
+    private void UpdateActiveWebViewPointerDrag(Vector2 normalized)
+    {
+        if (activeWebViewDragBridge.TryPointerMove(normalized))
+        {
+            activeWebViewDragLastNormalized = normalized;
+        }
+
+        LastClickResult = $"{GetActiveWebViewDragDisplayId()} webViewDrag=True activation={activeWebViewPointerActivation}";
+    }
+
+    private void EndActiveWebViewPointerDrag()
+    {
+        if (activeWebViewDragBridge == null)
+        {
+            return;
+        }
+
+        WebViewPointerActivation activation = activeWebViewPointerActivation;
+        Vector2 normalized = GetWebViewDragPosition(
+            activeWebViewDragDisplay,
+            activeWebViewDragLastNormalized,
+            activeWebViewDragCondition);
+        if (activeWebViewDragBridge != null)
+        {
+            activeWebViewDragBridge.TryPointerUp(normalized);
+        }
+
+        LastClickResult = $"{GetActiveWebViewDragDisplayId()} webViewPointerUp=True activation={activation}";
+        activeWebViewDragBridge = null;
+        activeWebViewDragDisplay = null;
+        activeWebViewPointerActivation = WebViewPointerActivation.None;
+        activeWebViewStickGestureAxis = WebViewStickGestureAxis.None;
+        webViewRayNeutralStartTime = -1f;
+    }
+
+    private Vector2 GetWebViewDragPosition(
+        DisplaySurface lockedDisplay,
+        Vector2 fallbackNormalized,
+        InteractionCondition condition)
+    {
+        if (activeWebViewPointerActivation == WebViewPointerActivation.Stick)
+        {
+            return fallbackNormalized;
+        }
+
+        if (condition == InteractionCondition.ExplicitDisplayFocus)
+        {
+            if (displayManager != null
+                && displayManager.FocusedDisplay == lockedDisplay
+                && virtualCursorController != null)
+            {
+                return virtualCursorController.NormalizedPosition;
+            }
+
+            return fallbackNormalized;
+        }
+
+        if ((condition == InteractionCondition.RaycastBaseline || condition == InteractionCondition.GazeRay)
+            && lockedDisplay != null
+            && raycastPointer != null)
+        {
+            Ray ray = raycastPointer.CurrentRay;
+            if (ray.direction != Vector3.zero
+                && displayManager != null
+                && displayManager.TryGetHitOnDisplay(lockedDisplay, ray, out DisplayHit lockedHit))
+            {
+                return lockedHit.Normalized;
+            }
+        }
+
+        return fallbackNormalized;
+    }
+
+    private bool TryGetCurrentWebViewPointerTarget(out DisplaySurface display, out Vector2 normalized)
+    {
+        display = null;
+        normalized = Vector2.zero;
+
+        if (inputManager.CurrentCondition == InteractionCondition.RaycastBaseline
+            || inputManager.CurrentCondition == InteractionCondition.GazeRay)
+        {
+            if (raycastPointer == null || displayManager == null)
+            {
+                return false;
+            }
+
+            if (!displayManager.HasCurrentRaycastHit)
+            {
+                return false;
+            }
+
+            DisplayHit hit = displayManager.CurrentRaycastHit;
+            display = hit.Display;
+            normalized = hit.Normalized;
+            return HasInputConsumingWebView(display);
+        }
+
+        if (inputManager.CurrentCondition == InteractionCondition.ExplicitDisplayFocus)
+        {
+            display = displayManager != null ? displayManager.FocusedDisplay : null;
+            if (display == null || virtualCursorController == null || !HasInputConsumingWebView(display))
+            {
+                display = null;
+                return false;
+            }
+
+            normalized = virtualCursorController.NormalizedPosition;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool HasInputConsumingWebView(DisplaySurface display)
+    {
+        return IsActiveInputWebView(GetWebViewBridge(display));
+    }
+
+    private static bool IsActiveInputWebView(TLabWebViewDisplayBridge bridge)
+    {
+        return bridge != null
+            && bridge.ConsumeExperimentInput
+            && (bridge.IsWebViewEnabled || bridge.IsReady);
+    }
+
+    private bool IsWebViewDragContextValid(
+        TLabWebViewDisplayBridge bridge,
+        DisplaySurface display,
+        InteractionCondition condition)
+    {
+        if (inputManager == null
+            || inputManager.CurrentCondition != condition
+            || display == null
+            || !IsActiveInputWebView(bridge))
+        {
+            return false;
+        }
+
+        if (condition == InteractionCondition.ExplicitDisplayFocus)
+        {
+            return displayManager != null && displayManager.FocusedDisplay == display;
+        }
+
+        if (condition == InteractionCondition.GazeRay)
+        {
+            return raycastPointer != null && raycastPointer.GazeSelectedDisplay == display;
+        }
+
+        return true;
+    }
+
+    private string GetActiveWebViewDragDisplayId()
+    {
+        return activeWebViewDragDisplay != null ? activeWebViewDragDisplay.name : "None";
+    }
+
+    private void CancelWebViewPointerDrag()
+    {
+        ClearPendingDirectWebViewDrag();
+        EndActiveWebViewPointerDrag();
+    }
+
+    private void ClearPendingDirectWebViewDrag()
+    {
+        pendingWebViewDragBridge = null;
+        pendingWebViewDragDisplay = null;
+        pendingWebViewDragActivation = WebViewPointerActivation.None;
+        pendingWebViewDragCondition = default;
     }
 
     private bool ShouldDispatchClickThisFrame()
     {
-        // トリガーをスクロールに使った場合は、離した瞬間のクリックとして扱わない。
-        bool triggerClick = inputManager.TriggerReleased && !triggerGestureScrolled;
-        if (inputManager.TriggerReleased)
-        {
-            triggerGestureScrolled = false;
-        }
+        return inputManager.SubmitReleased;
+    }
 
-        return inputManager.SubmitPressed || triggerClick;
+    private bool UsesStickTouchGestureMode()
+    {
+        return webViewSessionManager != null
+            && webViewSessionManager.IsSessionRunning
+            && webViewSessionManager.UsesStickTouchGesture;
+    }
+
+    private bool UsesDirectScrollAndSeekMode()
+    {
+        return webViewSessionManager != null
+            && webViewSessionManager.IsSessionRunning
+            && webViewSessionManager.UsesDirectScrollAndSeek;
     }
 
     private void DispatchRaycastBaselineClick()
@@ -111,18 +835,22 @@ public class ClickDispatcher : MonoBehaviour
             return;
         }
 
-        if (focusPointingTaskManager != null && focusPointingTaskManager.TryHandleTaskControlClick(hit.DisplayId, hit.Normalized))
+        if (TryHandleTaskControlClick(hit.DisplayId, hit.Normalized))
         {
             LastClickResult = $"{hit.DisplayId} taskControl=True";
             return;
         }
 
-        string targetId = string.Empty;
-        bool validTarget = hit.Display != null && hit.Display.TryClickDebugTarget(hit.Normalized, out targetId);
-        LastClickResult = $"{hit.DisplayId} valid={validTarget} target={targetId}";
+        if (TryHandleWebViewClick(hit.Display, hit.Normalized))
+        {
+            LastClickResult = $"{hit.DisplayId} webView=True";
+            return;
+        }
+
+        LastClickResult = hit.DisplayId;
         NotifyTaskLayer(hit.DisplayId, hit.Normalized, hit.Display != null);
         Ray ray = raycastPointer != null ? raycastPointer.CurrentRay : default;
-        LogClick(hit.DisplayId, hit.Normalized, validTarget, targetId, ray);
+        LogClick(hit.DisplayId, hit.Normalized, ray);
     }
 
     private void DispatchExplicitFocusClick()
@@ -143,17 +871,22 @@ public class ClickDispatcher : MonoBehaviour
             return;
         }
 
-        if (focusPointingTaskManager != null && focusPointingTaskManager.TryHandleTaskControlClick(focusedDisplay.name, normalized))
+        if (TryHandleTaskControlClick(focusedDisplay.name, normalized))
         {
             LastClickResult = $"{focusedDisplay.name} taskControl=True";
             return;
         }
 
-        string targetId = string.Empty;
-        bool validTarget = focusedDisplay.TryClickDebugTarget(normalized, out targetId);
-        LastClickResult = $"{focusedDisplay.name} valid={validTarget} target={targetId}";
+        if (TryHandleWebViewClick(focusedDisplay, normalized))
+        {
+            LastClickResult = $"{focusedDisplay.name} webView=True";
+            return;
+        }
+
+        LastClickResult = focusedDisplay.name;
         NotifyTaskLayer(focusedDisplay.name, normalized, true);
-        Ray gazeRay = gazeProvider != null ? gazeProvider.GetGazeRay() : default;
+        Ray gazeRay = default;
+        gazeProvider?.TryGetValidGazeRay(out gazeRay);
         bool gazeOnDifferentDisplay = focusManager != null && focusManager.IsGazeOnDifferentDisplay(focusedDisplay);
 
         if (logger != null)
@@ -164,15 +897,13 @@ public class ClickDispatcher : MonoBehaviour
                 focusManager != null ? focusManager.CurrentCandidateIds : "None",
                 focusedDisplay.name,
                 normalized,
-                validTarget,
-                targetId,
                 gazeOnDifferentDisplay,
                 gazeRay.origin,
                 gazeRay.direction);
         }
         else
         {
-            Debug.Log($"[ClickDispatcher] condition={inputManager.CurrentCondition}, focusedDisplay={focusedDisplay.name}, normalized={Format(normalized)}, validTarget={validTarget}, targetId={targetId}, gazeOnDifferentDisplay={gazeOnDifferentDisplay}");
+            Debug.Log($"[ClickDispatcher] condition={inputManager.CurrentCondition}, focusedDisplay={focusedDisplay.name}, normalized={Format(normalized)}, gazeOnDifferentDisplay={gazeOnDifferentDisplay}");
         }
     }
 
@@ -217,6 +948,11 @@ public class ClickDispatcher : MonoBehaviour
             focusPointingTaskManager = FindObjectOfType<FocusPointingTaskManager>();
         }
 
+        if (webViewSessionManager == null)
+        {
+            webViewSessionManager = FindObjectOfType<WebViewSessionManager>();
+        }
+
         if (vrTaskMenuManager == null)
         {
             vrTaskMenuManager = FindObjectOfType<VRTaskMenuManager>();
@@ -230,30 +966,86 @@ public class ClickDispatcher : MonoBehaviour
 
     private void NotifyTaskLayer(string clickedDisplayId, Vector2 normalized, bool hasValidDisplay)
     {
-        if (focusPointingTaskManager == null || inputManager == null)
+        if (inputManager == null)
         {
             return;
         }
 
-        focusPointingTaskManager.HandleClick(new FocusPointingClickEvent
+        if (focusPointingTaskManager != null)
         {
-            Condition = inputManager.CurrentCondition,
-            ClickedDisplayId = clickedDisplayId,
-            ClickedNormalizedPosition = normalized,
-            Timestamp = Time.time,
-            HasValidDisplay = hasValidDisplay
-        });
+            focusPointingTaskManager.HandleClick(new FocusPointingClickEvent
+            {
+                Condition = inputManager.CurrentCondition,
+                ClickedDisplayId = clickedDisplayId,
+                ClickedNormalizedPosition = normalized,
+                Timestamp = Time.time,
+                HasValidDisplay = hasValidDisplay
+            });
+        }
+
     }
 
-    private void LogClick(string displayId, Vector2 normalized, bool validTarget, string targetId, Ray ray)
+    private bool TryHandleTaskControlClick(string displayId, Vector2 normalizedPosition)
+    {
+        return (focusPointingTaskManager != null
+                && focusPointingTaskManager.TryHandleTaskControlClick(displayId, normalizedPosition))
+            || (webViewSessionManager != null
+                && webViewSessionManager.TryHandleTaskControlClick(displayId, normalizedPosition));
+    }
+
+    private bool TryGetTaskControlPointerHit(out DisplayHit hit)
+    {
+        hit = default;
+        if (displayManager == null || raycastPointer == null)
+        {
+            return false;
+        }
+
+        if (inputManager != null && inputManager.CurrentCondition == InteractionCondition.GazeRay)
+        {
+            if (!displayManager.HasCurrentRaycastHit)
+            {
+                return false;
+            }
+
+            hit = displayManager.CurrentRaycastHit;
+            return hit.Display != null;
+        }
+
+        return displayManager.TryGetForemostHit(raycastPointer.CurrentRay, out hit);
+    }
+
+    private bool TryHandleWebViewClick(DisplaySurface display, Vector2 normalizedPosition)
+    {
+        if (display == null)
+        {
+            return false;
+        }
+
+        TLabWebViewDisplayBridge webViewBridge = GetWebViewBridge(display);
+        bool handled = webViewBridge != null && webViewBridge.TryClick(normalizedPosition);
+        if (handled)
+        {
+            webViewSessionManager?.RecordWebViewClick(display.name, normalizedPosition);
+        }
+
+        return handled;
+    }
+
+    private static TLabWebViewDisplayBridge GetWebViewBridge(DisplaySurface display)
+    {
+        return display != null ? display.GetComponent<TLabWebViewDisplayBridge>() : null;
+    }
+
+    private void LogClick(string displayId, Vector2 normalized, Ray ray)
     {
         if (logger != null)
         {
-            logger.LogRaycastClick(inputManager.CurrentCondition, displayId, normalized, validTarget, targetId, ray.origin, ray.direction);
+            logger.LogRaycastClick(inputManager.CurrentCondition, displayId, normalized, ray.origin, ray.direction);
         }
         else
         {
-            Debug.Log($"[ClickDispatcher] condition={inputManager.CurrentCondition}, displayId={displayId}, normalized={Format(normalized)}, validTarget={validTarget}, targetId={targetId}");
+            Debug.Log($"[ClickDispatcher] condition={inputManager.CurrentCondition}, displayId={displayId}, normalized={Format(normalized)}");
         }
     }
 
@@ -264,8 +1056,8 @@ public class ClickDispatcher : MonoBehaviour
             && inputManager.CurrentCondition == InteractionCondition.ExplicitDisplayFocus
             && gazeProvider != null)
         {
-            ray = gazeProvider.GetGazeRay();
-            return ray.direction != Vector3.zero;
+            return gazeProvider.TryGetValidGazeRay(out ray)
+                && ray.direction != Vector3.zero;
         }
 
         if (raycastPointer != null)
@@ -276,6 +1068,37 @@ public class ClickDispatcher : MonoBehaviour
 
         ray = default;
         return false;
+    }
+
+    private bool TryHandleDisplayMenuClick()
+    {
+        if (vrTaskMenuManager == null || raycastPointer == null || displayManager == null)
+        {
+            return false;
+        }
+
+        DisplayHit menuHit;
+        if (inputManager != null && inputManager.CurrentCondition == InteractionCondition.GazeRay)
+        {
+            if (!displayManager.HasCurrentRaycastHit)
+            {
+                return false;
+            }
+
+            menuHit = displayManager.CurrentRaycastHit;
+        }
+        else if (!displayManager.TryGetForemostHit(raycastPointer.CurrentRay, out menuHit))
+        {
+            return false;
+        }
+
+        if (!vrTaskMenuManager.TryHandleClick(menuHit.DisplayId, menuHit.Normalized))
+        {
+            return false;
+        }
+
+        LastClickResult = $"{menuHit.DisplayId} menu=True";
+        return true;
     }
 
     private static string Format(Vector2 value)

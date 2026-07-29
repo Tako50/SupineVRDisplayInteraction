@@ -75,6 +75,24 @@ public class DisplayManager : MonoBehaviour
         return true;
     }
 
+    public bool TryGetHitOnDisplay(DisplaySurface display, Ray ray, out DisplayHit displayHit)
+    {
+        displayHit = default;
+        if (display == null || display.TransparentHitPlane == null || ray.direction == Vector3.zero)
+        {
+            return false;
+        }
+
+        if (!display.TransparentHitPlane.Raycast(ray, out RaycastHit physicsHit, maxRayDistance))
+        {
+            return false;
+        }
+
+        Vector2 normalized = GetNormalizedFromWorldPoint(display, physicsHit.point);
+        displayHit = new DisplayHit(display, physicsHit, normalized);
+        return true;
+    }
+
     public DisplayHit[] GetDisplayHitsAll(Ray ray)
     {
         // ExplicitDisplayFocusでは重なった表示候補を全部集めるためRaycastAllを使う。
@@ -105,6 +123,95 @@ public class DisplayManager : MonoBehaviour
 
         reusableHits.Sort((left, right) => left.Distance.CompareTo(right.Distance));
         return reusableHits.ToArray();
+    }
+
+    /// <summary>
+    /// RayがどのHitPlaneにも直接当たらない場合に、表示矩形までの角度距離が最小のDisplayを返す。
+    /// preferredDisplayは境界付近の微小な視線揺れによるDisplay切替を抑えるためにだけ優先する。
+    /// </summary>
+    public bool TryGetNearestDisplayCandidate(
+        Ray ray,
+        DisplaySurface preferredDisplay,
+        float maxAngularDistanceDegrees,
+        float switchHysteresisDegrees,
+        out DisplaySurface display,
+        out Vector2 normalized,
+        out float angularDistanceDegrees)
+    {
+        display = null;
+        normalized = new Vector2(0.5f, 0.5f);
+        angularDistanceDegrees = float.PositiveInfinity;
+
+        if (ray.direction.sqrMagnitude <= Mathf.Epsilon || maxAngularDistanceDegrees < 0f)
+        {
+            return false;
+        }
+
+        if (displays == null || displays.Length == 0)
+        {
+            RefreshDisplays();
+        }
+
+        DisplaySurface bestDisplay = null;
+        Vector2 bestNormalized = normalized;
+        float bestAngle = float.PositiveInfinity;
+        Vector2 preferredNormalized = normalized;
+        float preferredAngle = float.PositiveInfinity;
+        bool preferredIsEligible = false;
+
+        for (int i = 0; i < displays.Length; i++)
+        {
+            DisplaySurface candidate = displays[i];
+            if (!IsEligibleGazeCandidate(candidate)
+                || !candidate.TryGetClosestPointToRay(
+                    ray,
+                    out Vector2 candidateNormalized,
+                    out _,
+                    out float candidateAngle))
+            {
+                continue;
+            }
+
+            if (candidate == preferredDisplay)
+            {
+                preferredNormalized = candidateNormalized;
+                preferredAngle = candidateAngle;
+                preferredIsEligible = true;
+            }
+
+            bool hasLowerAngle = candidateAngle < bestAngle - 0.0001f;
+            bool winsDeterministicTie = Mathf.Abs(candidateAngle - bestAngle) <= 0.0001f
+                && (bestDisplay == null
+                    || string.CompareOrdinal(candidate.name, bestDisplay.name) < 0);
+            if (hasLowerAngle || winsDeterministicTie)
+            {
+                bestDisplay = candidate;
+                bestNormalized = candidateNormalized;
+                bestAngle = candidateAngle;
+            }
+        }
+
+        if (bestDisplay == null || bestAngle > maxAngularDistanceDegrees)
+        {
+            return false;
+        }
+
+        float hysteresis = Mathf.Max(0f, switchHysteresisDegrees);
+        if (preferredIsEligible
+            && preferredDisplay != bestDisplay
+            && preferredAngle <= maxAngularDistanceDegrees
+            && bestAngle + hysteresis >= preferredAngle)
+        {
+            display = preferredDisplay;
+            normalized = preferredNormalized;
+            angularDistanceDegrees = preferredAngle;
+            return true;
+        }
+
+        display = bestDisplay;
+        normalized = bestNormalized;
+        angularDistanceDegrees = bestAngle;
+        return true;
     }
 
     public void SetCurrentRaycastHit(DisplayHit hit)
@@ -149,17 +256,8 @@ public class DisplayManager : MonoBehaviour
         }
 
         display.BringCursorToFront();
-
-        RectTransform canvasRect = display.WorldSpaceCanvas != null
-            ? display.WorldSpaceCanvas.GetComponent<RectTransform>()
-            : null;
-
-        Vector2 canvasSize = canvasRect != null ? canvasRect.sizeDelta : new Vector2(800f, 450f);
         // 画面外入力は表示端へ寄せ、カーソルがディスプレイ外へ消えないようにする。
-        Vector2 clamped = new Vector2(Mathf.Clamp01(normalized.x), Mathf.Clamp01(normalized.y));
-        display.Cursor.anchoredPosition = new Vector2(
-            (clamped.x - 0.5f) * canvasSize.x,
-            (clamped.y - 0.5f) * canvasSize.y);
+        display.Cursor.anchoredPosition = display.NormalizedToCanvasPosition(normalized);
     }
 
     public void SetOnlyCursorsVisible(DisplaySurface primary, DisplaySurface secondary)
@@ -292,6 +390,16 @@ public class DisplayManager : MonoBehaviour
         }
 
         return false;
+    }
+
+    private static bool IsEligibleGazeCandidate(DisplaySurface display)
+    {
+        return display != null
+            && display.isActiveAndEnabled
+            && display.gameObject.activeInHierarchy
+            && display.TransparentHitPlane != null
+            && display.TransparentHitPlane.enabled
+            && display.TransparentHitPlane.gameObject.activeInHierarchy;
     }
 }
 

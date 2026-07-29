@@ -1,0 +1,3 @@
+participantId,sessionId,taskPhase,conditionName,interactionCondition,nAttempts,nCompletedTrials,nCorrectAttempts,accuracyPerAttempt,displayErrorRate,targetErrorRate,missRate,attemptsPerCompletedTrial,meanResponseTime,medianResponseTime,sdResponseTime,minResponseTime,maxResponseTime
+P000,S000,MainTask,ConditionA,RaycastBaseline,119,106,106,0.8908,0.0084,0.1008,0.0,1.1226,0.8977,0.8145,0.3578,0.515,3.341
+P000,S000,MainTask,ConditionB,ExplicitDisplayFocus,148,144,144,0.973,0.0068,0.0203,0.0,1.0278,1.0998,1.0025,0.3273,0.668,2.631

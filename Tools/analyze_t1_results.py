@@ -2,13 +2,15 @@
 """Prototype analyzer for T1 target-selection CSV logs.
 
 Input:
-  Logs/Quest/t1_results_*.csv by default, or explicit files/directories.
+  Logs/Quest/**/*_T1_*_results_*.csv (schema v2) and
+  Logs/Quest/**/t1_results_*.csv (legacy) by default, or explicit files/directories.
 
 Output:
   Analysis/T1/cleaned_attempts.csv
   Analysis/T1/cleaned_completed_trials.csv
   Analysis/T1/summary_by_condition.csv
   Analysis/T1/summary_by_condition_display.csv
+  Analysis/T1/summary_by_condition_occlusion.csv
 """
 
 from __future__ import annotations
@@ -23,13 +25,23 @@ from statistics import mean, median, stdev
 
 EXPECTED_COLUMNS = [
     "participantId",
+    "allocationCode",
     "sessionId",
+    "runId",
+    "schemaVersion",
     "taskPhase",
     "conditionName",
     "interactionCondition",
+    "t1Task",
+    "taskOrder",
+    "methodOrder",
     "layoutPreset",
+    "sequenceSeed",
     "trialIndexInCondition",
     "globalTrialIndex",
+    "trialSetId",
+    "trialIndexInSet",
+    "occlusion_type",
     "targetDisplayId",
     "targetPositionId",
     "targetLocalX",
@@ -45,10 +57,11 @@ EXPECTED_COLUMNS = [
     "targetError",
     "miss",
     "advancesTrial",
-    "directSelect",
     "trialStartTime",
     "clickTime",
     "responseTime",
+    "controllerMovementMeters",
+    "controllerRotationDegrees",
     "timestamp",
 ]
 
@@ -59,7 +72,10 @@ def parse_args() -> argparse.Namespace:
         "inputs",
         nargs="*",
         default=["Logs/Quest"],
-        help="CSV files or directories. Directories are searched for t1_results_*.csv.",
+        help=(
+            "CSV files or directories. Directories are searched for both "
+            "*_T1_*_results_*.csv (schema v2) and t1_results_*.csv (legacy)."
+        ),
     )
     parser.add_argument(
         "--out",
@@ -79,6 +95,7 @@ def find_input_files(inputs: list[str]) -> list[Path]:
     for item in inputs:
         path = Path(item)
         if path.is_dir():
+            files.extend(sorted(path.rglob("*_T1_*_results_*.csv")))
             files.extend(sorted(path.rglob("t1_results_*.csv")))
         elif path.is_file():
             files.append(path)
@@ -104,6 +121,13 @@ def read_rows(files: list[Path], phase: str) -> list[dict[str, str]]:
 
 def normalize_row(row: dict[str, str]) -> dict[str, str]:
     normalized = {column: row.get(column, "") for column in EXPECTED_COLUMNS}
+    if not normalized.get("occlusion_type"):
+        normalized["occlusion_type"] = row.get("occlusionType", "")
+    legacy_occlusion = normalized.get("occlusion_type", "")
+    if legacy_occlusion in {"Front", "BackClear"}:
+        normalized["occlusion_type"] = "none"
+    elif legacy_occlusion == "BackOccluded":
+        normalized["occlusion_type"] = "inputOccluded"
     return normalized
 
 
@@ -141,6 +165,8 @@ def clean_attempt_rows(rows: list[dict[str, str]]) -> list[dict[str, object]]:
                 **row,
                 "trialIndexInCondition": to_int(row["trialIndexInCondition"]),
                 "globalTrialIndex": to_int(row["globalTrialIndex"]),
+                "trialSetId": to_int(row["trialSetId"]),
+                "trialIndexInSet": to_int(row["trialIndexInSet"]),
                 "targetLocalX": to_float(row["targetLocalX"]),
                 "targetLocalY": to_float(row["targetLocalY"]),
                 "targetSize": to_float(row["targetSize"]),
@@ -152,10 +178,11 @@ def clean_attempt_rows(rows: list[dict[str, str]]) -> list[dict[str, object]]:
                 "targetError": int(flag(row, "targetError")),
                 "miss": int(flag(row, "miss")),
                 "advancesTrial": int(flag(row, "advancesTrial")),
-                "directSelect": int(flag(row, "directSelect")),
                 "trialStartTime": to_float(row["trialStartTime"]),
                 "clickTime": to_float(row["clickTime"]),
                 "responseTime": to_float(row["responseTime"]),
+                "controllerMovementMeters": to_float(row["controllerMovementMeters"]),
+                "controllerRotationDegrees": to_float(row["controllerRotationDegrees"]),
             }
         )
     return cleaned
@@ -179,6 +206,8 @@ def summarize(rows: list[dict[str, object]], group_keys: list[str]) -> list[dict
         target_errors = sum(int(row.get("targetError", 0)) for row in group_rows)
         misses = sum(int(row.get("miss", 0)) for row in group_rows)
         completion_times = [float(row["responseTime"]) for row in completed if not math.isnan(float(row["responseTime"]))]
+        movement = [float(row["controllerMovementMeters"]) for row in completed if not math.isnan(float(row["controllerMovementMeters"]))]
+        rotation = [float(row["controllerRotationDegrees"]) for row in completed if not math.isnan(float(row["controllerRotationDegrees"]))]
         attempts_per_completed = attempts / len(completed) if completed else math.nan
 
         summary = {group_keys[i]: key_values[i] for i in range(len(group_keys))}
@@ -197,6 +226,8 @@ def summarize(rows: list[dict[str, object]], group_keys: list[str]) -> list[dict
                 "sdResponseTime": round_float(safe_stdev(completion_times)),
                 "minResponseTime": round_float(min(completion_times) if completion_times else math.nan),
                 "maxResponseTime": round_float(max(completion_times) if completion_times else math.nan),
+                "meanControllerMovementMeters": round_float(safe_mean(movement)),
+                "meanControllerRotationDegrees": round_float(safe_mean(rotation)),
             }
         )
         summaries.append(summary)
@@ -241,8 +272,9 @@ def main() -> int:
     write_csv(out_dir / "cleaned_attempts.csv", cleaned, cleaned_fields)
     write_csv(out_dir / "cleaned_completed_trials.csv", completed, cleaned_fields)
 
-    condition_keys = ["participantId", "sessionId", "taskPhase", "conditionName", "interactionCondition"]
+    condition_keys = ["participantId", "sessionId", "taskPhase", "t1Task", "interactionCondition"]
     display_keys = condition_keys + ["targetDisplayId"]
+    occlusion_keys = condition_keys + ["occlusion_type"]
     summary_fields = condition_keys + [
         "nAttempts",
         "nCompletedTrials",
@@ -257,11 +289,19 @@ def main() -> int:
         "sdResponseTime",
         "minResponseTime",
         "maxResponseTime",
+        "meanControllerMovementMeters",
+        "meanControllerRotationDegrees",
     ]
     display_summary_fields = display_keys + summary_fields[len(condition_keys) :]
+    occlusion_summary_fields = occlusion_keys + summary_fields[len(condition_keys) :]
 
     write_csv(out_dir / "summary_by_condition.csv", summarize(cleaned, condition_keys), summary_fields)
     write_csv(out_dir / "summary_by_condition_display.csv", summarize(cleaned, display_keys), display_summary_fields)
+    write_csv(
+        out_dir / "summary_by_condition_occlusion.csv",
+        summarize(cleaned, occlusion_keys),
+        occlusion_summary_fields,
+    )
 
     print(f"[analyze_t1_results] Input files: {len(files)}")
     print(f"[analyze_t1_results] Attempts: {len(cleaned)}")

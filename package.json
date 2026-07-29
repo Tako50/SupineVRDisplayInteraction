@@ -1,0 +1,24 @@
+{
+  "name": "t2-camp-gear-comparison-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "quest:reverse": "adb reverse tcp:5173 tcp:5173",
+    "dev:quest": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build && node scripts/package-t2-web.mjs",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "typescript": "latest",
+    "vite": "latest"
+  }
+}

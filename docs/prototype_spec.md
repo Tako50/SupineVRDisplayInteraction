@@ -65,12 +65,12 @@ Meta Quest ProのEye Trackingを原則として使用する。
 
 本研究の主張は「複数2D仮想ディスプレイにおける入力フォーカス管理」であるため、予備実験および本実験では、HMD forwardではなく実視線を用いる。視線は単なるカーソルワープではなく、入力先ディスプレイの候補取得とディスプレイ内カーソル初期位置の指定に用いる。
 
-ただし、開発初期のデバッグやEye Trackingが一時的に不安定な場合に備えて、`GazeProvider` は以下の2種類の入力源を切り替えられるようにする。
+開発初期のデバッグに備えて、`GazeProvider` は以下の2種類の入力源を明示的に切り替えられるようにする。
 
-1. 開発用フォールバック：HMDのforward方向をgaze rayとして扱う
+1. 開発用モード：HMDのforward方向をgaze rayとして扱う
 2. 実験用：Meta Quest ProのEye Tracking APIからgaze rayを取得する
 
-HMD forwardは実験評価用ではなく、実装確認・デバッグ・故障時のフォールバックに限定する。予備実験以降は、原則としてEye Tracking版でフォーカス切替・カーソルワープ・スクロール・ログ記録を行う。
+HMD forwardは実験評価用ではなく、実装確認・デバッグに限定する。実験中にEye Trackingがinvalidになった場合はHMD forwardへ自動fallbackせず、最後の有効なfocus/candidate/cursorを保持する。
 
 ```csharp
 public enum GazeSource
@@ -82,6 +82,7 @@ public enum GazeSource
 public interface IGazeProvider
 {
     Ray GetGazeRay();
+    bool TryGetValidGazeRay(out Ray ray);
     bool IsEyeTrackingAvailable();
     GazeSource CurrentGazeSource { get; }
 }
@@ -108,15 +109,14 @@ public interface IGazeProvider
 - ターゲットサイズと重畳条件を複数条件で変える
 - 操作時間、Display error、Target error、フォーカス切替回数、カーソルワープ回数を記録する
 
-### 3. Exp_FocusScroll
+### 3. T2 Web Browsing
 
-フォーカス維持・スクロールタスク用シーン。
+YouTubeと自作比較Webを並行利用する半自由タスク。
 
-- 長い疑似Webページやコメント欄を2枚のディスプレイに表示
-- 指定されたディスプレイをフォーカスし、指定項目までスクロールする
-- 視線が別ディスプレイへ移っても入力フォーカスが維持されるかを確認する
-- 一定時間または一定試行数を連続で行う
-- 誤スクロール、フォーカス維持失敗、前半・後半でのパフォーマンスと疲労変化を記録する
+- `Display_B_Back` にYouTubeページを表示
+- `Display_A_Front` に実験用の製品比較Webページを表示
+- 候補選択前にYouTubeを最低1回、再生・停止・シークする
+- 手前Webで購入候補1〜3のいずれかを選択して完了
 
 ### 3.5. Exp_AttentionFocus
 
@@ -252,7 +252,7 @@ center = HMD position + HMD forward * distance
 |---|---|---|
 | 対象指定 | 右コントローラの向き | controller rayをHitPlaneへ飛ばす |
 | カーソル移動 | controller rayの交点 | ray hit位置にカーソルを表示 |
-| クリック | Aボタンまたは右トリガー短押し | hit中のUI要素をクリック |
+| クリック | Aボタン | hit中のUI要素をクリック。右トリガー単押しではクリックしない |
 | スクロール | rayを当てた状態でスティック | hit中のディスプレイをスクロール |
 | フォーカス切替 | rayが当たったディスプレイ | 最前面hitを操作対象にする |
 
@@ -263,16 +263,18 @@ center = HMD position + HMD forward * distance
 | 操作 | 入力 | 実装 |
 |---|---|---|
 | 入力候補取得 | 視線 | gaze rayと複数Displayの交点候補を取得する |
-| ディスプレイフォーカス確定 | 右グリップ | gaze候補から入力先Displayを確定する |
-| カーソル初期配置 | 右グリップ確定時 | focus確定と同時に、該当Display内のgaze hit位置へcursorを配置する |
+| ディスプレイフォーカス更新 | 右グリップ保持 | 有効なgaze候補から入力先Displayを連続更新する |
+| カーソル再配置 | 右グリップ保持 | 該当Display内のgaze hit位置へcursorを連続配置し、release後は最後の位置を維持する |
 | カーソル微調整 | 右スティック | focus中のDisplay内で相対移動する |
-| クリック | Aボタンまたは右トリガー短押し | focus中Displayのcursor位置にあるUI要素をクリックする |
+| クリック | Aボタン | focus中Displayのcursor位置にあるUI要素をクリックする。右トリガー単押しではクリックしない |
 | スクロール | 右トリガー＋右スティック上下 | focus中Displayをスクロールする。視線が他Displayへ移っても、明示的にfocus変更されるまでは入力先を維持する |
-| フォーカス解除・再指定 | 再度右グリップ | 現在のgaze候補に基づいて入力先Displayとcursor位置を更新する |
+| フォーカス再指定 | 再度右グリップ保持 | 保持中だけ現在のgaze候補に基づいて入力先Displayとcursor位置を更新する |
 
 この条件では、コントローラの位置・向きは操作対象の指定に使わない。
 
-視線は、入力先ディスプレイ候補の取得と、ディスプレイ内カーソル初期位置の指定に使う。ただし、視線が当たっただけではフォーカスを変更しない。グリップボタンが押された時点で、現在の視線候補を入力先ディスプレイとして確定する。
+視線は、入力先ディスプレイ候補の取得と、ディスプレイ内カーソル位置の指定に使う。ただし、視線が当たっただけではフォーカスを変更しない。グリップ保持中だけfocusとcursorを連続更新し、release後は最後の有効状態を維持する。
+
+直接hitがない場合は、gaze rayから各Display矩形までの角度距離が`3.0度`以内なら最寄りDisplayを候補とし、cursorを最寄りの表示端へclampする。画面間の境界では現在のfocused/candidate Displayを`0.5度`のhysteresisで優先する。全Displayから`3.0度`を超える場合とEye Trackingがinvalidの場合は更新しない。
 
 ## 実装モジュール設計
 
@@ -281,7 +283,7 @@ center = HMD position + HMD forward * distance
 責務：
 
 - 右スティック値の取得
-- Aボタン押下の取得
+- Aボタン解放の取得
 - 右グリップ押下の取得
 - 右トリガー押下量の取得
 - 現在の操作条件を返す
@@ -290,7 +292,7 @@ center = HMD position + HMD forward * distance
 
 ```csharp
 Vector2 RightStick;
-bool AButtonDown;
+bool AButtonReleased;
 bool GripDown;
 float TriggerValue;
 bool IsTriggerPressed;
@@ -301,7 +303,8 @@ bool IsTriggerPressed;
 責務：
 
 - Eye Tracking APIからgaze rayを取得
-- HMD forwardを使った開発用フォールバックgaze rayの生成
+- HMD forwardを使った明示的な開発用gaze rayの生成
+- 実験用Eye Trackingのvalidity判定とinvalid時の更新抑止
 - gaze rayの安定化
 - gaze rayの可視化
 - gaze sourceの切替
@@ -316,6 +319,7 @@ public enum GazeSource
 }
 
 Ray GetGazeRay();
+bool TryGetValidGazeRay(out Ray ray);
 bool IsEyeTrackingAvailable();
 GazeSource CurrentGazeSource { get; }
 ```
@@ -375,11 +379,13 @@ bool IsFocused;
 - gaze rayがどのDisplay候補に当たっているか判定する
 - 視線方向上に複数Display候補がある場合、候補リストを保持する
 - 入力先Displayの確定と、Display内cursor初期位置の決定を同時に行う
-- focus確定後は、視線が別Displayへ移っても入力先Displayを維持する
-- gaze hitだけではfocusを変更せず、grip入力によってのみ入力先Displayを確定・変更する
+- gripを保持していない間は、視線が別Displayへ移っても入力先Displayを維持する
+- gaze hitだけではfocusを変更せず、grip保持中にのみ入力先Displayを連続更新する
+- 画面外3.0度以内では角度上の最寄りDisplayを候補にし、0.5度の切替hysteresisを適用する
+- Eye Tracking invalid時は最後の有効なfocus/candidate/cursorを保持し、HMD forwardを使わない
 - overlap領域では、前面ディスプレイの一時透過や候補ハイライトを行う
-- グリップ押下時にfocusを切り替える
-- focus切替時にcursorをgaze位置へwarpする
+- グリップ保持中にfocusを切り替える
+- グリップ保持中にcursorをgaze位置へ連続warpする
 
 状態：
 
@@ -397,10 +403,10 @@ FocusedLocked
 2. DisplayManagerでhit候補を取得する
 3. 候補が1つなら、そのDisplayをfocus candidateにする
 4. 候補が複数なら、近方Display/遠方Displayの候補を記録し、必要に応じて前面Displayを半透明化する
-5. gripが押されたら、現在の視線候補から入力先Displayを確定する。gaze hitだけではfocusを変更しない
-6. focus変更と同時に、該当Display内のgaze hit位置へcursorを初期配置する
-7. focus確定後はFocusedLocked状態になり、stick / click / scrollはfocus中Displayへ送る
-8. 視線が別Displayへ移っても、gripで再指定されるまでは入力先Displayを維持する
+5. 直接hitがなければ3.0度以内の最寄りDisplay矩形を候補にし、0.5度の切替hysteresisを適用する
+6. grip保持中は、有効な視線候補から入力先Displayとcursor位置を連続更新する
+7. grip release後は最後の有効状態を維持し、stick / click / scrollはfocus中Displayへ送る
+8. Eye Tracking invalid時は更新せず、HMD forwardへfallbackしない
 
 初期値案：
 
@@ -414,7 +420,7 @@ FocusedLocked
 責務：
 
 - focus中Displayのcursor座標を保持
-- grip確定時にgaze位置へwarp
+- grip保持中にFocusManagerから渡された有効gaze位置へwarp
 - stick入力でcursorを相対移動
 - Display範囲外へ出ないようにclamp
 - カーソル速度を調整
@@ -432,10 +438,10 @@ cursor = clamp(cursor, displayRect)
 
 責務：
 
-- Aボタン押下または右トリガー短押しを検出
+- Aボタン押下を検出する。右トリガー単押しはクリックとして扱わない
 - 現在の条件に応じてクリック位置を決める
 - ベースラインではray hit位置
-- 提案手法ではvirtual cursor位置。右トリガー＋スティック上下でスクロールした場合、トリガーを離してもクリック扱いにしない
+- 提案手法ではvirtual cursor位置。右トリガーはスクロール修飾入力としてのみ扱う
 - UI要素またはタスクターゲットへクリックイベントを送る
 - ミスクリックをLoggerへ送る
 
@@ -497,6 +503,10 @@ enum InteractionCondition
 
 - 2枚のディスプレイを切り替えながら、指定ターゲットをクリックする性能を測る。
 - Display error と Target error を分けて測る。
+- Task A（左右）、Task B（前後・入力遮蔽なし）、Task C（前後・入力遮蔽あり）を比較する。
+- 割り当てられた操作手法で各タスクのブロックを96試行（2 displays x 6 positions x 2 sizes x 4 cycles）実施し、T1本番全体を288試行とする。
+- 各Displayの候補位置は `x=0.10/0.50/0.90`、`y=0.20/0.80`、サイズは1.5度/3度とする。
+- Task Cの奥側下段3点のみを `inputOccluded` として分析する。
 
 測定：
 
@@ -507,21 +517,26 @@ enum InteractionCondition
 - cursor warp count
 - cursor correction distance after warp
 - controller movement amount
+- controller rotation amount
 
-### T2: FocusScroll / フォーカス維持スクロール
+### T2: YouTube + 比較Web
 
 目的：
 
-- 指定Displayをスクロールするタスクで、誤スクロールとフォーカス維持を評価する。
-- 視線が別Displayへ移っても、入力フォーカスが維持されるかを見る。
+- 動画を流し見しながら複数Displayを継続利用する場面の使いやすさを評価する。
+- display-local操作で、controller poseやgazeへの常時依存を減らせるかを見る。
 
 測定：
 
-- scroll completion time
-- wrong display scroll count
-- focus maintenance success rate
-- scroll interruption count
-- first-half / second-half performance change
+- task duration
+- selected candidate
+- timeout時は12分でtask durationとresultを固定し、確定操作だけを継続
+- timeout後に確定した商品と確定時刻
+- YouTube play / pause / seek count
+- Web scroll / click amount
+- display switch count
+- controller movement / rotation amount
+- clutch count
 - subjective fatigue after block
 
 ### T3: AttentionFocus / 視覚的注意と入力フォーカスの分離

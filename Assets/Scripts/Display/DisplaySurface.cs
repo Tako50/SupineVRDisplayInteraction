@@ -22,39 +22,57 @@ public class DisplaySurface : MonoBehaviour
     [SerializeField] private BoxCollider transparentHitPlane;
     [SerializeField] private RectTransform cursor;
     [SerializeField] private RectTransform scrollContent;
-    [SerializeField] private RectTransform debugClickTarget;
 
     [Header("Sizing")]
-    [SerializeField] private Vector2 physicalSizeMeters = new Vector2(0.8f, 0.45f);
-    [SerializeField] private Vector2 canvasPixelSize = new Vector2(800f, 450f);
+    [SerializeField] private Vector2 physicalSizeMeters = DisplayGeometry.DefaultPhysicalSizeMeters;
+    [SerializeField] private Vector2 canvasPixelSize = DisplayGeometry.DefaultCanvasPixelSize;
+    [Tooltip("Fallback meters-per-pixel scale used only when the physical or pixel size is invalid.")]
     [SerializeField] private float canvasScale = 0.001f;
     [SerializeField] private float hitPlaneDepthMeters = 0.02f;
     [SerializeField] private Vector2 cursorPixelSize = new Vector2(10f, 10f);
 
     [Header("Debug Content")]
     [SerializeField] private DisplayContentMode contentMode = DisplayContentMode.Debug;
-    [SerializeField] private string debugTargetId = "DebugTarget";
     [SerializeField] private float scrollPixelsPerUnit = 160f;
     [SerializeField] private float maxScrollPixels = 420f;
 
+    [Header("Gaze Highlight")]
+    [SerializeField] private Color gazeHighlightColor = new Color(0.302f, 0.639f, 1f, 1f);
+    [SerializeField] private Color displayFrameColor = new Color(0.4f, 0.4f, 0.4f, 1f);
+    [Range(0f, 1f)]
+    [SerializeField] private float gazeHighlightStrength = 1f;
+    [Min(1f)]
+    [SerializeField] private float gazeHighlightBorderThicknessPixels = 6f;
+
     private float scrollOffsetPixels;
     private Image visiblePanelImage;
+    private RectTransform gazeHighlightFrame;
+    private Image[] gazeHighlightEdges;
     private Color basePanelColor = Color.white;
     private bool hasCachedBasePanelColor;
+    private bool gazeHighlighted;
+    private bool applyingOnValidate;
+    private static Sprite circleCursorSprite;
 
     public Canvas WorldSpaceCanvas => worldSpaceCanvas;
     public RectTransform VisiblePanel => visiblePanel;
     public BoxCollider TransparentHitPlane => transparentHitPlane;
     public RectTransform Cursor => cursor;
     public RectTransform ScrollContent => scrollContent;
-    public RectTransform DebugClickTarget => debugClickTarget;
     public Vector2 PhysicalSizeMeters => physicalSizeMeters;
     public Vector2 CanvasPixelSize => canvasPixelSize;
     public DisplayContentMode ContentMode => contentMode;
+    public float ScrollOffsetPixels => scrollOffsetPixels;
+    public bool IsGazeHighlighted => gazeHighlighted;
 
     private void Awake()
     {
+        EnsureDisplayPartsActive();
         CachePanelImage();
+        EnsureCursorVisual();
+        EnsureHighlightFrame();
+        ApplyHighlightFrameVisual();
+        SetHighlightFrameVisible(true);
     }
 
     public void AssignParts(Canvas canvas, RectTransform panel, BoxCollider hitPlane, RectTransform cursorRect)
@@ -63,13 +81,17 @@ public class DisplaySurface : MonoBehaviour
         visiblePanel = panel;
         transparentHitPlane = hitPlane;
         cursor = cursorRect;
+        visiblePanelImage = null;
+        gazeHighlightFrame = null;
+        gazeHighlightEdges = null;
+        hasCachedBasePanelColor = false;
+        EnsureDisplayPartsActive();
         ApplyConfiguration();
     }
 
-    public void AssignDebugContent(RectTransform contentRoot, RectTransform clickTarget)
+    public void AssignScrollContent(RectTransform contentRoot)
     {
         scrollContent = contentRoot;
-        debugClickTarget = clickTarget;
         ApplyScrollOffset();
         ApplyContentMode();
     }
@@ -91,24 +113,42 @@ public class DisplaySurface : MonoBehaviour
 
     public void SetFocusVisual(bool focused)
     {
-        CachePanelImage();
-        if (visiblePanelImage == null)
+        // 入力フォーカスの状態と視線ハイライトは独立させる。
+        if (!gazeHighlighted)
         {
-            return;
+            RestoreBasePanelColor();
+            ApplyHighlightFrameVisual();
+            SetHighlightFrameVisible(true);
         }
-
-        visiblePanelImage.color = WithAlpha(basePanelColor, basePanelColor.a);
     }
 
     public void SetCandidateVisual(bool candidate, bool overlapPreview)
     {
-        CachePanelImage();
-        if (visiblePanelImage == null)
+        // 候補管理から視線ハイライトの見た目を上書きしない。
+        if (!gazeHighlighted)
         {
+            RestoreBasePanelColor();
+            ApplyHighlightFrameVisual();
+            SetHighlightFrameVisible(true);
+        }
+    }
+
+    public void SetFocused(bool focused)
+    {
+        CachePanelImage();
+        EnsureHighlightFrame();
+        gazeHighlighted = focused;
+        RestoreBasePanelColor();
+
+        if (!focused)
+        {
+            ApplyHighlightFrameVisual();
+            SetHighlightFrameVisible(true);
             return;
         }
 
-        visiblePanelImage.color = WithAlpha(basePanelColor, basePanelColor.a);
+        ApplyHighlightFrameVisual();
+        SetHighlightFrameVisible(true);
     }
 
     public void SetSize(Vector2 sizeMeters, Vector2 pixelSize)
@@ -118,14 +158,46 @@ public class DisplaySurface : MonoBehaviour
         ApplyConfiguration();
     }
 
+    public Vector2 GetCanvasSize()
+    {
+        if (worldSpaceCanvas != null)
+        {
+            RectTransform canvasRect = worldSpaceCanvas.GetComponent<RectTransform>();
+            if (canvasRect != null && canvasRect.rect.width > 0f && canvasRect.rect.height > 0f)
+            {
+                return canvasRect.rect.size;
+            }
+        }
+
+        return DisplayGeometry.ValidPixelSize(canvasPixelSize);
+    }
+
+    public Vector2 NormalizedToCanvasPosition(Vector2 normalized)
+    {
+        Vector2 canvasSize = GetCanvasSize();
+        return new Vector2(
+            (Mathf.Clamp01(normalized.x) - 0.5f) * canvasSize.x,
+            (Mathf.Clamp01(normalized.y) - 0.5f) * canvasSize.y);
+    }
+
+    public Vector2 NormalizedToCanvasSize(Vector2 normalizedSize)
+    {
+        Vector2 canvasSize = GetCanvasSize();
+        return new Vector2(
+            Mathf.Max(0f, normalizedSize.x) * canvasSize.x,
+            Mathf.Max(0f, normalizedSize.y) * canvasSize.y);
+    }
+
     public void ApplyConfiguration()
     {
+        EnsureDisplayPartsActive();
+
         if (worldSpaceCanvas != null)
         {
             worldSpaceCanvas.renderMode = RenderMode.WorldSpace;
             worldSpaceCanvas.transform.localPosition = Vector3.zero;
             worldSpaceCanvas.transform.localRotation = Quaternion.identity;
-            worldSpaceCanvas.transform.localScale = Vector3.one * canvasScale;
+            worldSpaceCanvas.transform.localScale = ComputeCanvasScale();
 
             RectTransform canvasRect = worldSpaceCanvas.GetComponent<RectTransform>();
             if (canvasRect != null)
@@ -166,10 +238,116 @@ public class DisplaySurface : MonoBehaviour
             cursor.sizeDelta = cursorPixelSize;
             cursor.localScale = Vector3.one;
             cursor.localRotation = Quaternion.identity;
-            cursor.SetAsLastSibling();
+            EnsureCursorVisual();
+            if (!applyingOnValidate)
+            {
+                cursor.SetAsLastSibling();
+            }
         }
 
         ApplyScrollOffset();
+    }
+
+    private void EnsureDisplayPartsActive()
+    {
+        if (worldSpaceCanvas != null)
+        {
+            worldSpaceCanvas.gameObject.SetActive(true);
+        }
+
+        if (visiblePanel != null)
+        {
+            visiblePanel.gameObject.SetActive(true);
+        }
+
+        if (transparentHitPlane != null)
+        {
+            transparentHitPlane.gameObject.SetActive(true);
+        }
+    }
+
+    private Vector3 ComputeCanvasScale()
+    {
+        if (physicalSizeMeters.x <= 0f
+            || physicalSizeMeters.y <= 0f
+            || canvasPixelSize.x <= 0f
+            || canvasPixelSize.y <= 0f)
+        {
+            float fallbackScale = Mathf.Max(0.000001f, canvasScale);
+            return Vector3.one * fallbackScale;
+        }
+
+        float scaleX = physicalSizeMeters.x / canvasPixelSize.x;
+        float scaleY = physicalSizeMeters.y / canvasPixelSize.y;
+        return new Vector3(scaleX, scaleY, Mathf.Min(scaleX, scaleY));
+    }
+
+    private void EnsureCursorVisual()
+    {
+        if (cursor == null)
+        {
+            return;
+        }
+
+        Image image = cursor.GetComponent<Image>();
+        if (image == null)
+        {
+            image = cursor.gameObject.AddComponent<Image>();
+            image.color = Color.yellow;
+        }
+
+        image.color = Color.yellow;
+        image.sprite = GetCircleCursorSprite();
+        image.type = Image.Type.Simple;
+        image.preserveAspect = true;
+        image.raycastTarget = false;
+
+        Outline outline = cursor.GetComponent<Outline>();
+        if (outline != null)
+        {
+            outline.enabled = false;
+        }
+    }
+
+    private static Sprite GetCircleCursorSprite()
+    {
+        if (circleCursorSprite != null)
+        {
+            return circleCursorSprite;
+        }
+
+        const int textureSize = 64;
+        Texture2D texture = new Texture2D(textureSize, textureSize, TextureFormat.RGBA32, false)
+        {
+            name = "GeneratedCircleCursorSprite",
+            hideFlags = HideFlags.HideAndDontSave,
+            filterMode = FilterMode.Bilinear,
+            wrapMode = TextureWrapMode.Clamp
+        };
+
+        Color clear = Color.clear;
+        Color white = Color.white;
+        float center = (textureSize - 1) * 0.5f;
+        float radius = center;
+        for (int y = 0; y < textureSize; y++)
+        {
+            for (int x = 0; x < textureSize; x++)
+            {
+                float dx = x - center;
+                float dy = y - center;
+                texture.SetPixel(x, y, dx * dx + dy * dy <= radius * radius ? white : clear);
+            }
+        }
+
+        texture.Apply();
+        circleCursorSprite = Sprite.Create(
+            texture,
+            new Rect(0f, 0f, textureSize, textureSize),
+            new Vector2(0.5f, 0.5f),
+            textureSize);
+        circleCursorSprite.name = "GeneratedCircleCursorSprite";
+        circleCursorSprite.hideFlags = HideFlags.HideAndDontSave;
+        return circleCursorSprite;
     }
 
     public Vector2 WorldToNormalized(Vector3 worldPoint)
@@ -189,8 +367,29 @@ public class DisplaySurface : MonoBehaviour
     public bool TryRayToClampedNormalized(Ray ray, out Vector2 normalized)
     {
         // 視線が表示のHitPlane外を向いていても、表示平面との交点を使って一番近い端へ寄せる。
+        return TryGetClosestPointToRay(
+            ray,
+            out normalized,
+            out _,
+            out _);
+    }
+
+    /// <summary>
+    /// Rayと表示平面の交点を表示矩形へクランプし、視線から矩形までの角度距離を返す。
+    /// 画面外へ少し外れたEye Trackingを、最寄りの表示端へ救済するために使う。
+    /// </summary>
+    public bool TryGetClosestPointToRay(
+        Ray ray,
+        out Vector2 normalized,
+        out Vector3 worldPoint,
+        out float angularDistanceDegrees)
+    {
         normalized = new Vector2(0.5f, 0.5f);
-        if (physicalSizeMeters.x <= 0f || physicalSizeMeters.y <= 0f || ray.direction == Vector3.zero)
+        worldPoint = transform.position;
+        angularDistanceDegrees = float.PositiveInfinity;
+        if (physicalSizeMeters.x <= 0f
+            || physicalSizeMeters.y <= 0f
+            || ray.direction.sqrMagnitude <= Mathf.Epsilon)
         {
             return false;
         }
@@ -201,46 +400,26 @@ public class DisplaySurface : MonoBehaviour
             return false;
         }
 
-        Vector3 worldPoint = ray.GetPoint(enter);
+        Vector3 planePoint = ray.GetPoint(enter);
+        Vector3 localPoint = transform.InverseTransformPoint(planePoint);
+        float halfWidth = physicalSizeMeters.x * 0.5f;
+        float halfHeight = physicalSizeMeters.y * 0.5f;
+        Vector3 clampedLocalPoint = new Vector3(
+            Mathf.Clamp(localPoint.x, -halfWidth, halfWidth),
+            Mathf.Clamp(localPoint.y, -halfHeight, halfHeight),
+            0f);
+        worldPoint = transform.TransformPoint(clampedLocalPoint);
+
+        Vector3 directionToClosestPoint = worldPoint - ray.origin;
+        if (directionToClosestPoint.sqrMagnitude <= Mathf.Epsilon
+            || Vector3.Dot(ray.direction, directionToClosestPoint) <= 0f)
+        {
+            return false;
+        }
+
         normalized = WorldToNormalized(worldPoint);
+        angularDistanceDegrees = Vector3.Angle(ray.direction, directionToClosestPoint);
         return true;
-    }
-
-    public bool TryClickDebugTarget(Vector2 normalized, out string targetId)
-    {
-        targetId = debugTargetId;
-        if (debugClickTarget == null || worldSpaceCanvas == null || !debugClickTarget.gameObject.activeInHierarchy)
-        {
-            return false;
-        }
-
-        RectTransform canvasRect = worldSpaceCanvas.GetComponent<RectTransform>();
-        if (canvasRect == null)
-        {
-            return false;
-        }
-
-        Vector2 canvasSize = canvasRect.sizeDelta;
-        Vector2 canvasPoint = new Vector2(
-            (Mathf.Clamp01(normalized.x) - 0.5f) * canvasSize.x,
-            (Mathf.Clamp01(normalized.y) - 0.5f) * canvasSize.y);
-
-        Vector3[] worldCorners = new Vector3[4];
-        debugClickTarget.GetWorldCorners(worldCorners);
-
-        Vector2 min = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
-        Vector2 max = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
-        for (int i = 0; i < worldCorners.Length; i++)
-        {
-            Vector3 local = canvasRect.InverseTransformPoint(worldCorners[i]);
-            min = Vector2.Min(min, local);
-            max = Vector2.Max(max, local);
-        }
-
-        return canvasPoint.x >= min.x
-            && canvasPoint.x <= max.x
-            && canvasPoint.y >= min.y
-            && canvasPoint.y <= max.y;
     }
 
     public float Scroll(float stickVertical, float deltaTime)
@@ -260,6 +439,19 @@ public class DisplaySurface : MonoBehaviour
         scrollOffsetPixels = Mathf.Clamp(scrollOffsetPixels + deltaPixels, -maxScrollPixels, maxScrollPixels);
         ApplyScrollOffset();
         return scrollOffsetPixels - previous;
+    }
+
+    public void ResetScroll()
+    {
+        scrollOffsetPixels = 0f;
+        ApplyScrollOffset();
+    }
+
+    public void SetMaxScrollPixels(float value)
+    {
+        maxScrollPixels = Mathf.Max(0f, value);
+        scrollOffsetPixels = Mathf.Clamp(scrollOffsetPixels, -maxScrollPixels, maxScrollPixels);
+        ApplyScrollOffset();
     }
 
     private void ApplyScrollOffset()
@@ -296,6 +488,119 @@ public class DisplaySurface : MonoBehaviour
         }
     }
 
+    private void EnsureHighlightFrame()
+    {
+        if (visiblePanel == null)
+        {
+            return;
+        }
+
+        if (gazeHighlightFrame == null)
+        {
+            Transform existingFrame = visiblePanel.Find("GazeHighlightFrame");
+            GameObject frameObject = existingFrame != null
+                ? existingFrame.gameObject
+                : new GameObject("GazeHighlightFrame", typeof(RectTransform));
+            frameObject.transform.SetParent(visiblePanel, false);
+            gazeHighlightFrame = frameObject.GetComponent<RectTransform>();
+        }
+
+        gazeHighlightFrame.anchorMin = Vector2.zero;
+        gazeHighlightFrame.anchorMax = Vector2.one;
+        gazeHighlightFrame.offsetMin = Vector2.zero;
+        gazeHighlightFrame.offsetMax = Vector2.zero;
+        gazeHighlightFrame.pivot = new Vector2(0.5f, 0.5f);
+        gazeHighlightFrame.localScale = Vector3.one;
+        gazeHighlightFrame.localRotation = Quaternion.identity;
+        gazeHighlightFrame.SetAsLastSibling();
+
+        if (gazeHighlightEdges == null || gazeHighlightEdges.Length != 4)
+        {
+            gazeHighlightEdges = new Image[4];
+        }
+
+        gazeHighlightEdges[0] = EnsureHighlightEdge("Top", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f));
+        gazeHighlightEdges[1] = EnsureHighlightEdge("Bottom", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f));
+        gazeHighlightEdges[2] = EnsureHighlightEdge("Left", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f));
+        gazeHighlightEdges[3] = EnsureHighlightEdge("Right", new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(1f, 0.5f));
+        ApplyHighlightFrameVisual();
+    }
+
+    private Image EnsureHighlightEdge(string edgeName, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot)
+    {
+        Transform existingEdge = gazeHighlightFrame.Find(edgeName);
+        GameObject edgeObject = existingEdge != null
+            ? existingEdge.gameObject
+            : new GameObject(edgeName, typeof(RectTransform));
+        edgeObject.transform.SetParent(gazeHighlightFrame, false);
+
+        RectTransform rect = edgeObject.GetComponent<RectTransform>();
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.pivot = pivot;
+        rect.anchoredPosition = Vector2.zero;
+        rect.localScale = Vector3.one;
+        rect.localRotation = Quaternion.identity;
+
+        Image edgeImage = edgeObject.GetComponent<Image>();
+        if (edgeImage == null)
+        {
+            edgeImage = edgeObject.AddComponent<Image>();
+        }
+
+        edgeImage.raycastTarget = false;
+        return edgeImage;
+    }
+
+    private void ApplyHighlightFrameVisual()
+    {
+        if (gazeHighlightFrame == null || gazeHighlightEdges == null)
+        {
+            return;
+        }
+
+        float thickness = Mathf.Max(1f, gazeHighlightBorderThicknessPixels);
+        Color frameColor = gazeHighlighted ? gazeHighlightColor : displayFrameColor;
+        if (gazeHighlighted)
+        {
+            frameColor.a *= Mathf.Clamp01(gazeHighlightStrength);
+        }
+
+        ConfigureHighlightEdge(gazeHighlightEdges[0], new Vector2(0f, thickness), frameColor);
+        ConfigureHighlightEdge(gazeHighlightEdges[1], new Vector2(0f, thickness), frameColor);
+        ConfigureHighlightEdge(gazeHighlightEdges[2], new Vector2(thickness, 0f), frameColor);
+        ConfigureHighlightEdge(gazeHighlightEdges[3], new Vector2(thickness, 0f), frameColor);
+    }
+
+    private static void ConfigureHighlightEdge(Image edgeImage, Vector2 sizeDelta, Color color)
+    {
+        if (edgeImage == null)
+        {
+            return;
+        }
+
+        RectTransform rect = edgeImage.rectTransform;
+        rect.sizeDelta = sizeDelta;
+        edgeImage.color = color;
+    }
+
+    private void SetHighlightFrameVisible(bool visible)
+    {
+        if (gazeHighlightFrame != null)
+        {
+            gazeHighlightFrame.gameObject.SetActive(visible);
+        }
+    }
+
+    private void RestoreBasePanelColor()
+    {
+        CachePanelImage();
+        if (visiblePanelImage != null)
+        {
+            visiblePanelImage.color = WithAlpha(basePanelColor, basePanelColor.a);
+        }
+    }
+
     private static Color WithAlpha(Color color, float alpha)
     {
         color.a = alpha;
@@ -304,7 +609,17 @@ public class DisplaySurface : MonoBehaviour
 
     private void OnValidate()
     {
-        ApplyConfiguration();
-        ApplyContentMode();
+        applyingOnValidate = true;
+        try
+        {
+            ApplyConfiguration();
+            ApplyContentMode();
+            ApplyHighlightFrameVisual();
+            SetHighlightFrameVisible(gazeHighlighted);
+        }
+        finally
+        {
+            applyingOnValidate = false;
+        }
     }
 }

@@ -33,7 +33,6 @@ public class PrototypeDebugVisualizer : MonoBehaviour
     [SerializeField] private float rayLength = 4f;
     [SerializeField] private float hitPointRadius = 0.01f;
     [SerializeField] private RayVisualizationMode rayVisualizationMode = RayVisualizationMode.Hidden;
-    [SerializeField] private bool allowRuntimeRayVisualizationToggle = false;
     [SerializeField] private bool showGazeRayInGame = true;
     [SerializeField] private bool showGazeRayOnlyWhileGripHeld = true;
     [SerializeField] private float gazeRayStartOffset = 0.35f;
@@ -47,7 +46,7 @@ public class PrototypeDebugVisualizer : MonoBehaviour
     [SerializeField] private Text overlayText;
     [SerializeField] private bool showWorldConditionLabel = true;
     [SerializeField] private string worldConditionLabelAnchorDisplayId = "Display_B_Back";
-    [SerializeField] private Vector2 worldConditionLabelNormalizedAnchor = new Vector2(0.5f, 1.30f);
+    [SerializeField] private Vector2 worldConditionLabelNormalizedAnchor = new Vector2(0.5f, 1.60f);
     [SerializeField] private float worldConditionLabelForwardOffset = -0.01f;
     [SerializeField] private Vector2 worldConditionLabelSize = new Vector2(520f, 72f);
     [SerializeField] private float worldConditionLabelScale = 0.0015f;
@@ -66,7 +65,6 @@ public class PrototypeDebugVisualizer : MonoBehaviour
     private void Update()
     {
         ResolveReferences();
-        HandleRayVisualizationToggle();
         UpdateRaycastPointerVisibility();
         UpdateGazeRayVisuals();
         UpdateUnityUiOverlay();
@@ -83,16 +81,16 @@ public class PrototypeDebugVisualizer : MonoBehaviour
         }
 
         Ray controllerRay = GetControllerRay();
+        float controllerRayLength = raycastPointer != null ? raycastPointer.VisibleRayLengthMeters : rayLength;
         Gizmos.color = Color.cyan;
-        Gizmos.DrawLine(controllerRay.origin, controllerRay.origin + controllerRay.direction * rayLength);
+        Gizmos.DrawLine(controllerRay.origin, controllerRay.origin + controllerRay.direction * controllerRayLength);
         if (displayManager.TryGetForemostHit(controllerRay, out DisplayHit controllerHit))
         {
             Gizmos.DrawSphere(controllerHit.Hit.point, hitPointRadius);
         }
 
-        if (gazeProvider != null)
+        if (gazeProvider != null && gazeProvider.TryGetValidGazeRay(out Ray gazeRay))
         {
-            Ray gazeRay = gazeProvider.GetGazeRay();
             Gizmos.color = Color.magenta;
             Gizmos.DrawLine(gazeRay.origin, gazeRay.origin + gazeRay.direction * rayLength);
             DisplayHit[] gazeHits = displayManager.GetDisplayHitsAll(gazeRay);
@@ -118,8 +116,8 @@ public class PrototypeDebugVisualizer : MonoBehaviour
             return;
         }
 
-        GUI.Box(new Rect(12f, 12f, 540f, 292f), "Explicit Display Focus Debug");
-        GUI.Label(new Rect(24f, 40f, 500f, 250f), BuildOverlayText());
+        GUI.Box(new Rect(12f, 12f, 540f, 312f), "Explicit Display Focus Debug");
+        GUI.Label(new Rect(24f, 40f, 500f, 270f), BuildOverlayText());
     }
 
     private void ResolveReferences()
@@ -195,7 +193,15 @@ public class PrototypeDebugVisualizer : MonoBehaviour
         GameObject canvasObject = new GameObject("Prototype_DebugOverlayCanvas");
         canvasObject.transform.SetParent(transform, false);
         Canvas canvas = canvasObject.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        Camera overlayCamera = Camera.main;
+        canvas.renderMode = overlayCamera != null
+            ? RenderMode.ScreenSpaceCamera
+            : RenderMode.ScreenSpaceOverlay;
+        canvas.worldCamera = overlayCamera;
+        if (overlayCamera != null)
+        {
+            canvas.planeDistance = Mathf.Max(overlayCamera.nearClipPlane + 0.01f, 0.5f);
+        }
         canvas.sortingOrder = 1000;
         canvasObject.AddComponent<CanvasScaler>();
         canvasObject.AddComponent<GraphicRaycaster>();
@@ -287,7 +293,12 @@ public class PrototypeDebugVisualizer : MonoBehaviour
             return;
         }
 
-        Ray gazeRay = gazeProvider.GetGazeRay();
+        if (!gazeProvider.TryGetValidGazeRay(out Ray gazeRay))
+        {
+            SetGazeRayVisible(false);
+            return;
+        }
+
         Vector3 lineStart = gazeRay.origin + gazeRay.direction * Mathf.Max(0f, gazeRayStartOffset);
         Vector3 lineEnd = gazeRay.origin + gazeRay.direction * rayLength;
         bool hasHit = displayManager.TryGetForemostHit(gazeRay, out DisplayHit gazeHit);
@@ -332,24 +343,24 @@ public class PrototypeDebugVisualizer : MonoBehaviour
             return;
         }
 
-        raycastPointer.SetRayLineVisible(ShouldShowControllerRay());
+        if (rayVisualizationMode == RayVisualizationMode.Hidden)
+        {
+            return;
+        }
+
+        raycastPointer.SetRayVisualEnabled(ShouldEnableControllerRayVisual());
     }
 
-    private bool ShouldShowControllerRay()
+    private bool ShouldEnableControllerRayVisual()
     {
-        if (rayVisualizationMode == RayVisualizationMode.Hidden)
+        if (rayVisualizationMode == RayVisualizationMode.GazeOnly)
         {
             return false;
         }
 
-        if (rayVisualizationMode == RayVisualizationMode.ControllerOnly || rayVisualizationMode == RayVisualizationMode.Both)
-        {
-            return true;
-        }
-
-        return rayVisualizationMode == RayVisualizationMode.ConditionBased
-            && inputManager != null
-            && inputManager.CurrentCondition == InteractionCondition.RaycastBaseline;
+        return rayVisualizationMode == RayVisualizationMode.ControllerOnly
+            || rayVisualizationMode == RayVisualizationMode.Both
+            || rayVisualizationMode == RayVisualizationMode.ConditionBased;
     }
 
     private bool ShouldShowGazeRay()
@@ -383,37 +394,6 @@ public class PrototypeDebugVisualizer : MonoBehaviour
         }
 
         return true;
-    }
-
-    private void HandleRayVisualizationToggle()
-    {
-        if (!allowRuntimeRayVisualizationToggle
-            || inputManager == null
-            || !inputManager.RayVisualizationTogglePressed)
-        {
-            return;
-        }
-
-        rayVisualizationMode = NextRayVisualizationMode(rayVisualizationMode);
-        UpdateRaycastPointerVisibility();
-        Debug.Log($"[PrototypeDebugVisualizer] rayVisualizationMode={rayVisualizationMode}");
-    }
-
-    private static RayVisualizationMode NextRayVisualizationMode(RayVisualizationMode current)
-    {
-        switch (current)
-        {
-            case RayVisualizationMode.ConditionBased:
-                return RayVisualizationMode.ControllerOnly;
-            case RayVisualizationMode.ControllerOnly:
-                return RayVisualizationMode.GazeOnly;
-            case RayVisualizationMode.GazeOnly:
-                return RayVisualizationMode.Both;
-            case RayVisualizationMode.Both:
-                return RayVisualizationMode.Hidden;
-            default:
-                return RayVisualizationMode.ConditionBased;
-        }
     }
 
     public void SetRayVisualizationMode(RayVisualizationMode mode)
@@ -533,13 +513,34 @@ public class PrototypeDebugVisualizer : MonoBehaviour
 
         Transform labelTransform = worldConditionLabel.transform.parent;
         labelTransform.gameObject.SetActive(true);
-        labelTransform.position = GetWorldConditionLabelPosition(out Quaternion labelRotation);
+        Vector3 labelPosition = GetWorldConditionLabelPosition(out Quaternion labelRotation);
         labelTransform.rotation = labelRotation;
         labelTransform.localScale = Vector3.one * worldConditionLabelScale;
 
         string condition = inputManager != null ? inputManager.CurrentCondition.ToString() : "Unknown";
         string phase = focusPointingTaskManager != null ? focusPointingTaskManager.CurrentPhase.ToString() : "Dev";
-        worldConditionLabel.text = $"{phase} | {condition}";
+        string progress = focusPointingTaskManager != null
+            ? focusPointingTaskManager.MainSetProgressText
+            : string.Empty;
+        bool hasProgress = !string.IsNullOrEmpty(progress);
+        RectTransform labelRect = labelTransform as RectTransform;
+        if (labelRect != null)
+        {
+            const float progressLineHeight = 48f;
+            labelRect.sizeDelta = new Vector2(
+                worldConditionLabelSize.x,
+                worldConditionLabelSize.y + (hasProgress ? progressLineHeight : 0f));
+            if (hasProgress)
+            {
+                labelPosition -= labelRotation * Vector3.up
+                    * (progressLineHeight * worldConditionLabelScale * 0.5f);
+            }
+        }
+
+        labelTransform.position = labelPosition;
+        worldConditionLabel.text = hasProgress
+            ? $"{phase} | {condition}\n{progress}"
+            : $"{phase} | {condition}";
     }
 
     private Vector3 GetWorldConditionLabelPosition(out Quaternion rotation)
@@ -606,7 +607,9 @@ public class PrototypeDebugVisualizer : MonoBehaviour
         Ray controllerRay = GetControllerRay();
         bool hasRayHit = displayManager.TryGetForemostHit(controllerRay, out DisplayHit rayHit);
         DisplayHit gazeHit = default;
-        bool hasGazeHit = gazeProvider != null && displayManager.TryGetForemostHit(gazeProvider.GetGazeRay(), out gazeHit);
+        Ray gazeRay = default;
+        bool gazeValid = gazeProvider != null && gazeProvider.TryGetValidGazeRay(out gazeRay);
+        bool hasGazeHit = gazeValid && displayManager.TryGetForemostHit(gazeRay, out gazeHit);
         string condition = inputManager != null ? inputManager.CurrentCondition.ToString() : "Unknown";
         string focusState = focusManager != null ? focusManager.CurrentState.ToString() : "Unknown";
         string candidates = focusManager != null ? focusManager.CurrentCandidateIds : "None";
@@ -619,10 +622,19 @@ public class PrototypeDebugVisualizer : MonoBehaviour
             ? $"{eyeTrackingAdapter.IsEyeTrackingAvailable} permission={eyeTrackingAdapter.HasEyeTrackingPermission} device={eyeTrackingAdapter.LastDeviceName} tracked={eyeTrackingAdapter.LastIsTrackedValue:0.0} delta={eyeTrackingAdapter.LastForwardDeltaDegrees:0.00}"
             : "No adapter";
         string debugInput = debugInputProvider != null && debugInputProvider.IsEnabled ? "Enabled" : "Disabled";
+        string rightTrigger = inputManager != null
+            ? $"value={inputManager.TriggerValue:0.00} held={inputManager.TriggerHeld} pressed={inputManager.TriggerPressed} released={inputManager.TriggerReleased}"
+            : "No input manager";
         string lastClick = clickDispatcher != null ? clickDispatcher.LastClickResult : "None";
         string lastScroll = scrollController != null
             ? $"{scrollController.LastScrollDisplayId} {scrollController.LastScrollAmount:0.000}"
             : "None";
+        string controllerRayVisual = raycastPointer != null
+            ? $"{(raycastPointer.RayVisualEnabled ? "ON" : "OFF")} {raycastPointer.RayLengthLevel} {raycastPointer.VisibleRayLengthMeters:0.00}m"
+            : "No RaycastPointer";
+        string gazeRayState = raycastPointer != null
+            ? $"selected={(raycastPointer.GazeSelectedDisplay != null ? raycastPointer.GazeSelectedDisplay.name : "None")} valid={raycastPointer.GazeValid} pointerValid={raycastPointer.PointerValid} penetrated={raycastPointer.PenetratedDisplayIds}"
+            : "No RaycastPointer";
         string trial = focusPointingTaskManager != null && focusPointingTaskManager.IsRunning
             ? $"{focusPointingTaskManager.CurrentTrialIndex} target={focusPointingTaskManager.CurrentTargetDisplayId} {Format(focusPointingTaskManager.CurrentTargetNormalizedPosition)} size={focusPointingTaskManager.CurrentTargetSizeNormalized:0.000}"
             : "None";
@@ -631,16 +643,19 @@ public class PrototypeDebugVisualizer : MonoBehaviour
             "Explicit Display Focus Debug\n" +
             $"Condition: {condition}\n" +
             $"Ray mode: {rayVisualizationMode}\n" +
+            $"Controller ray visual: {controllerRayVisual}\n" +
+            $"GazeRay: {gazeRayState}\n" +
             $"Gaze source: configured={configuredGazeSource}, active={activeGazeSource}\n" +
             $"Eye tracking: {eyeTracking}\n" +
             $"Focus state: {focusState}\n" +
             $"Focused display: {focusedDisplay}\n" +
-            $"Gaze candidates: {candidates}\n" +
+            $"Gaze candidates: {candidates} ({BuildExplicitCandidateMode()})\n" +
             $"Gaze hit: {(hasGazeHit ? gazeHit.DisplayId + " " + Format(gazeHit.Normalized) : "None")}\n" +
             $"Controller hit: {(hasRayHit ? rayHit.DisplayId + " " + Format(rayHit.Normalized) : "None")}\n" +
             $"Cursor normalized: {cursorPosition}\n" +
             $"Layout: {layout}\n" +
             $"Debug input: {debugInput}\n" +
+            $"Right trigger: {rightTrigger}\n" +
             $"Last click: {lastClick}\n" +
             $"Last scroll: {lastScroll}\n" +
             $"FocusPointing trial: {trial}";
@@ -662,5 +677,22 @@ public class PrototypeDebugVisualizer : MonoBehaviour
     private static string Format(Vector2 value)
     {
         return $"({value.x:0.000}, {value.y:0.000})";
+    }
+
+    private string BuildExplicitCandidateMode()
+    {
+        if (focusManager == null)
+        {
+            return "Unknown";
+        }
+
+        if (!focusManager.HasValidGazeThisFrame)
+        {
+            return "invalid gaze: held";
+        }
+
+        return focusManager.CurrentCandidateUsesOffDisplaySnap
+            ? $"off-display snap {focusManager.CurrentCandidateAngularDistanceDegrees:0.00}deg"
+            : "direct";
     }
 }

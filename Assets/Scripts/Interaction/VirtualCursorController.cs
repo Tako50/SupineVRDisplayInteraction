@@ -9,10 +9,12 @@ public class VirtualCursorController : MonoBehaviour
 {
     [SerializeField] private PrototypeInputManager inputManager;
     [SerializeField] private DisplayManager displayManager;
-    [SerializeField] private GazeProvider gazeProvider;
-    [SerializeField] private float cursorSpeed = 0.55f;
+    [SerializeField] private WebViewSessionManager webViewSessionManager;
+    [Tooltip("Cursor speed in display canvas pixels per second at full stick deflection.")]
+    [SerializeField] private float cursorSpeedPixelsPerSecond = 220f;
     [SerializeField] private float deadzone = 0.08f;
-    [SerializeField] private float acceleration = 0f;
+    [Tooltip("Additional pixels per second at full stick deflection.")]
+    [SerializeField] private float accelerationPixelsPerSecond = 0f;
     [SerializeField] private bool allowStickCursorMovement = true;
     [SerializeField] private bool logCursorMovement = false;
     [SerializeField] private float cursorMoveLogInterval = 0.25f;
@@ -47,8 +49,8 @@ public class VirtualCursorController : MonoBehaviour
 
         if (inputManager.GripHeld)
         {
-            // グリップ中は視線でカーソルを置き直す。表示外ならDisplaySurface側で端へクランプされる。
-            UpdateCursorFromGaze(focusedDisplay);
+            // 視線の有効性判定、候補解決、warpはFocusManagerが同じ1サンプルで行う。
+            // Eye Trackingが無効なフレームではFocusManagerがwarpしないため、現在位置を保持する。
             displayManager.SetCursorNormalized(focusedDisplay, NormalizedPosition, true);
             return;
         }
@@ -60,35 +62,31 @@ public class VirtualCursorController : MonoBehaviour
         }
 
         Vector2 stick = inputManager.Stick;
-        if (stick.magnitude < deadzone || inputManager.TriggerHeld)
+        bool horizontalDirectWebDrag = IsHorizontalDirectWebViewDragCandidate(stick);
+        bool relativeScrollActive = inputManager.TriggerHeld
+            && !inputManager.SubmitHeld
+            && !horizontalDirectWebDrag;
+        if (stick.magnitude < deadzone || relativeScrollActive)
         {
-            // トリガー中はスクロール操作を優先し、カーソル移動と競合させない。
+            // トリガー＋上下の相対スクロール中はカーソル位置を固定する。
             stick = Vector2.zero;
         }
-
-        float speed = cursorSpeed;
-        if (acceleration > 0f)
+        else if (horizontalDirectWebDrag)
         {
-            speed += acceleration * stick.magnitude;
+            // YouTube seek barなどのWeb UI drag中は、斜め入力でバーから外れないよう水平だけ動かす。
+            stick.y = 0f;
         }
 
-        Vector2 delta = stick * speed * Time.deltaTime;
-        if (delta.sqrMagnitude > 0f)
+        float speed = cursorSpeedPixelsPerSecond;
+        if (accelerationPixelsPerSecond > 0f)
         {
-            NormalizedPosition = new Vector2(
-                Mathf.Clamp01(NormalizedPosition.x + delta.x),
-                Mathf.Clamp01(NormalizedPosition.y + delta.y));
-
-            if (logCursorMovement && Time.time - lastCursorMoveLogTime >= cursorMoveLogInterval)
-            {
-                lastCursorMoveLogTime = Time.time;
-                Debug.Log($"[VirtualCursor] moved displayId={focusedDisplay.name}, normalized={Format(NormalizedPosition)}");
-            }
+            speed += accelerationPixelsPerSecond * stick.magnitude;
         }
 
+        ApplyStickDelta(focusedDisplay, stick, speed, Time.deltaTime);
         displayManager.SetCursorNormalized(focusedDisplay, NormalizedPosition, true);
 
-        if (inputManager.SubmitPressed)
+        if (inputManager.SubmitReleased)
         {
             Debug.Log($"[VirtualCursor] condition={inputManager.CurrentCondition}, displayId={focusedDisplay.name}, normalized={Format(NormalizedPosition)}");
         }
@@ -110,24 +108,37 @@ public class VirtualCursorController : MonoBehaviour
                 : FindObjectOfType<DisplayManager>();
         }
 
-        if (gazeProvider == null)
+        if (webViewSessionManager == null)
         {
-            gazeProvider = FindObjectOfType<GazeProvider>();
+            webViewSessionManager = FindObjectOfType<WebViewSessionManager>();
         }
     }
 
-    private void UpdateCursorFromGaze(DisplaySurface focusedDisplay)
+    private bool IsHorizontalDirectWebViewDragCandidate(Vector2 stick)
     {
-        if (focusedDisplay == null || gazeProvider == null)
+        if (!inputManager.TriggerHeld || inputManager.SubmitHeld)
         {
-            return;
+            return false;
         }
 
-        Ray gazeRay = gazeProvider.GetGazeRay();
-        if (focusedDisplay.TryRayToClampedNormalized(gazeRay, out Vector2 clampedNormalized))
+        if (webViewSessionManager == null
+            || !webViewSessionManager.IsSessionRunning
+            || !webViewSessionManager.UsesDirectScrollAndSeek
+            || displayManager == null
+            || displayManager.FocusedDisplay == null)
         {
-            NormalizedPosition = clampedNormalized;
+            return false;
         }
+
+        TLabWebViewDisplayBridge bridge = displayManager.FocusedDisplay.GetComponent<TLabWebViewDisplayBridge>();
+        if (bridge == null
+            || !bridge.ConsumeExperimentInput
+            || (!bridge.IsWebViewEnabled && !bridge.IsReady))
+        {
+            return false;
+        }
+
+        return Mathf.Abs(stick.x) > Mathf.Abs(stick.y);
     }
 
     public void WarpTo(DisplaySurface display, Vector2 normalized)
@@ -143,6 +154,30 @@ public class VirtualCursorController : MonoBehaviour
     public void SetStickCursorMovementEnabled(bool enabled)
     {
         allowStickCursorMovement = enabled;
+    }
+
+    private void ApplyStickDelta(DisplaySurface display, Vector2 stick, float speed, float deltaTime)
+    {
+        Vector2 canvasSize = display != null ? display.CanvasPixelSize : Vector2.one;
+        canvasSize.x = Mathf.Max(1f, canvasSize.x);
+        canvasSize.y = Mathf.Max(1f, canvasSize.y);
+
+        Vector2 deltaPixels = stick * speed * deltaTime;
+        Vector2 delta = new Vector2(deltaPixels.x / canvasSize.x, deltaPixels.y / canvasSize.y);
+        if (delta.sqrMagnitude <= 0f)
+        {
+            return;
+        }
+
+        NormalizedPosition = new Vector2(
+            Mathf.Clamp01(NormalizedPosition.x + delta.x),
+            Mathf.Clamp01(NormalizedPosition.y + delta.y));
+
+        if (logCursorMovement && Time.time - lastCursorMoveLogTime >= cursorMoveLogInterval)
+        {
+            lastCursorMoveLogTime = Time.time;
+            Debug.Log($"[VirtualCursor] moved displayId={display.name}, normalized={Format(NormalizedPosition)}");
+        }
     }
 
     private static string Format(Vector2 value)

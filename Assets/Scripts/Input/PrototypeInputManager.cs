@@ -16,24 +16,46 @@ public class PrototypeInputManager : MonoBehaviour
     [SerializeField] private InteractionCondition currentCondition = InteractionCondition.RaycastBaseline;
     [SerializeField] private bool allowConditionToggle = true;
     [SerializeField] private float stickDeadzone = 0.08f;
+    [Header("XR Trigger")]
+    [Range(0f, 1f)]
+    [Tooltip("Analog value at which a released XR trigger becomes held.")]
+    [SerializeField] private float triggerPressThreshold = 0.45f;
+    [Range(0f, 1f)]
+    [Tooltip("Lower analog value required to release a held XR trigger. This hysteresis prevents edge flicker.")]
+    [SerializeField] private float triggerReleaseThreshold = 0.35f;
+
+    [Header("References")]
     [SerializeField] private EditorDebugInputProvider debugInputProvider;
 
     private readonly List<XRInputDevice> rightHandDevices = new List<XRInputDevice>();
+    private readonly List<XRInputDevice> leftHandDevices = new List<XRInputDevice>();
     private bool previousPrimaryButton;
     private bool previousSecondaryButton;
     private bool previousGripButton;
     private bool previousTriggerButton;
+    private bool previousLeftTriggerButton;
+    private bool previousStickClickButton;
 
     public InteractionCondition CurrentCondition => currentCondition;
     public Vector2 Stick { get; private set; }
     public bool SubmitPressed { get; private set; }
+    public bool SubmitHeld { get; private set; }
+    public bool SubmitReleased { get; private set; }
     public bool GripPressed { get; private set; }
     public bool GripHeld { get; private set; }
     public bool TriggerPressed { get; private set; }
     public bool TriggerHeld { get; private set; }
     public bool TriggerReleased { get; private set; }
+    public float TriggerValue { get; private set; }
+    public bool StickClickPressed { get; private set; }
+    public bool StickClickHeld { get; private set; }
+    public bool StickClickReleased { get; private set; }
+    public bool LeftTriggerPressed { get; private set; }
+    public bool LeftTriggerHeld { get; private set; }
+    public bool LeftTriggerReleased { get; private set; }
+    public float LeftTriggerValue { get; private set; }
+    public bool SecondaryButtonPressed { get; private set; }
     public bool ConditionTogglePressed { get; private set; }
-    public bool RayVisualizationTogglePressed { get; private set; }
     public bool ResetFocusPressed => debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.ResetFocusPressed;
     public bool DebugInputEnabled => debugInputProvider != null && debugInputProvider.IsEnabled;
     public bool IsConditionLocked { get; private set; }
@@ -98,9 +120,18 @@ public class PrototypeInputManager : MonoBehaviour
 
     private void ToggleCondition()
     {
-        SetCondition(currentCondition == InteractionCondition.RaycastBaseline
-            ? InteractionCondition.ExplicitDisplayFocus
-            : InteractionCondition.RaycastBaseline);
+        switch (currentCondition)
+        {
+            case InteractionCondition.RaycastBaseline:
+                SetCondition(InteractionCondition.GazeRay);
+                break;
+            case InteractionCondition.GazeRay:
+                SetCondition(InteractionCondition.ExplicitDisplayFocus);
+                break;
+            default:
+                SetCondition(InteractionCondition.RaycastBaseline);
+                break;
+        }
     }
 
     private void ReadInputs()
@@ -110,8 +141,11 @@ public class PrototypeInputManager : MonoBehaviour
         bool xrPrimary = false;
         bool xrSecondary = false;
         bool xrGrip = false;
+        bool xrStickClick = false;
         bool xrTriggerButton = false;
         float xrTriggerValue = 0f;
+        bool xrLeftTriggerButton = false;
+        float xrLeftTriggerValue = 0f;
 
         XRInputDevice rightHand = GetRightHandDevice();
         if (rightHand.isValid)
@@ -120,8 +154,16 @@ public class PrototypeInputManager : MonoBehaviour
             rightHand.TryGetFeatureValue(XRCommonUsages.primaryButton, out xrPrimary);
             rightHand.TryGetFeatureValue(XRCommonUsages.secondaryButton, out xrSecondary);
             rightHand.TryGetFeatureValue(XRCommonUsages.gripButton, out xrGrip);
+            rightHand.TryGetFeatureValue(XRCommonUsages.primary2DAxisClick, out xrStickClick);
             rightHand.TryGetFeatureValue(XRCommonUsages.triggerButton, out xrTriggerButton);
             rightHand.TryGetFeatureValue(XRCommonUsages.trigger, out xrTriggerValue);
+        }
+
+        XRInputDevice leftHand = GetLeftHandDevice();
+        if (leftHand.isValid)
+        {
+            leftHand.TryGetFeatureValue(XRCommonUsages.triggerButton, out xrLeftTriggerButton);
+            leftHand.TryGetFeatureValue(XRCommonUsages.trigger, out xrLeftTriggerValue);
         }
 
         Vector2 debugStick = debugInputProvider != null && debugInputProvider.IsEnabled
@@ -135,29 +177,68 @@ public class PrototypeInputManager : MonoBehaviour
             Stick = Vector2.zero;
         }
 
-        bool debugSubmit = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.SubmitPressed;
+        bool debugSubmitPressed = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.SubmitPressed;
+        bool debugSubmitHeld = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.SubmitHeld;
+        bool debugSubmitReleased = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.SubmitReleased;
         bool debugGrip = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.GripPressed;
         bool debugGripHeld = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.GripHeld;
         bool debugTriggerHeld = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.TriggerHeld;
         bool debugTriggerPressed = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.TriggerPressed;
         bool debugTriggerReleased = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.TriggerReleased;
+        bool debugStickClickPressed = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.StickClickPressed;
+        bool debugStickClickHeld = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.StickClickHeld;
+        bool debugStickClickReleased = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.StickClickReleased;
+        bool debugLeftTriggerHeld = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.ExitHeld;
+        bool debugLeftTriggerPressed = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.ExitPressed;
+        bool debugLeftTriggerReleased = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.ExitReleased;
         bool debugConditionToggle = debugInputProvider != null && debugInputProvider.IsEnabled && debugInputProvider.ToggleConditionPressed;
-        bool xrTriggerHeld = xrTriggerButton || xrTriggerValue > 0.5f;
+        bool xrTriggerHeld = ResolveTriggerHeld(xrTriggerButton, xrTriggerValue, previousTriggerButton);
+        bool xrLeftTriggerHeld = ResolveTriggerHeld(xrLeftTriggerButton, xrLeftTriggerValue, previousLeftTriggerButton);
+
+        TriggerValue = Mathf.Max(debugTriggerHeld ? 1f : 0f, xrTriggerButton ? 1f : Mathf.Clamp01(xrTriggerValue));
+        LeftTriggerValue = Mathf.Max(debugLeftTriggerHeld ? 1f : 0f, xrLeftTriggerButton ? 1f : Mathf.Clamp01(xrLeftTriggerValue));
 
         // Pressed/Released はこのフレームだけtrueになるイベントとして扱う。
-        SubmitPressed = debugSubmit || (xrPrimary && !previousPrimaryButton);
+        SubmitPressed = debugSubmitPressed || (xrPrimary && !previousPrimaryButton);
+        SubmitHeld = debugSubmitHeld || xrPrimary;
+        SubmitReleased = debugSubmitReleased || (!xrPrimary && previousPrimaryButton);
         GripPressed = debugGrip || (xrGrip && !previousGripButton);
         GripHeld = debugGripHeld || xrGrip;
         TriggerHeld = debugTriggerHeld || xrTriggerHeld;
         TriggerPressed = debugTriggerPressed || (xrTriggerHeld && !previousTriggerButton);
         TriggerReleased = debugTriggerReleased || (!xrTriggerHeld && previousTriggerButton);
-        ConditionTogglePressed = debugConditionToggle || (xrSecondary && !previousSecondaryButton);
-        RayVisualizationTogglePressed = false;
+        StickClickPressed = debugStickClickPressed || (xrStickClick && !previousStickClickButton);
+        StickClickHeld = debugStickClickHeld || xrStickClick;
+        StickClickReleased = debugStickClickReleased || (!xrStickClick && previousStickClickButton);
+        LeftTriggerHeld = debugLeftTriggerHeld || xrLeftTriggerHeld;
+        LeftTriggerPressed = debugLeftTriggerPressed || (xrLeftTriggerHeld && !previousLeftTriggerButton);
+        LeftTriggerReleased = debugLeftTriggerReleased || (!xrLeftTriggerHeld && previousLeftTriggerButton);
+        SecondaryButtonPressed = debugConditionToggle || (xrSecondary && !previousSecondaryButton);
+        ConditionTogglePressed = SecondaryButtonPressed;
 
         previousPrimaryButton = xrPrimary;
         previousSecondaryButton = xrSecondary;
         previousGripButton = xrGrip;
         previousTriggerButton = xrTriggerHeld;
+        previousLeftTriggerButton = xrLeftTriggerHeld;
+        previousStickClickButton = xrStickClick;
+    }
+
+    private bool ResolveTriggerHeld(bool triggerButton, float triggerValue, bool wasHeld)
+    {
+        float pressThreshold = Mathf.Clamp01(triggerPressThreshold);
+        float releaseThreshold = Mathf.Min(pressThreshold, Mathf.Clamp01(triggerReleaseThreshold));
+        float threshold = wasHeld ? releaseThreshold : pressThreshold;
+        return triggerButton || triggerValue >= threshold;
+    }
+
+    public void SendLeftHapticImpulse(float amplitude, float duration)
+    {
+        XRInputDevice leftHand = GetLeftHandDevice();
+        if (leftHand.isValid)
+        {
+            leftHand.SendHapticImpulse(0u, Mathf.Clamp01(amplitude), Mathf.Max(0f, duration));
+        }
     }
 
     private void ResolveReferences()
@@ -176,6 +257,16 @@ public class PrototypeInputManager : MonoBehaviour
             rightHandDevices);
 
         return rightHandDevices.Count > 0 ? rightHandDevices[0] : default;
+    }
+
+    private XRInputDevice GetLeftHandDevice()
+    {
+        leftHandDevices.Clear();
+        InputDevices.GetDevicesWithCharacteristics(
+            InputDeviceCharacteristics.Left | InputDeviceCharacteristics.Controller,
+            leftHandDevices);
+
+        return leftHandDevices.Count > 0 ? leftHandDevices[0] : default;
     }
 
 }

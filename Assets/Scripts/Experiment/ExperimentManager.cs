@@ -14,20 +14,35 @@ public class ExperimentManager : MonoBehaviour
     [SerializeField] private DisplayLayoutManager layoutManager;
     [SerializeField] private RaycastPointer raycastPointer;
     [SerializeField] private FocusManager focusManager;
+    [SerializeField] private VirtualCursorController virtualCursorController;
+    [SerializeField] private ScrollController scrollController;
+    [SerializeField] private GazeDisplayFocusManager gazeDisplayFocusManager;
     [SerializeField] private EditorDebugInputProvider debugInputProvider;
     [SerializeField] private Logger logger;
 
     [Header("Experiment State")]
     [SerializeField] private InteractionCondition startingCondition = InteractionCondition.RaycastBaseline;
-    [SerializeField] private DisplayLayoutPreset startingLayout = DisplayLayoutPreset.StrongOcclusion;
+    [SerializeField] private DisplayLayoutPreset startingLayout = DisplayLayoutPreset.UpDownDepth;
+    [SerializeField] private bool applyStartingLayoutOnStart = true;
+    [SerializeField] private bool allowLayoutSwitching = false;
     [SerializeField] private bool lockDisplaysAfterStart = true;
     [SerializeField] private float debugLogIntervalSeconds = 0.5f;
 
     private DisplayLayoutPreset currentLayout;
+    private bool currentRayVisualEnabled;
+    private RayVisualLengthLevel currentRayLengthLevel;
+    private InteractionCondition lastRayVisualCondition;
+    private bool hasAppliedRayVisualCondition;
     private float nextDebugLogTime;
 
     public InteractionCondition CurrentCondition => inputManager != null ? inputManager.CurrentCondition : startingCondition;
+    public bool HighlightEnabled => gazeDisplayFocusManager != null
+        ? gazeDisplayFocusManager.HighlightEnabled
+        : true;
     public DisplayLayoutPreset CurrentLayout => currentLayout;
+    public bool RayVisualEnabled => currentRayVisualEnabled;
+    public RayVisualLengthLevel RayLengthLevel => currentRayLengthLevel;
+    public float RayVisualLengthMeters => raycastPointer != null ? raycastPointer.VisibleRayLengthMeters : 0f;
 
     private void Awake()
     {
@@ -38,16 +53,23 @@ public class ExperimentManager : MonoBehaviour
         {
             inputManager.SetCondition(startingCondition);
         }
+
+        SetHighlightEnabled(true);
+        ApplyRayVisualForCurrentCondition();
     }
 
     private void Start()
     {
-        ApplyLayout(startingLayout);
+        if (applyStartingLayoutOnStart)
+        {
+            ApplyLayout(startingLayout);
+        }
     }
 
     private void Update()
     {
         ResolveReferences();
+        ApplyRayVisualIfConditionChanged();
         HandleKeyboardShortcuts();
         SampleDebugState();
     }
@@ -56,6 +78,12 @@ public class ExperimentManager : MonoBehaviour
     {
         // 通常は開始時HMD基準で固定。必要なときだけHMD正面リセットで配置基準を取り直す。
         currentLayout = preset;
+        if (!allowLayoutSwitching)
+        {
+            Debug.Log($"[ExperimentManager] layout switching disabled. Kept fixed display transforms. requested={preset}");
+            return;
+        }
+
         if (layoutManager != null)
         {
             if (lockDisplaysAfterStart)
@@ -71,24 +99,98 @@ public class ExperimentManager : MonoBehaviour
         Debug.Log($"[ExperimentManager] layout={preset}");
     }
 
+    public void SetApplyStartingLayoutOnStart(bool enabled)
+    {
+        applyStartingLayoutOnStart = enabled;
+    }
+
+    public void SetAllowLayoutSwitching(bool enabled)
+    {
+        allowLayoutSwitching = enabled;
+    }
+
+    public void SetHighlightEnabled(bool enabled)
+    {
+        // Highlight is fixed ON for both experiment methods.
+        enabled = true;
+        if (gazeDisplayFocusManager != null)
+        {
+            gazeDisplayFocusManager.SetHighlightEnabled(enabled);
+        }
+
+        ApplyRayVisualForCurrentCondition();
+    }
+
+    public void ApplyRayVisualForCurrentCondition()
+    {
+        bool showBaselineLongRay = CurrentCondition == InteractionCondition.RaycastBaseline
+            || CurrentCondition == InteractionCondition.GazeRay;
+        ApplyRayVisualSettings(showBaselineLongRay, RayVisualLengthLevel.Long);
+        lastRayVisualCondition = CurrentCondition;
+        hasAppliedRayVisualCondition = true;
+    }
+
+    private void ApplyRayVisualSettings(bool enabled, RayVisualLengthLevel level)
+    {
+        bool changed = currentRayVisualEnabled != enabled || currentRayLengthLevel != level;
+        currentRayVisualEnabled = enabled;
+        currentRayLengthLevel = level;
+
+        if (raycastPointer != null)
+        {
+            raycastPointer.SetRayVisualSettings(enabled, level);
+        }
+
+        if (changed)
+        {
+            Debug.Log(
+                $"[ExperimentManager] rayVisualEnabled={enabled}, "
+                + $"rayLengthLevel={level}, rayLengthMeters={RayVisualLengthMeters:0.00}");
+        }
+    }
+
+    private void ApplyRayVisualIfConditionChanged()
+    {
+        if (!HighlightEnabled)
+        {
+            SetHighlightEnabled(true);
+        }
+
+        if (!hasAppliedRayVisualCondition
+            || lastRayVisualCondition != CurrentCondition)
+        {
+            ApplyRayVisualForCurrentCondition();
+        }
+    }
+
+    public void SetInteractionAndHighlight(InteractionCondition interactionMethod, bool enabled)
+    {
+        if (inputManager != null)
+        {
+            inputManager.SetCondition(interactionMethod);
+        }
+
+        SetHighlightEnabled(enabled);
+    }
+
     private void HandleKeyboardShortcuts()
     {
-        if (debugInputProvider == null || !debugInputProvider.IsEnabled)
+        if (!allowLayoutSwitching || debugInputProvider == null || !debugInputProvider.IsEnabled)
         {
             return;
         }
 
-        if (debugInputProvider.NoOcclusionPressed)
+        if (debugInputProvider.UpDownDepthPressed)
         {
-            ApplyLayout(DisplayLayoutPreset.NoOcclusion);
+            ApplyLayout(DisplayLayoutPreset.UpDownDepth);
         }
-        else if (debugInputProvider.PartialOcclusionPressed)
+        else if (debugInputProvider.LeftRightPressed)
         {
-            ApplyLayout(DisplayLayoutPreset.PartialOcclusion);
+            ApplyLayout(DisplayLayoutPreset.LeftRight);
         }
-        else if (debugInputProvider.StrongOcclusionPressed)
+        else if (debugInputProvider.UpDownPressed)
         {
-            ApplyLayout(DisplayLayoutPreset.StrongOcclusion);
+            ApplyLayout(DisplayLayoutPreset.UpDown);
         }
     }
 
@@ -99,16 +201,68 @@ public class ExperimentManager : MonoBehaviour
             return;
         }
 
-        DisplayHit gazeHit = default;
-        bool hasGazeHit = false;
-
         bool hasRayHit = displayManager.HasCurrentRaycastHit;
         DisplayHit rayHit = hasRayHit ? displayManager.CurrentRaycastHit : default;
         Ray controllerRay = raycastPointer != null ? raycastPointer.CurrentRay : default;
 
         if (logger != null && logger.ShouldSample())
         {
-            logger.LogFrame(inputManager.CurrentCondition, currentLayout, gazeProvider.CurrentGazeSource, rayHit, hasRayHit, gazeHit, hasGazeHit, displayManager.FocusedDisplay, controllerRay.origin, controllerRay.direction);
+            bool gazeValid = gazeProvider.TryGetValidGazeRay(out Ray gazeRay);
+            DisplayHit gazeHit = default;
+            bool hasGazeHit = gazeValid
+                && displayManager.TryGetForemostHit(gazeRay, out gazeHit);
+
+            bool hasCursor = false;
+            string cursorDisplayId = "None";
+            Vector2 cursorNormalized = Vector2.zero;
+            if ((inputManager.CurrentCondition == InteractionCondition.RaycastBaseline
+                    || inputManager.CurrentCondition == InteractionCondition.GazeRay)
+                && hasRayHit)
+            {
+                hasCursor = true;
+                cursorDisplayId = rayHit.DisplayId;
+                cursorNormalized = rayHit.Normalized;
+            }
+            else if (inputManager.CurrentCondition == InteractionCondition.ExplicitDisplayFocus
+                && displayManager.FocusedDisplay != null
+                && virtualCursorController != null)
+            {
+                hasCursor = true;
+                cursorDisplayId = displayManager.FocusedDisplay.name;
+                cursorNormalized = virtualCursorController.NormalizedPosition;
+            }
+
+            logger.LogFrame(
+                inputManager.CurrentCondition,
+                currentLayout,
+                rayHit,
+                hasRayHit,
+                gazeHit,
+                hasGazeHit,
+                displayManager.FocusedDisplay,
+                cursorDisplayId,
+                cursorNormalized,
+                hasCursor,
+                controllerRay.origin,
+                controllerRay.direction);
+
+            if (inputManager.CurrentCondition == InteractionCondition.GazeRay && raycastPointer != null)
+            {
+                logger.LogGazeRayFrame(
+                    raycastPointer.GazeValid,
+                    raycastPointer.GazeHitDisplayId,
+                    raycastPointer.GazeSelectedDisplay != null ? raycastPointer.GazeSelectedDisplay.name : "None",
+                    rayHit,
+                    hasRayHit,
+                    controllerRay.origin,
+                    controllerRay.direction,
+                    raycastPointer.PenetratedDisplayIds,
+                    raycastPointer.GazeDisplaySwitchCount,
+                    raycastPointer.TriggerPressCount,
+                    scrollController != null ? scrollController.LastScrollDisplayId : "None",
+                    raycastPointer.InvalidGazePolicy,
+                    raycastPointer.GazeDisplaySwitchDwellSeconds);
+            }
         }
 
         if (Time.time >= nextDebugLogTime)
@@ -152,6 +306,21 @@ public class ExperimentManager : MonoBehaviour
         if (focusManager == null)
         {
             focusManager = FindObjectOfType<FocusManager>();
+        }
+
+        if (virtualCursorController == null)
+        {
+            virtualCursorController = FindObjectOfType<VirtualCursorController>();
+        }
+
+        if (scrollController == null)
+        {
+            scrollController = FindObjectOfType<ScrollController>();
+        }
+
+        if (gazeDisplayFocusManager == null)
+        {
+            gazeDisplayFocusManager = FindObjectOfType<GazeDisplayFocusManager>();
         }
 
         if (debugInputProvider == null)

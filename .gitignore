@@ -5,6 +5,8 @@
 [Bb]uilds/
 [Ll]ogs/
 [Uu]ser[Ss]ettings/
+*.app/
+*.apk
 
 .vs/
 .vscode/
@@ -19,8 +21,27 @@
 *.svd
 *.pdb
 *.mdb
+*.pyc
+
+Tools/__pycache__/
+docs/.Rhistory
+mono_crash.*
+nested_access.dll
+
+# Paid/trial local assets. Import locally; do not commit plugin binaries.
+Assets/Vuplex/
+Assets/Vuplex.meta
 
 .DS_Store
 Thumbs.db
+
+# T2 comparison web build artifacts
+node_modules/
+dist/
+*.tsbuildinfo
+
+# T2 local-only product images. Keep originals local; do not publish rights-sensitive assets.
+public/images/*
+!public/images/.gitkeep
 
 sysinfo.txt

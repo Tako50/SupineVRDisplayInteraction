@@ -25,11 +25,12 @@ public class EditorDebugInputProvider : MonoBehaviour
     [SerializeField] private KeyCode gripKey = KeyCode.G;
     [SerializeField] private KeyCode submitKey = KeyCode.Space;
     [SerializeField] private KeyCode triggerKey = KeyCode.LeftShift;
+    [SerializeField] private KeyCode stickClickKey = KeyCode.LeftControl;
+    [SerializeField] private KeyCode exitHoldKey = KeyCode.X;
     [SerializeField] private KeyCode resetFocusKey = KeyCode.R;
-    [SerializeField] private KeyCode noOcclusionKey = KeyCode.Alpha1;
-    [SerializeField] private KeyCode partialOcclusionKey = KeyCode.Alpha2;
-    [SerializeField] private KeyCode strongOcclusionKey = KeyCode.Alpha3;
-    [SerializeField] private KeyCode toggleRayVisualizationKey = KeyCode.V;
+    [SerializeField] private KeyCode upDownDepthKey = KeyCode.Alpha1;
+    [SerializeField] private KeyCode leftRightKey = KeyCode.Alpha2;
+    [SerializeField] private KeyCode upDownKey = KeyCode.Alpha3;
 
     [Header("Stick Keys")]
     [SerializeField] private KeyCode stickLeftKey = KeyCode.A;
@@ -45,17 +46,24 @@ public class EditorDebugInputProvider : MonoBehaviour
     public bool LogDebugInputEvents => logDebugInputEvents;
     public Vector2 Stick { get; private set; }
     public bool SubmitPressed { get; private set; }
+    public bool SubmitHeld { get; private set; }
+    public bool SubmitReleased { get; private set; }
     public bool GripPressed { get; private set; }
     public bool GripHeld { get; private set; }
     public bool TriggerPressed { get; private set; }
     public bool TriggerHeld { get; private set; }
     public bool TriggerReleased { get; private set; }
+    public bool StickClickPressed { get; private set; }
+    public bool StickClickHeld { get; private set; }
+    public bool StickClickReleased { get; private set; }
+    public bool ExitPressed { get; private set; }
+    public bool ExitHeld { get; private set; }
+    public bool ExitReleased { get; private set; }
     public bool ToggleConditionPressed { get; private set; }
     public bool ResetFocusPressed { get; private set; }
-    public bool NoOcclusionPressed { get; private set; }
-    public bool PartialOcclusionPressed { get; private set; }
-    public bool StrongOcclusionPressed { get; private set; }
-    public bool ToggleRayVisualizationPressed { get; private set; }
+    public bool UpDownDepthPressed { get; private set; }
+    public bool LeftRightPressed { get; private set; }
+    public bool UpDownPressed { get; private set; }
 
     private void Update()
     {
@@ -78,17 +86,24 @@ public class EditorDebugInputProvider : MonoBehaviour
 
         Stick = Vector2.ClampMagnitude(stick, 1f);
         SubmitPressed = GetKeyDown(submitKey);
+        SubmitHeld = GetKey(submitKey);
+        SubmitReleased = GetKeyUp(submitKey);
         GripPressed = GetKeyDown(gripKey);
         GripHeld = GetKey(gripKey);
         TriggerHeld = GetKey(triggerKey);
         TriggerPressed = GetKeyDown(triggerKey);
         TriggerReleased = GetKeyUp(triggerKey);
+        StickClickHeld = GetKey(stickClickKey);
+        StickClickPressed = GetKeyDown(stickClickKey);
+        StickClickReleased = GetKeyUp(stickClickKey);
+        ExitHeld = GetKey(exitHoldKey);
+        ExitPressed = GetKeyDown(exitHoldKey);
+        ExitReleased = GetKeyUp(exitHoldKey);
         ToggleConditionPressed = GetKeyDown(toggleConditionKey);
         ResetFocusPressed = GetKeyDown(resetFocusKey);
-        NoOcclusionPressed = GetKeyDown(noOcclusionKey);
-        PartialOcclusionPressed = GetKeyDown(partialOcclusionKey);
-        StrongOcclusionPressed = GetKeyDown(strongOcclusionKey);
-        ToggleRayVisualizationPressed = GetKeyDown(toggleRayVisualizationKey);
+        UpDownDepthPressed = GetKeyDown(upDownDepthKey);
+        LeftRightPressed = GetKeyDown(leftRightKey);
+        UpDownPressed = GetKeyDown(upDownKey);
 
         if (logDebugInputEvents)
         {
@@ -100,17 +115,24 @@ public class EditorDebugInputProvider : MonoBehaviour
     {
         Stick = Vector2.zero;
         SubmitPressed = false;
+        SubmitHeld = false;
+        SubmitReleased = false;
         GripPressed = false;
         GripHeld = false;
         TriggerHeld = false;
         TriggerPressed = false;
         TriggerReleased = false;
+        StickClickHeld = false;
+        StickClickPressed = false;
+        StickClickReleased = false;
+        ExitPressed = false;
+        ExitHeld = false;
+        ExitReleased = false;
         ToggleConditionPressed = false;
         ResetFocusPressed = false;
-        NoOcclusionPressed = false;
-        PartialOcclusionPressed = false;
-        StrongOcclusionPressed = false;
-        ToggleRayVisualizationPressed = false;
+        UpDownDepthPressed = false;
+        LeftRightPressed = false;
+        UpDownPressed = false;
     }
 
     private bool IsPlatformEnabled()
@@ -136,7 +158,12 @@ public class EditorDebugInputProvider : MonoBehaviour
 
         if (SubmitPressed)
         {
-            Debug.Log("[EditorDebugInput] AButtonDown");
+            Debug.Log("[EditorDebugInput] AButtonPressed");
+        }
+
+        if (SubmitReleased)
+        {
+            Debug.Log("[EditorDebugInput] AButtonReleased");
         }
 
         if (TriggerPressed)
@@ -149,20 +176,26 @@ public class EditorDebugInputProvider : MonoBehaviour
             Debug.Log("[EditorDebugInput] TriggerReleased");
         }
 
+        if (StickClickPressed)
+        {
+            Debug.Log("[EditorDebugInput] StickClickPressed");
+        }
+
+        if (StickClickReleased)
+        {
+            Debug.Log("[EditorDebugInput] StickClickReleased");
+        }
+
         if (ResetFocusPressed)
         {
             Debug.Log("[EditorDebugInput] Reset focus");
         }
 
-        if (NoOcclusionPressed || PartialOcclusionPressed || StrongOcclusionPressed)
+        if (UpDownDepthPressed || LeftRightPressed || UpDownPressed)
         {
             Debug.Log("[EditorDebugInput] Layout preset shortcut");
         }
 
-        if (ToggleRayVisualizationPressed)
-        {
-            Debug.Log("[EditorDebugInput] Toggle ray visualization");
-        }
     }
 
     private static bool GetKey(KeyCode keyCode)
@@ -212,6 +245,8 @@ public class EditorDebugInputProvider : MonoBehaviour
                 return keyboard.dKey;
             case KeyCode.G:
                 return keyboard.gKey;
+            case KeyCode.H:
+                return keyboard.hKey;
             case KeyCode.R:
                 return keyboard.rKey;
             case KeyCode.S:

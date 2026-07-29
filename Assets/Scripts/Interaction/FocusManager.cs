@@ -16,21 +16,47 @@ public enum FocusState
 /// </summary>
 public class FocusManager : MonoBehaviour
 {
+    [Header("References")]
     [SerializeField] private PrototypeInputManager inputManager;
     [SerializeField] private GazeProvider gazeProvider;
     [SerializeField] private DisplayManager displayManager;
     [SerializeField] private VirtualCursorController virtualCursorController;
     [SerializeField] private Logger logger;
 
+    [Header("Off-Display Gaze Assistance")]
+    [Tooltip("Maximum angular distance outside a display edge that can snap to the nearest display. A valid gaze farther away does not update focus or cursor.")]
+    [Min(0f)]
+    [SerializeField] private float offDisplaySnapMaxAngleDegrees = 3f;
+    [Tooltip("During off-display snapping, keep the current focused/candidate display until another display is closer by this angular amount.")]
+    [Min(0f)]
+    [SerializeField] private float offDisplaySwitchHysteresisDegrees = 0.5f;
+
     private DisplayHit[] currentCandidates = new DisplayHit[0];
-    private string lastCandidateIds = "None";
+    private DisplaySurface currentCandidateDisplay;
+    private Vector2 currentCandidateNormalized = new Vector2(0.5f, 0.5f);
+    private bool currentCandidateUsesOffDisplaySnap;
+    private float currentCandidateAngularDistanceDegrees;
+    private Ray currentValidGazeRay;
+    private bool hasValidGazeThisFrame;
+    private bool hasObservedGazeValidity;
+    private bool previousGazeValid;
+    private bool hasLoggedOffDisplaySnapState;
+    private bool lastLoggedOffDisplaySnapState;
+    private string lastCandidateSignature = "None|Direct";
 
     public FocusState CurrentState { get; private set; } = FocusState.NoCandidate;
-    public DisplaySurface CandidateDisplay => currentCandidates.Length > 0 ? currentCandidates[0].Display : null;
+    public DisplaySurface CandidateDisplay => currentCandidateDisplay;
     public DisplayHit PrimaryCandidate => currentCandidates.Length > 0 ? currentCandidates[0] : default;
     public DisplayHit[] CurrentCandidates => currentCandidates;
-    public string CurrentCandidateIds => DisplayManager.FormatDisplayIds(currentCandidates);
-    public bool HasCandidate => currentCandidates.Length > 0;
+    public string CurrentCandidateIds => currentCandidates.Length > 0
+        ? DisplayManager.FormatDisplayIds(currentCandidates)
+        : currentCandidateDisplay != null ? currentCandidateDisplay.name : "None";
+    public bool HasCandidate => currentCandidateDisplay != null;
+    public bool HasValidGazeThisFrame => hasValidGazeThisFrame;
+    public bool CurrentCandidateUsesOffDisplaySnap => currentCandidateUsesOffDisplaySnap;
+    public float CurrentCandidateAngularDistanceDegrees => currentCandidateAngularDistanceDegrees;
+    public float OffDisplaySnapMaxAngleDegrees => offDisplaySnapMaxAngleDegrees;
+    public float OffDisplaySwitchHysteresisDegrees => offDisplaySwitchHysteresisDegrees;
 
     private void Awake()
     {
@@ -48,8 +74,7 @@ public class FocusManager : MonoBehaviour
 
         if (inputManager.CurrentCondition != InteractionCondition.ExplicitDisplayFocus)
         {
-            currentCandidates = new DisplayHit[0];
-            CurrentState = FocusState.NoCandidate;
+            ResetCandidateState();
             displayManager.ResetDisplayVisuals();
             return;
         }
@@ -59,7 +84,17 @@ public class FocusManager : MonoBehaviour
             ClearFocus();
         }
 
-        UpdateCandidates();
+        hasValidGazeThisFrame = gazeProvider.TryGetValidGazeRay(out Ray gazeRay);
+        LogGazeValidityChange(hasValidGazeThisFrame);
+        if (!hasValidGazeThisFrame)
+        {
+            // Eye Trackingの瞬断をHMD forwardへ置き換えない。
+            // 最後の有効なfocus、candidate、cursorをそのまま保持する。
+            return;
+        }
+
+        currentValidGazeRay = gazeRay;
+        UpdateCandidates(gazeRay);
 
         if (inputManager.GripHeld)
         {
@@ -68,7 +103,7 @@ public class FocusManager : MonoBehaviour
                 Debug.Log($"[FocusManager] grip received candidates={CurrentCandidateIds}");
             }
 
-            UpdateFocusFromCurrentGaze(inputManager.GripPressed);
+            UpdateFocusFromCurrentGaze(gazeRay, inputManager.GripPressed);
         }
     }
 
@@ -104,13 +139,44 @@ public class FocusManager : MonoBehaviour
         }
     }
 
-    private void UpdateCandidates()
+    private void UpdateCandidates(Ray gazeRay)
     {
         // 視線Rayでは重なり候補を全部拾う。フォーカス済みなら候補が変わっても入力対象は変えない。
-        Ray gazeRay = gazeProvider.GetGazeRay();
+        DisplaySurface preferredDisplay = displayManager.FocusedDisplay != null
+            ? displayManager.FocusedDisplay
+            : currentCandidateDisplay;
         currentCandidates = displayManager.GetDisplayHitsAll(gazeRay);
 
-        if (currentCandidates.Length == 0)
+        if (currentCandidates.Length > 0)
+        {
+            currentCandidateDisplay = currentCandidates[0].Display;
+            currentCandidateNormalized = currentCandidates[0].Normalized;
+            currentCandidateUsesOffDisplaySnap = false;
+            currentCandidateAngularDistanceDegrees = 0f;
+        }
+        else if (displayManager.TryGetNearestDisplayCandidate(
+            gazeRay,
+            preferredDisplay,
+            offDisplaySnapMaxAngleDegrees,
+            offDisplaySwitchHysteresisDegrees,
+            out DisplaySurface nearestDisplay,
+            out Vector2 nearestNormalized,
+            out float angularDistanceDegrees))
+        {
+            currentCandidateDisplay = nearestDisplay;
+            currentCandidateNormalized = nearestNormalized;
+            currentCandidateUsesOffDisplaySnap = true;
+            currentCandidateAngularDistanceDegrees = angularDistanceDegrees;
+        }
+        else
+        {
+            currentCandidateDisplay = null;
+            currentCandidateNormalized = new Vector2(0.5f, 0.5f);
+            currentCandidateUsesOffDisplaySnap = false;
+            currentCandidateAngularDistanceDegrees = 0f;
+        }
+
+        if (!HasCandidate)
         {
             CurrentState = displayManager.FocusedDisplay != null ? FocusState.FocusedLocked : FocusState.NoCandidate;
         }
@@ -120,9 +186,9 @@ public class FocusManager : MonoBehaviour
         }
         else
         {
-            CurrentState = currentCandidates.Length == 1
-                ? FocusState.GazeOnSingleDisplay
-                : FocusState.GazeOnMultipleDisplays;
+            CurrentState = currentCandidates.Length > 1
+                ? FocusState.GazeOnMultipleDisplays
+                : FocusState.GazeOnSingleDisplay;
         }
 
         displayManager.ApplyFocusVisuals(currentCandidates, displayManager.FocusedDisplay == null);
@@ -139,27 +205,26 @@ public class FocusManager : MonoBehaviour
         LogCandidateChange(gazeRay);
     }
 
-    private void UpdateFocusFromCurrentGaze(bool logFocusEvent)
+    private void UpdateFocusFromCurrentGaze(Ray gazeRay, bool logFocusEvent)
     {
-        // Phase 3 MVPでは複数候補のうち最も近い候補を選ぶ。将来ここを候補選択UIへ差し替える。
-        if (currentCandidates.Length == 0)
+        if (!HasCandidate)
         {
             return;
         }
 
-        DisplayHit selected = SelectCandidateForFocus(currentCandidates);
-        displayManager.SetFocusedDisplay(selected.Display);
-        displayManager.SetOnlyCursorsVisible(selected.Display, null);
+        DisplaySurface selectedDisplay = currentCandidateDisplay;
+        Vector2 selectedNormalized = currentCandidateNormalized;
+        displayManager.SetFocusedDisplay(selectedDisplay);
+        displayManager.SetOnlyCursorsVisible(selectedDisplay, null);
         displayManager.ApplyFocusVisuals(null);
         CurrentState = FocusState.FocusedLocked;
 
         if (virtualCursorController != null)
         {
-            virtualCursorController.WarpTo(selected.Display, selected.Normalized);
+            virtualCursorController.WarpTo(selectedDisplay, selectedNormalized);
         }
 
-        Ray gazeRay = gazeProvider.GetGazeRay();
-        bool gazeOnDifferentDisplay = IsGazeOnDifferentDisplay(selected.Display);
+        bool gazeOnDifferentDisplay = IsGazeOnDifferentDisplay(selectedDisplay);
         if (!logFocusEvent)
         {
             return;
@@ -171,8 +236,8 @@ public class FocusManager : MonoBehaviour
                 inputManager.CurrentCondition,
                 gazeProvider.CurrentGazeSource,
                 CurrentCandidateIds,
-                selected.DisplayId,
-                selected.Normalized,
+                selectedDisplay.name,
+                selectedNormalized,
                 gazeOnDifferentDisplay,
                 gazeRay.origin,
                 gazeRay.direction);
@@ -180,15 +245,16 @@ public class FocusManager : MonoBehaviour
                 inputManager.CurrentCondition,
                 gazeProvider.CurrentGazeSource,
                 CurrentCandidateIds,
-                selected.DisplayId,
-                selected.Normalized,
+                selectedDisplay.name,
+                selectedNormalized,
                 gazeOnDifferentDisplay,
                 gazeRay.origin,
                 gazeRay.direction);
         }
         else
         {
-            Debug.Log($"[FocusManager] condition={inputManager.CurrentCondition}, focusedDisplay={selected.DisplayId}, normalized={Format(selected.Normalized)}, candidates={CurrentCandidateIds}");
+            Debug.Log(
+                $"[FocusManager] condition={inputManager.CurrentCondition}, focusedDisplay={selectedDisplay.name}, normalized={Format(selectedNormalized)}, candidates={CurrentCandidateIds}, acquisition={GetCandidateAcquisitionLabel()}");
         }
     }
 
@@ -202,18 +268,21 @@ public class FocusManager : MonoBehaviour
         displayManager.SetFocusedDisplay(null);
         displayManager.HideAllCursors();
         displayManager.ApplyFocusVisuals(currentCandidates);
-        CurrentState = currentCandidates.Length == 0
+        CurrentState = !HasCandidate
             ? FocusState.NoCandidate
-            : currentCandidates.Length == 1
-                ? FocusState.GazeOnSingleDisplay
-                : FocusState.GazeOnMultipleDisplays;
+            : currentCandidates.Length > 1
+                ? FocusState.GazeOnMultipleDisplays
+                : FocusState.GazeOnSingleDisplay;
 
         Debug.Log("[FocusManager] focus cleared");
     }
 
     public void ForceRefocusFromCurrentGazeCandidate()
     {
-        UpdateFocusFromCurrentGaze(true);
+        if (hasValidGazeThisFrame)
+        {
+            UpdateFocusFromCurrentGaze(currentValidGazeRay, true);
+        }
     }
 
     public string GetFocusedDisplayId()
@@ -232,30 +301,27 @@ public class FocusManager : MonoBehaviour
         return CurrentState;
     }
 
-    private static DisplayHit SelectCandidateForFocus(DisplayHit[] candidates)
-    {
-        return candidates[0];
-    }
-
     public bool IsGazeOnDifferentDisplay(DisplaySurface focusedDisplay)
     {
-        if (focusedDisplay == null || currentCandidates.Length == 0)
+        if (focusedDisplay == null || !HasCandidate)
         {
             return false;
         }
 
-        return currentCandidates[0].Display != null && currentCandidates[0].Display != focusedDisplay;
+        return currentCandidateDisplay != focusedDisplay;
     }
 
     private void LogCandidateChange(Ray gazeRay)
     {
         string candidateIds = CurrentCandidateIds;
-        if (candidateIds == lastCandidateIds)
+        string acquisitionMode = currentCandidateUsesOffDisplaySnap ? "OffDisplaySnap" : "Direct";
+        string candidateSignature = $"{candidateIds}|{acquisitionMode}";
+        if (candidateSignature == lastCandidateSignature)
         {
             return;
         }
 
-        lastCandidateIds = candidateIds;
+        lastCandidateSignature = candidateSignature;
         if (logger != null)
         {
             logger.LogExplicitCandidateUpdate(
@@ -270,8 +336,67 @@ public class FocusManager : MonoBehaviour
         }
         else
         {
-            Debug.Log($"[FocusManager] state={CurrentState}, candidates={candidateIds}");
+            Debug.Log(
+                $"[FocusManager] state={CurrentState}, candidates={candidateIds}, acquisition={GetCandidateAcquisitionLabel()}");
         }
+
+        if (!hasLoggedOffDisplaySnapState
+            || lastLoggedOffDisplaySnapState != currentCandidateUsesOffDisplaySnap)
+        {
+            bool shouldLogTransition = hasLoggedOffDisplaySnapState || currentCandidateUsesOffDisplaySnap;
+            hasLoggedOffDisplaySnapState = true;
+            lastLoggedOffDisplaySnapState = currentCandidateUsesOffDisplaySnap;
+            if (shouldLogTransition && logger != null)
+            {
+                logger.LogEvent(
+                    currentCandidateUsesOffDisplaySnap
+                        ? "OffDisplayGazeSnapStarted"
+                        : "OffDisplayGazeSnapEnded",
+                    inputManager.CurrentCondition,
+                    currentCandidateDisplay != null ? currentCandidateDisplay.name : "None",
+                    currentCandidateNormalized);
+            }
+        }
+    }
+
+    private void LogGazeValidityChange(bool gazeValid)
+    {
+        if (hasObservedGazeValidity && previousGazeValid == gazeValid)
+        {
+            return;
+        }
+
+        hasObservedGazeValidity = true;
+        previousGazeValid = gazeValid;
+        if (logger != null)
+        {
+            logger.LogEvent(
+                gazeValid ? "ExplicitGazeValid" : "ExplicitGazeInvalidHold",
+                inputManager.CurrentCondition,
+                currentCandidateDisplay != null ? currentCandidateDisplay.name : "None",
+                currentCandidateNormalized);
+        }
+    }
+
+    private void ResetCandidateState()
+    {
+        currentCandidates = new DisplayHit[0];
+        currentCandidateDisplay = null;
+        currentCandidateNormalized = new Vector2(0.5f, 0.5f);
+        currentCandidateUsesOffDisplaySnap = false;
+        currentCandidateAngularDistanceDegrees = 0f;
+        hasValidGazeThisFrame = false;
+        hasObservedGazeValidity = false;
+        hasLoggedOffDisplaySnapState = false;
+        lastCandidateSignature = "None|Direct";
+        CurrentState = FocusState.NoCandidate;
+    }
+
+    private string GetCandidateAcquisitionLabel()
+    {
+        return currentCandidateUsesOffDisplaySnap
+            ? $"OffDisplaySnap {currentCandidateAngularDistanceDegrees:0.00}deg"
+            : "Direct";
     }
 
     private static string Format(Vector2 value)
